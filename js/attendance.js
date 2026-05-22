@@ -13,7 +13,10 @@ function attendanceView() {
         <div class="subtitle">Check in / track attendance</div>
       </div>
       <div id="attendance-self" class="card"></div>
-      <div id="attendance-pending" class="card"></div>
+      <div id="attendance-pending" class="card">
+        <div class="card-header"><h3>Pending Approvals</h3></div>
+        <div id="attendance-pending-list"><p class="text-muted small">Loading...</p></div>
+      </div>
       <div class="card">
         <div class="card-header"><h3>Today's Records</h3></div>
         <div id="attendance-today-list"><p class="text-muted small">Loading...</p></div>
