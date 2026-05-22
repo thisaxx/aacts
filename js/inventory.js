@@ -36,7 +36,6 @@ function inventoryView() {
       <div class="card">
         <div class="card-header">
           <h3>Fuel Stock</h3>
-          <button class="btn btn-sm btn-primary" id="add-fuel-type-btn">+ Add Fuel Type</button>
         </div>
         <div id="fuel-stock-inv"><p class="text-muted small">Loading...</p></div>
       </div>
@@ -112,7 +111,6 @@ function inventoryView() {
   document.getElementById('save-part-btn').addEventListener('click', onSavePart);
   document.getElementById('adj-add').addEventListener('click', () => adjustPart(1));
   document.getElementById('adj-remove').addEventListener('click', () => adjustPart(-1));
-  document.getElementById('add-fuel-type-btn').addEventListener('click', showAddFuelTypeSheet);
 
   seedParts().then(() => seedFuelStock()).then(() => {
     renderInventory();
@@ -298,46 +296,6 @@ async function renderInventory() {
   } else {
     lowEl.innerHTML = allLow.join('');
   }
-}
-
-function showAddFuelTypeSheet() {
-  showBottomSheet(`
-    <div class="card-header"><h3>Add Fuel Type</h3></div>
-    <div class="form-group">
-      <label for="new-fuel-name">Fuel Name</label>
-      <input type="text" id="new-fuel-name" placeholder="e.g. Avgas 100LL">
-    </div>
-    <div class="form-group">
-      <label for="new-fuel-id">ID (short code)</label>
-      <input type="text" id="new-fuel-id" placeholder="e.g. avgas">
-    </div>
-    <div class="form-group">
-      <label>Initial Quantity (L)</label>
-      ${stepperHTML('new-fuel-qty', 1000, 0, 99999, 100)}
-    </div>
-    <div class="form-group">
-      <label>Min Safe Level (L)</label>
-      ${stepperHTML('new-fuel-min', 200, 0, 99999, 50)}
-    </div>
-    <button class="btn btn-primary btn-block" id="confirm-add-fuel-btn">Add Fuel Type</button>
-    <button class="btn btn-secondary btn-block" id="cancel-add-fuel-btn" style="margin-top:8px">Cancel</button>
-  `);
-  initSteppers();
-  document.getElementById('confirm-add-fuel-btn').addEventListener('click', async () => {
-    const name = document.getElementById('new-fuel-name').value.trim();
-    const id = document.getElementById('new-fuel-id').value.trim().toLowerCase().replace(/\s+/g, '_');
-    const qty = parseFloat(document.getElementById('new-fuel-qty').textContent) || 0;
-    const min = parseFloat(document.getElementById('new-fuel-min').textContent) || 0;
-    if (!name || !id) { showToast('Enter name and ID', 'error'); return; }
-    const existing = await DB.get('fuel_stock', id);
-    if (existing) { showToast('Fuel type with this ID already exists', 'error'); return; }
-    await DB.put('fuel_stock', { id, name, quantityLiters: qty, minSafeLevel: min, lastUpdated: new Date().toISOString() });
-    await queueSync('fuel_stock', 'create', { id, name, quantityLiters: qty, minSafeLevel: min });
-    showToast(`Added ${name}`);
-    window.__sheetClose(true);
-    renderInventory();
-  });
-  document.getElementById('cancel-add-fuel-btn').addEventListener('click', () => window.__sheetClose(null));
 }
 
 function showRecordUsageSheet(fuelId, fuelName) {
