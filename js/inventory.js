@@ -113,8 +113,10 @@ function inventoryView() {
   document.getElementById('adj-remove').addEventListener('click', () => adjustPart(-1));
 
   seedParts().then(() => {
-    renderInventory();
-    populateAdjustSelect();
+    seedFuelStock().then(() => {
+      renderInventory();
+      populateAdjustSelect();
+    });
   });
 }
 
