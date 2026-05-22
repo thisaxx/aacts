@@ -255,7 +255,7 @@ async function dashboardView() {
       </div>` : ''}
       ${mixLow ? `<div class="status-card" style="border-color:rgba(239,68,68,0.3)">
         <div class="status-dot red"></div>
-        <div class="status-text text-red">Mix fuel low: ${mixStock.quantityLiters}L remaining (min 50L)</div>
+        <div class="status-text text-red">Mix fuel low: ${mixStock.quantityLiters}L remaining (needs at least 50L)</div>
       </div>` : ''}
 
       <div class="dashboard-grid">

@@ -181,6 +181,7 @@ async function renderInventory() {
   } else {
     fuelEl.innerHTML = fuelStocks.map(fs => {
       const low = fs.quantityLiters <= fs.minSafeLevel;
+      const mixAlert = fs.id === 'mix' && fs.quantityLiters < 50;
       return `
       <div class="fuel-stock-item ${low ? 'fuel-low' : ''}" style="margin-bottom:10px">
         <div class="fuel-stock-header" style="display:flex;justify-content:space-between;align-items:center">
@@ -203,7 +204,7 @@ async function renderInventory() {
                style="width:${Math.min(100, (fs.quantityLiters / (fs.minSafeLevel * 3)) * 100)}%"></div>
         </div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
-          Min: ${fs.minSafeLevel}L ${low ? '&mdash; <span class="text-red">LOW STOCK</span>' : ''}
+          Min: ${fs.minSafeLevel}L ${low ? '&mdash; <span class="text-red">LOW STOCK</span>' : ''} ${mixAlert ? '&mdash; <span class="text-red">Below 50L threshold</span>' : ''}
         </div>
       </div>
     `;
