@@ -881,25 +881,67 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function showExportSheet() {
   showBottomSheet(`
     <div class="card-header"><h3>Export Data</h3></div>
-    <p class="text-muted small" style="margin-bottom:14px">Download all data as JSON file for backup or analysis.</p>
-    <button class="btn btn-primary btn-block" id="export-all-btn">Export All Data</button>
+    <p class="text-muted small" style="margin-bottom:14px">Generate a sorted PDF report of all data.</p>
+    <button class="btn btn-primary btn-block" id="export-all-btn">Generate PDF Report</button>
     <button class="btn btn-secondary btn-block" id="close-export-btn" style="margin-top:8px">Close</button>
   `);
   document.getElementById('export-all-btn').addEventListener('click', async () => {
-    const stores = ['aircraft', 'flights', 'defects', 'fuel_logs', 'fuel_stock', 'maintenance_tasks', 'parts', 'users', 'attendance'];
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const stores = ['aircraft', 'flights', 'defects', 'maintenance_tasks', 'fuel_stock', 'fuel_logs', 'parts', 'users', 'attendance'];
     const data = {};
     for (const name of stores) {
       data[name] = await DB.getAll(name);
     }
-    data._exportedAt = new Date().toISOString();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `aac-export-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast('Export downloaded');
+
+    doc.setFontSize(18);
+    doc.text('AAC — Data Export', 14, 20);
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
+    doc.line(14, 32, 196, 32);
+
+    let y = 40;
+
+    for (const name of stores) {
+      const items = data[name] || [];
+      if (items.length === 0) continue;
+
+      if (y > 250) { doc.addPage(); y = 20; }
+
+      doc.setFontSize(14);
+      doc.text(name.replace(/_/g, ' ').toUpperCase(), 14, y);
+      y += 6;
+
+      const sorted = [...items].sort((a, b) => {
+        const ka = a.tailNumber || a.partNumber || a.id || a.name || '';
+        const kb = b.tailNumber || b.partNumber || b.id || b.name || '';
+        return ka.toString().localeCompare(kb.toString());
+      });
+
+      const keys = Object.keys(sorted[0]).filter(k => !k.startsWith('_'));
+      const headers = keys.map(k => k.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()));
+      const rows = sorted.map(item => keys.map(k => {
+        const v = item[k];
+        if (v === null || v === undefined) return '';
+        if (typeof v === 'object') return JSON.stringify(v);
+        return String(v);
+      }));
+
+      doc.autoTable({
+        startY: y,
+        head: [headers],
+        body: rows,
+        styles: { fontSize: 7, cellPadding: 1.5 },
+        headStyles: { fillColor: [10, 132, 255], fontSize: 7 },
+        margin: { left: 14, right: 14 },
+        tableWidth: 'auto'
+      });
+
+      y = doc.lastAutoTable.finalY + 8;
+    }
+
+    doc.save(`aac-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+    showToast('PDF report downloaded');
     window.__sheetClose(true);
   });
   document.getElementById('close-export-btn').addEventListener('click', () => window.__sheetClose(null));
