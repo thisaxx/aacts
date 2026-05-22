@@ -176,6 +176,7 @@ async function showTaskDetail(taskId) {
   task.status = 'rectified';
   task.rectifiedBy = localStorage.getItem('aac_user') || 'Technician';
   task.rectifiedAt = new Date().toISOString();
+  task.rectifiedRole = localStorage.getItem('aac_user_role') || '';
 
   await DB.put('maintenance_tasks', task);
   await queueSync('maintenance_tasks', 'update', task);
@@ -184,9 +185,15 @@ async function showTaskDetail(taskId) {
 }
 
 async function onRelease(taskId) {
+  const userRole = localStorage.getItem('aac_user_role');
+  if (userRole !== 'engineer' && userRole !== 'admin') {
+    showToast('Only engineers can release to service (CRS)', 'error');
+    return;
+  }
+
   const confirmed = await showConfirmDialog(
-    'Release to Service',
-    'Confirm you are Authorized Personnel and wish to Release to Service?'
+    'Certificate of Release to Service',
+    `Confirm you are signing as ${userRole.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} and wish to Release to Service?`
   );
   if (!confirmed) return;
 
@@ -196,6 +203,7 @@ async function onRelease(taskId) {
   task.status = 'released';
   task.releasedBy = localStorage.getItem('aac_user') || 'Authorized Personnel';
   task.releasedAt = new Date().toISOString();
+  task.releasedRole = localStorage.getItem('aac_user_role') || '';
 
   await DB.put('maintenance_tasks', task);
   await queueSync('maintenance_tasks', 'update', task);
