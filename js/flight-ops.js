@@ -344,22 +344,30 @@ async function onFlightSubmit(e) {
     showToast('Flight logged successfully');
   }
 
-  // Create after-flight inspection task
-  const inspTask = {
-    id: 'insp_' + Date.now(),
-    type: 'after-flight',
-    aircraftId: ac.tailNumber,
-    description: `After-flight inspection for ${flight.flightDate} flight (${(duration * 60).toFixed(0)} min)`,
-    priority: 'medium',
-    status: 'open',
-    notes: '',
-    rectifiedBy: '',
-    rectifiedAt: '',
-    rectifiedRole: '',
-    createdAt: new Date().toISOString()
-  };
-  await DB.put('maintenance_tasks', inspTask);
-  await queueSync('maintenance_tasks', 'create', inspTask);
+  // Create after-flight inspection only if CRS was issued today
+  const flightDate = flight.flightDate;
+  const crsToday = ac.dailyCrsDate === flightDate;
+  const releasedTasksToday = (await DB.getAll('maintenance_tasks')).filter(t =>
+    t.aircraftId === ac.tailNumber && t.status === 'released' &&
+    t.releasedAt && t.releasedAt.slice(0, 10) === flightDate
+  );
+  if (crsToday || releasedTasksToday.length > 0) {
+    const inspTask = {
+      id: 'insp_' + Date.now(),
+      type: 'after-flight',
+      aircraftId: ac.tailNumber,
+      description: `After-flight inspection for ${flight.flightDate} flight (${(duration * 60).toFixed(0)} min)`,
+      priority: 'medium',
+      status: 'open',
+      notes: '',
+      rectifiedBy: '',
+      rectifiedAt: '',
+      rectifiedRole: '',
+      createdAt: new Date().toISOString()
+    };
+    await DB.put('maintenance_tasks', inspTask);
+    await queueSync('maintenance_tasks', 'create', inspTask);
+  }
 
   document.getElementById('flight-form').reset();
   document.getElementById('flight-date').valueAsDate = new Date();
