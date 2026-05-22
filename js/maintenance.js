@@ -185,20 +185,23 @@ async function showTaskDetail(taskId) {
 }
 
 async function onRelease(taskId) {
+  const task = await DB.get('maintenance_tasks', taskId);
+  if (!task) return;
+
   const userRole = localStorage.getItem('aac_user_role');
-  if (userRole !== 'engineer' && userRole !== 'admin') {
-    showToast('Only engineers can release to service (CRS)', 'error');
+  const isAfterFlight = task.type === 'after-flight';
+  const allowedRoles = isAfterFlight ? ['engineer', 'senior_technician', 'admin'] : ['engineer', 'admin'];
+
+  if (!allowedRoles.includes(userRole)) {
+    showToast(`Only ${isAfterFlight ? 'Senior Technician or Engineer' : 'engineers'} can release to service (CRS)`, 'error');
     return;
   }
 
   const confirmed = await showConfirmDialog(
-    'Certificate of Release to Service',
-    `Confirm you are signing as ${userRole.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} and wish to Release to Service?`
+    isAfterFlight ? 'Sign After-Flight Inspection' : 'Certificate of Release to Service',
+    `Confirm you are signing as ${userRole.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}?`
   );
   if (!confirmed) return;
-
-  const task = await DB.get('maintenance_tasks', taskId);
-  if (!task) return;
 
   task.status = 'released';
   task.releasedBy = localStorage.getItem('aac_user') || 'Authorized Personnel';

@@ -1,4 +1,4 @@
-const CACHE = 'aac-v1';
+const CACHE = 'aac-v2';
 const PREFIX = '/aacts';
 const ASSETS = [
   PREFIX + '/',
@@ -16,8 +16,8 @@ const ASSETS = [
   PREFIX + '/js/attendance.js',
   PREFIX + '/manifest.json',
   PREFIX + '/img/aircraft.jpg',
-  PREFIX + '/img/icon-192.svg',
-  PREFIX + '/img/icon-512.svg'
+  PREFIX + '/img/icon-192.png',
+  PREFIX + '/img/icon-512.png'
 ];
 
 self.addEventListener('install', e => {

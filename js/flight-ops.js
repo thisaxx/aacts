@@ -105,22 +105,22 @@ function flightOpsView() {
         <div class="row">
           <div class="form-group">
             <label>Left Wing (gal)</label>
-            ${stepperHTML('fuel-before-left', 0, 0, 500, 5, true)}
+            <input type="number" id="fuel-before-left" value="0" min="0" step="1" class="form-input fuel-input">
           </div>
           <div class="form-group">
             <label>Right Wing (gal)</label>
-            ${stepperHTML('fuel-before-right', 0, 0, 500, 5, true)}
+            <input type="number" id="fuel-before-right" value="0" min="0" step="1" class="form-input fuel-input">
           </div>
         </div>
         <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px;display:block;margin:10px 0 8px">After Flight</label>
         <div class="row">
           <div class="form-group">
             <label>Left Wing (gal)</label>
-            ${stepperHTML('fuel-after-left', 0, 0, 500, 5, true)}
+            <input type="number" id="fuel-after-left" value="0" min="0" step="1" class="form-input fuel-input">
           </div>
           <div class="form-group">
             <label>Right Wing (gal)</label>
-            ${stepperHTML('fuel-after-right', 0, 0, 500, 5, true)}
+            <input type="number" id="fuel-after-right" value="0" min="0" step="1" class="form-input fuel-input">
           </div>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-muted);padding:6px 2px 0">
@@ -237,7 +237,7 @@ function updateCalcDuration() {
   updateFuelCalc();
 }
 
-function fuelVal(id) { return parseFloat(document.getElementById(id).textContent) || 0; }
+function fuelVal(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
 
 function updateFuelCalc() {
   const before = fuelVal('fuel-before-left') + fuelVal('fuel-before-right');
@@ -348,12 +348,30 @@ async function onFlightSubmit(e) {
     showToast('Flight logged successfully');
   }
 
+  // Create after-flight inspection task
+  const inspTask = {
+    id: 'insp_' + Date.now(),
+    type: 'after-flight',
+    aircraftId: ac.tailNumber,
+    description: `After-flight inspection for ${flight.flightDate} flight (${(duration * 60).toFixed(0)} min)`,
+    priority: 'medium',
+    status: 'open',
+    notes: '',
+    rectifiedBy: '',
+    rectifiedAt: '',
+    rectifiedRole: '',
+    createdAt: new Date().toISOString()
+  };
+  await DB.put('maintenance_tasks', inspTask);
+  await queueSync('maintenance_tasks', 'create', inspTask);
+
   document.getElementById('flight-form').reset();
   document.getElementById('flight-date').valueAsDate = new Date();
   document.getElementById('takeoff-time').value = '';
   document.getElementById('landing-time').value = '';
   ['fuel-before-left','fuel-before-right','fuel-after-left','fuel-after-right','refuel-amount'].forEach(id => {
-    document.getElementById(id).textContent = '0';
+    const el = document.getElementById(id);
+    if (el) el.value = 0;
   });
   document.getElementById('calc-duration').textContent = '—';
   document.getElementById('calc-consumed').textContent = '—';

@@ -148,6 +148,11 @@ async function renderDefects() {
   });
   document.querySelectorAll('.del-defect-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
+      const role = localStorage.getItem('aac_user_role');
+      if (role !== 'engineer' && role !== 'admin') {
+        showToast('Only Engineer or Admin can delete defects');
+        return;
+      }
       const id = btn.dataset.id;
       const confirmed = await showConfirmDialog('Delete Defect', 'Delete this defect permanently?');
       if (!confirmed) return;
@@ -160,6 +165,9 @@ async function renderDefects() {
 }
 
 function defectCard(defect) {
+  const role = localStorage.getItem('aac_user_role');
+  const canResolve = role === 'engineer' || role === 'senior_technician' || role === 'admin';
+  const canDelete = role === 'engineer' || role === 'admin';
   const urgencyLabel = defect.urgency === 'grounding'
     ? '<span class="badge badge-open" style="border-color:rgba(239,68,68,0.3)">GROUNDING</span>'
     : '<span class="badge badge-rectified">MONITOR</span>';
@@ -179,14 +187,19 @@ function defectCard(defect) {
       <p class="task-desc">${escHtml(defect.description)}</p>
       <p class="task-meta">Reported by ${escHtml(defect.reportedBy)} &middot; ${new Date(defect.createdAt).toLocaleDateString()}</p>
       <div class="task-actions">
-        ${defect.status === 'open' ? `<button class="btn btn-sm btn-success resolve-defect-btn" data-id="${defect.id}">Resolve</button>` : ''}
-        <button class="btn btn-sm btn-danger del-defect-btn" data-id="${defect.id}" style="padding:4px 8px;font-size:11px">&times;</button>
+        ${defect.status === 'open' && canResolve ? `<button class="btn btn-sm btn-success resolve-defect-btn" data-id="${defect.id}">Resolve</button>` : ''}
+        ${canDelete ? `<button class="btn btn-sm btn-danger del-defect-btn" data-id="${defect.id}" style="padding:4px 8px;font-size:11px">&times;</button>` : ''}
       </div>
     </div>
   `;
 }
 
 async function resolveDefect(defectId) {
+  const role = localStorage.getItem('aac_user_role');
+  if (role !== 'engineer' && role !== 'senior_technician' && role !== 'admin') {
+    showToast('Only Engineer or Senior Technician can resolve defects');
+    return;
+  }
   const confirmed = await showConfirmDialog('Resolve Defect', 'Mark this defect as rectified?');
   if (!confirmed) return;
   const defect = await DB.get('defects', defectId);

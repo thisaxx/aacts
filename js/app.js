@@ -182,6 +182,7 @@ async function dashboardView() {
   const parts = await getParts();
   const defects = await getDefects();
   const fuelStocks = await getFuelStock();
+  const userRole = localStorage.getItem('aac_user_role');
 
   const tach = ac.totalTachTime;
   const hoursSinceOil = tach - ac.lastOilChangeTach;
@@ -195,19 +196,29 @@ async function dashboardView() {
   const groundingDefects = defects.filter(d => d.urgency === 'grounding' && d.status === 'open').length;
   const lowFuels = fuelStocks.filter(fs => fs.quantityLiters <= fs.minSafeLevel).length;
 
-  let statusClass, statusLabel;
-  if (groundingDefects > 0 || minRemaining <= 0) {
+  // After-flight inspection pending
+  const afterFlightPending = tasks.filter(t => t.type === 'after-flight' && t.status === 'open').length > 0;
+  // Daily CRS check
+  const today = new Date().toISOString().slice(0, 10);
+  const crsIssuedToday = ac.dailyCrsDate === today;
+
+  let statusClass, statusLabel, statusExtra = '';
+  const reasons = [];
+  if (groundingDefects > 0) { reasons.push(`${groundingDefects} grounding defect(s)`); }
+  if (minRemaining <= 0) { reasons.push('Inspection overdue'); }
+  if (afterFlightPending) { reasons.push('After-flight inspection pending'); }
+  if (!crsIssuedToday) { reasons.push('No daily CRS issued'); }
+
+  if (reasons.length > 0) {
     statusClass = 'red'; statusLabel = 'Grounded';
+    statusExtra = ' &middot; ' + reasons.join(', ');
   } else if (minRemaining <= 5) {
     statusClass = 'orange'; statusLabel = 'Caution';
+    statusExtra = ` &middot; ${minRemaining.toFixed(1)} hrs until next inspection`;
   } else {
     statusClass = 'green'; statusLabel = 'Flightworthy';
+    statusExtra = ` &middot; All clear — CRS valid`;
   }
-
-  let statusExtra = '';
-  if (groundingDefects > 0) statusExtra = ` &middot; ${groundingDefects} grounding defect(s)`;
-  else if (minRemaining <= 0) statusExtra = ' &middot; Inspection overdue';
-  else statusExtra = ` &middot; ${minRemaining.toFixed(1)} hrs until next inspection`;
 
   app.innerHTML = `
     <div class="page">
@@ -220,6 +231,21 @@ async function dashboardView() {
         <div class="status-dot ${statusClass}"></div>
         <div class="status-text">${statusLabel}${statusExtra}</div>
       </div>
+
+      ${!crsIssuedToday && (userRole === 'engineer' || userRole === 'admin') ? `
+      <div class="card" style="border-color:rgba(10,132,255,0.2);text-align:center">
+        <button class="btn btn-primary btn-block" id="issue-daily-crs-btn">Issue Daily CRS</button>
+        <p class="text-muted small" style="margin-top:6px">Aircraft is grounded until daily CRS is issued</p>
+      </div>` : crsIssuedToday ? `
+      <div class="status-card" style="border-color:rgba(48,209,88,0.2)">
+        <div class="status-dot green"></div>
+        <div class="status-text">&#10003; Daily CRS issued today by ${escHtml(ac.dailyCrsBy || 'Engineer')}</div>
+      </div>` : ''}
+      ${afterFlightPending ? `
+      <div class="status-card" style="border-color:rgba(255,159,10,0.3)">
+        <div class="status-dot orange"></div>
+        <div class="status-text">&#9888; After-flight inspection pending &mdash; requires sign-off</div>
+      </div>` : ''}
 
       ${lowFuels > 0 ? `<div class="status-card" style="border-color:rgba(245,158,11,0.3)">
         <div class="status-dot orange"></div>
@@ -372,6 +398,21 @@ async function dashboardView() {
       dashboardView();
     });
   });
+
+  const crsBtn = document.getElementById('issue-daily-crs-btn');
+  if (crsBtn) {
+    crsBtn.addEventListener('click', async () => {
+      const confirmed = await showConfirmDialog('Issue Daily CRS', 'Confirm you are an authorized engineer and wish to issue the Certificate of Release to Service for today?');
+      if (!confirmed) return;
+      const ac = await getAircraft();
+      ac.dailyCrsDate = new Date().toISOString().slice(0, 10);
+      ac.dailyCrsBy = localStorage.getItem('aac_user') || 'Engineer';
+      await DB.put('aircraft', ac);
+      await queueSync('aircraft', 'update', ac);
+      showToast('Daily CRS issued — aircraft is flightworthy');
+      dashboardView();
+    });
+  }
 }
 
 function navigate(view) {
@@ -514,9 +555,12 @@ function profileView() {
 }
 
 function showAircraftSheet() {
+  const role = localStorage.getItem('aac_user_role');
+  const canEdit = role === 'engineer' || role === 'admin';
   showBottomSheet(`
     <div class="card-header"><h3>Manage Aircraft</h3></div>
     <div id="ac-list-sheet"></div>
+    ${canEdit ? `
     <hr>
     <div class="form-group">
       <label for="new-ac-tail">Tail Number</label>
@@ -538,12 +582,15 @@ function showAircraftSheet() {
     </div>
     <button class="btn btn-primary btn-block" id="add-ac-btn">+ Add Aircraft</button>
     <button class="btn btn-secondary btn-block" id="close-ac-btn" style="margin-top:8px">Close</button>
+    ` : `<button class="btn btn-secondary btn-block" id="close-ac-btn" style="margin-top:8px">Close</button>`}
   `);
 
-  initSteppers();
+  if (canEdit) {
+    initSteppers();
+  }
   renderACListSheet();
 
-  document.getElementById('add-ac-btn').addEventListener('click', async () => {
+  document.getElementById('add-ac-btn')?.addEventListener('click', async () => {
     const tail = document.getElementById('new-ac-tail').value.trim().toUpperCase();
     const type = document.getElementById('new-ac-type').value.trim() || 'Aircraft';
     if (!tail) { showToast('Enter a tail number', 'error'); return; }
@@ -582,6 +629,8 @@ function showAircraftSheet() {
 async function renderACListSheet() {
   const all = await getAllAircraft();
   const current = getCurrentAircraftKey();
+  const role = localStorage.getItem('aac_user_role');
+  const canEdit = role === 'engineer' || role === 'admin';
   const el = document.getElementById('ac-list-sheet');
   if (!el) return;
   if (all.length === 0) {
@@ -599,17 +648,17 @@ async function renderACListSheet() {
           <span>Engine TSO: ${(ac.engineETSO || 0).toFixed(1)}h</span>
           <span>Prop TSO: ${(ac.propellerPTSO || 0).toFixed(1)}h</span>
         </div>` : ''}
-        <div style="margin-top:6px">
+        ${canEdit ? `<div style="margin-top:6px">
           <button class="btn btn-ghost change-photo-btn" data-tail="${ac.tailNumber}" style="font-size:10px;padding:4px 10px">Change Photo</button>
-        </div>
+        </div>` : ''}
       </div>
       <div class="ac-list-actions">
         ${ac.tailNumber !== current ? `<button class="btn btn-sm btn-primary switch-ac-btn" data-tail="${ac.tailNumber}">Select</button>` : `
-          <button class="btn btn-sm btn-ghost reset-etso-btn" data-tail="${ac.tailNumber}" title="Reset Engine TSO">E</button>
-          <button class="btn btn-sm btn-ghost reset-ptso-btn" data-tail="${ac.tailNumber}" title="Reset Prop TSO">P</button>
+          ${canEdit ? `<button class="btn btn-sm btn-ghost reset-etso-btn" data-tail="${ac.tailNumber}" title="Reset Engine TSO">E</button>
+          <button class="btn btn-sm btn-ghost reset-ptso-btn" data-tail="${ac.tailNumber}" title="Reset Prop TSO">P</button>` : ''}
           <span class="badge badge-released">Current</span>
         `}
-        <button class="btn btn-sm btn-danger del-ac-btn" data-tail="${ac.tailNumber}" ${all.length <= 1 ? 'disabled' : ''}>&times;</button>
+        ${canEdit ? `<button class="btn btn-sm btn-danger del-ac-btn" data-tail="${ac.tailNumber}" ${all.length <= 1 ? 'disabled' : ''}>&times;</button>` : ''}
       </div>
     </div>
   `).join('');
