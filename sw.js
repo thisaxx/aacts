@@ -1,4 +1,4 @@
-const CACHE = 'aac-v3';
+const CACHE = 'aac-v4';
 const PREFIX = '/aacts';
 const ASSETS = [
   PREFIX + '/',
@@ -17,7 +17,8 @@ const ASSETS = [
   PREFIX + '/manifest.json',
   PREFIX + '/img/aircraft.jpg',
   PREFIX + '/img/icon-192.png',
-  PREFIX + '/img/icon-512.png'
+  PREFIX + '/img/icon-512.png',
+  PREFIX + '/firebase-messaging-sw.js'
 ];
 
 self.addEventListener('install', e => {

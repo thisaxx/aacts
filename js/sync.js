@@ -10,6 +10,7 @@ const firebaseConfig = {
 
 let db_firestore;
 let _deviceId;
+let _messaging;
 
 async function initFirebase() {
   try {
@@ -19,10 +20,34 @@ async function initFirebase() {
     await firebase.auth().signInAnonymously();
     _deviceId = firebase.auth().currentUser.uid;
     subscribeToAll();
+    initFCM();
   } catch (e) {
     console.warn('Firebase init failed — offline-only mode', e);
   }
   updateSyncBadge();
+}
+
+async function initFCM() {
+  try {
+    if ('Notification' in window && navigator.serviceWorker) {
+      const reg = await navigator.serviceWorker.register('/aacts/firebase-messaging-sw.js');
+      _messaging = firebase.messaging();
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        const token = await _messaging.getToken({ vapidKey: 'BPDOB1rrNFE1rDZF1kssXN6m3stPy6e69cpC7nFhkXrVq6vFw8kQRh3amP6nfw43X4T9qN4N-s6NoFzQrUYYN1o', serviceWorkerRegistration: reg });
+        if (token) {
+          await db_firestore.collection('fcm_tokens').doc(_deviceId).set({ token, _deviceId, _updatedAt: Date.now() }, { merge: true });
+        }
+        _messaging.onMessage(payload => {
+          if (payload.notification) {
+            showNotification(payload.notification.title, payload.notification.body);
+          }
+        });
+      }
+    }
+  } catch (e) {
+    console.warn('FCM init failed', e);
+  }
 }
 
 const FIRESTORE_COLLECTIONS = [

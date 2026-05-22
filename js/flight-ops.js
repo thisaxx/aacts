@@ -139,16 +139,12 @@ function flightOpsView() {
             <div class="form-group">
               <label for="refuel-source">Source</label>
               <select id="refuel-source">
-                <option value="Bowser 1">Bowser 1</option>
                 <option value="Main Pump">Main Pump</option>
-                <option value="Bowser 2">Bowser 2</option>
               </select>
             </div>
             <div class="form-group">
               <label for="fuel-type">Fuel Type</label>
               <select id="fuel-type">
-                <option value="avgas">Avgas 100LL</option>
-                <option value="mogas">Mogas</option>
                 <option value="mix">Mix</option>
               </select>
             </div>

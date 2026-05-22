@@ -858,6 +858,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     localStorage.setItem('aac_pin', newPin.trim());
     showToast('Pincode changed successfully');
   });
+  document.getElementById('sidebar-export').addEventListener('click', async e => {
+    e.preventDefault();
+    closeSidebar();
+    showExportSheet();
+  });
 
   updateSidebarUser();
   updateSidebarInspections();
@@ -872,3 +877,39 @@ document.addEventListener('DOMContentLoaded', async () => {
   navigate('dashboard');
   checkInspectionNotifications();
 });
+
+async function showExportSheet() {
+  showBottomSheet(`
+    <div class="card-header"><h3>Export Data</h3></div>
+    <p class="text-muted small" style="margin-bottom:14px">Download all data as JSON file for backup or analysis.</p>
+    <button class="btn btn-primary btn-block" id="export-all-btn">Export All Data</button>
+    <button class="btn btn-secondary btn-block" id="close-export-btn" style="margin-top:8px">Close</button>
+  `);
+  document.getElementById('export-all-btn').addEventListener('click', async () => {
+    const stores = ['aircraft', 'flights', 'defects', 'fuel_logs', 'fuel_stock', 'maintenance_tasks', 'parts', 'users', 'attendance'];
+    const data = {};
+    for (const name of stores) {
+      data[name] = await DB.getAll(name);
+    }
+    data._exportedAt = new Date().toISOString();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `aac-export-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Export downloaded');
+    window.__sheetClose(true);
+  });
+  document.getElementById('close-export-btn').addEventListener('click', () => window.__sheetClose(null));
+}
+
+function showNotification(title, body) {
+  const toast = document.getElementById('toast');
+  if (toast) {
+    toast.textContent = `${title}: ${body}`;
+    toast.className = 'toast show';
+    setTimeout(() => { toast.className = 'toast'; }, 4000);
+  }
+}
