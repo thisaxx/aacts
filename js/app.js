@@ -481,6 +481,14 @@ function profileView() {
     const r = document.querySelector('input[name="profile-role"]:checked')?.value;
     if (!n) { showToast('Enter your name', 'error'); return; }
     if (!r) { showToast('Select your role', 'error'); return; }
+
+    if (r === 'admin' || r === 'engineer') {
+      const pin = localStorage.getItem('aac_pin') || '1234';
+      const entered = await showPromptDialog('Pincode Required', `Enter admin pincode to set role as ${r.replace(/_/g, ' ')}:`);
+      if (entered === null) { showToast('Profile save cancelled', 'warning'); return; }
+      if (entered.trim() !== pin) { showToast('Incorrect pincode', 'error'); return; }
+    }
+
     localStorage.setItem('aac_user', n);
     localStorage.setItem('aac_user_role', r);
     const uid = localStorage.getItem('aac_user_id');
@@ -774,6 +782,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     closeSidebar();
     const confirmed = await showConfirmDialog('Reset All Data', 'This will delete ALL data including aircraft, flights, defects, parts, and fuel. Are you sure?');
     if (confirmed) await clearAllData();
+  });
+  document.getElementById('sidebar-pincode').addEventListener('click', async e => {
+    e.preventDefault();
+    closeSidebar();
+    const current = localStorage.getItem('aac_pin') || '1234';
+    const old = await showPromptDialog('Change Pincode', 'Enter current pincode:');
+    if (old === null) return;
+    if (old.trim() !== current) { showToast('Incorrect pincode', 'error'); return; }
+    const newPin = await showPromptDialog('Change Pincode', 'Enter new pincode:');
+    if (newPin === null || newPin.trim().length < 4) { showToast('Pincode must be at least 4 characters', 'error'); return; }
+    const confirmPin = await showPromptDialog('Change Pincode', 'Confirm new pincode:');
+    if (confirmPin === null || confirmPin.trim() !== newPin.trim()) { showToast('Pincodes do not match', 'error'); return; }
+    localStorage.setItem('aac_pin', newPin.trim());
+    showToast('Pincode changed successfully');
   });
 
   updateSidebarUser();
