@@ -876,7 +876,55 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   navigate('dashboard');
   checkInspectionNotifications();
+  scheduleEndOfDayCheck();
 });
+
+async function checkEndOfDayData() {
+  const today = new Date().toISOString().slice(0, 10);
+  const ac = await getAircraft();
+  const flights = await getFlights();
+  const allAttendance = await DB.getAll('attendance');
+  const allTasks = await DB.getAll('maintenance_tasks');
+  const allDefects = await DB.getAll('defects');
+
+  const missing = [];
+  const todaysFlights = flights.filter(f => f.flightDate === today);
+  if (todaysFlights.length === 0) missing.push('No flights logged today');
+
+  const todaysAttendance = allAttendance.filter(a => a.date === today);
+  if (todaysAttendance.length === 0) missing.push('No attendance check-in today');
+
+  if (ac.dailyCrsDate !== today) missing.push('Daily CRS not issued');
+
+  const openDefects = allDefects.filter(d => d.status === 'open');
+  if (openDefects.length > 0) missing.push(`${openDefects.length} open defect(s) unresolved`);
+
+  const pendingAfterFlight = allTasks.filter(t => t.type === 'after-flight' && t.status === 'open');
+  if (pendingAfterFlight.length > 0) missing.push(`${pendingAfterFlight.length} after-flight inspection(s) pending`);
+
+  return missing;
+}
+
+function scheduleEndOfDayCheck() {
+  const now = new Date();
+  const endHour = 18;
+  const target = new Date(now);
+  target.setHours(endHour, 0, 0, 0);
+  if (now >= target) { target.setDate(target.getDate() + 1); }
+  const ms = target - now;
+
+  setTimeout(async () => {
+    const missing = await checkEndOfDayData();
+    if (missing.length > 0) {
+      const body = missing.join('\n');
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('AAC — End of Day Reminder', { body, icon: '/aacts/img/icon-192.png' });
+      }
+      showNotification('End of Day Reminder', missing.join(' · '));
+    }
+    scheduleEndOfDayCheck();
+  }, ms);
+}
 
 async function showExportSheet() {
   showBottomSheet(`
