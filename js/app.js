@@ -266,7 +266,7 @@ async function dashboardView() {
           <div class="qa-icon">&#128230;</div>
           <div class="qa-label">Stock</div>
         </a>
-        <a href="#" class="quick-action" onclick="navigate('fuel')">
+        <a href="#" class="quick-action" onclick="navigate('inventory')">
           <div class="qa-icon">&#9981;</div>
           <div class="qa-label">Fuel</div>
         </a>
@@ -378,6 +378,7 @@ function navigate(view) {
   document.querySelectorAll('.nav-link').forEach(a => a.classList.remove('active'));
   const link = document.querySelector(`.nav-link[data-view="${view}"]`);
   if (link) link.classList.add('active');
+  closeSidebar();
 
   switch (view) {
     case 'dashboard': dashboardView(); break;
@@ -385,7 +386,9 @@ function navigate(view) {
     case 'defects': defectsView(); break;
     case 'maintenance': maintenanceView(); break;
     case 'inventory': inventoryView(); break;
-    case 'fuel': fuelView(); break;
+    case 'calendar': calendarView(); break;
+    case 'attendance': attendanceView(); break;
+    case 'profile': profileView(); break;
   }
 }
 
@@ -398,6 +401,77 @@ function onRemoteUpdate() {
     if (active) navigate(active);
   }, 1000);
 }
+
+/* ── Profile View ── */
+function profileView() {
+  const app = document.getElementById('app');
+  const name = localStorage.getItem('aac_user') || '';
+  const role = localStorage.getItem('aac_user_role') || '';
+  const roles = [
+    { value: 'technician', label: 'Technician', desc: 'Can log flights, report defects, view data' },
+    { value: 'senior_technician', label: 'Senior Technician', desc: 'Above + can approve attendance' },
+    { value: 'engineer', label: 'Engineer', desc: 'Above + can approve CRS (Release to Service)' },
+    { value: 'admin', label: 'Admin', desc: 'Full access to all features' }
+  ];
+  app.innerHTML = `
+    <div class="page">
+      <div class="page-header"><h2>My Profile</h2></div>
+      <div class="card">
+        <div class="form-group">
+          <label>Your Name</label>
+          <input type="text" id="profile-name" value="${escHtml(name)}" placeholder="e.g. John Smith">
+        </div>
+        <div class="form-group">
+          <label>Your Role</label>
+          <div class="profile-role-select">
+            ${roles.map(r => `
+              <label class="profile-role-option ${role === r.value ? 'selected' : ''}">
+                <input type="radio" name="profile-role" value="${r.value}" ${role === r.value ? 'checked' : ''}>
+                <div><div class="profile-role-label">${r.label}</div><div class="profile-role-desc">${r.desc}</div></div>
+              </label>
+            `).join('')}
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" id="profile-save-btn">Save Profile</button>
+      </div>
+    </div>
+  `;
+  document.querySelectorAll('.profile-role-option').forEach(el => {
+    el.addEventListener('click', () => {
+      document.querySelectorAll('.profile-role-option').forEach(o => o.classList.remove('selected'));
+      el.classList.add('selected');
+      el.querySelector('input').checked = true;
+    });
+  });
+  document.getElementById('profile-save-btn').addEventListener('click', async () => {
+    const n = document.getElementById('profile-name').value.trim();
+    const r = document.querySelector('input[name="profile-role"]:checked')?.value;
+    if (!n) { showToast('Enter your name', 'error'); return; }
+    if (!r) { showToast('Select your role', 'error'); return; }
+    localStorage.setItem('aac_user', n);
+    localStorage.setItem('aac_user_role', r);
+    const uid = localStorage.getItem('aac_user_id');
+    if (uid) {
+      const existing = await DB.get('users', uid);
+      if (existing) {
+        existing.name = n;
+        existing.role = r;
+        await DB.put('users', existing);
+        await queueSync('users', 'update', existing);
+      }
+    } else {
+      const id = 'user_' + Date.now();
+      localStorage.setItem('aac_user_id', id);
+      const u = { id, name: n, role: r, createdAt: new Date().toISOString() };
+      await DB.put('users', u);
+      await queueSync('users', 'create', u);
+    }
+    updateSidebarUser();
+    showToast('Profile saved');
+    navigate('dashboard');
+  });
+}
+
 function showAircraftSheet() {
   showBottomSheet(`
     <div class="card-header"><h3>Manage Aircraft</h3></div>
@@ -560,7 +634,7 @@ async function renderACListSheet() {
 }
 
 async function clearAllData() {
-  const stores = ['flights','aircraft','defects','fuel_logs','fuel_stock','maintenance_tasks','parts','sync_queue'];
+  const stores = ['flights','aircraft','defects','fuel_logs','fuel_stock','maintenance_tasks','parts','sync_queue','users','attendance'];
   const db = await openDB();
   for (const s of stores) {
     await new Promise((res, rej) => {
@@ -649,7 +723,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     navigate(document.querySelector('.nav-link.active')?.dataset?.view || 'dashboard');
   });
 
-  document.getElementById('manage-ac-btn').addEventListener('click', showAircraftSheet);
+  document.getElementById('hamburger-btn').addEventListener('click', openSidebar);
+  document.getElementById('sidebar-overlay').addEventListener('click', closeSidebar);
+  document.querySelectorAll('.sidebar-link[data-view]').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      navigate(a.dataset.view);
+    });
+  });
+  document.getElementById('sidebar-manage-ac').addEventListener('click', e => {
+    e.preventDefault();
+    closeSidebar();
+    showAircraftSheet();
+  });
+  document.getElementById('sidebar-reset').addEventListener('click', async e => {
+    e.preventDefault();
+    closeSidebar();
+    const confirmed = await showConfirmDialog('Reset All Data', 'This will delete ALL data including aircraft, flights, defects, parts, and fuel. Are you sure?');
+    if (confirmed) await clearAllData();
+  });
+
+  updateSidebarUser();
+  updateSidebarInspections();
 
   document.querySelectorAll('.nav-link').forEach(a => {
     a.addEventListener('click', e => {
@@ -659,4 +754,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   navigate('dashboard');
+  checkInspectionNotifications();
 });
