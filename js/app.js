@@ -403,6 +403,38 @@ function onRemoteUpdate() {
   }, 1000);
 }
 
+/* ── Sidebar ── */
+function openSidebar() {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebar-overlay').classList.add('open');
+}
+function closeSidebar() {
+  document.getElementById('sidebar')?.classList.remove('open');
+  document.getElementById('sidebar-overlay')?.classList.remove('open');
+}
+
+function updateSidebarUser() {
+  const name = localStorage.getItem('aac_user');
+  const role = localStorage.getItem('aac_user_role');
+  document.getElementById('sidebar-name').textContent = name || 'No User';
+  document.getElementById('sidebar-role').textContent = role ? role.replace(/_/g, ' ') : '—';
+  document.getElementById('sidebar-avatar').textContent = name ? name[0].toUpperCase() : '?';
+}
+
+async function updateSidebarInspections() {
+  try {
+    const ac = await getAircraft();
+    if (!ac) return;
+    const insp = getInspectionStatus(ac);
+    const el = document.getElementById('sidebar-insp-list');
+    if (!el) return;
+    el.innerHTML = `
+      <div class="sidebar-insp-item"><span>50hr Oil</span><span class="${insp.oilClass}">${insp.oilRemaining.toFixed(1)}h</span></div>
+      <div class="sidebar-insp-item"><span>100hr Structural</span><span class="${insp.structClass}">${insp.structRemaining.toFixed(1)}h</span></div>
+    `;
+  } catch (e) {}
+}
+
 /* ── Profile View ── */
 function profileView() {
   const app = document.getElementById('app');
