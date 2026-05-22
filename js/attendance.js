@@ -10,13 +10,10 @@ function attendanceView() {
     <div class="page">
       <div class="page-header">
         <h2>Attendance</h2>
-        <div class="subtitle">Check in / approve site attendance</div>
+        <div class="subtitle">Check in / track attendance</div>
       </div>
       <div id="attendance-self" class="card"></div>
-      <div id="attendance-pending" class="card">
-        <div class="card-header"><h3>Pending Approvals</h3></div>
-        <div id="attendance-pending-list"><p class="text-muted small">Loading...</p></div>
-      </div>
+      <div id="attendance-pending" class="card"></div>
       <div class="card">
         <div class="card-header"><h3>Today's Records</h3></div>
         <div id="attendance-today-list"><p class="text-muted small">Loading...</p></div>
@@ -40,7 +37,7 @@ async function renderAttendance() {
     if (active) {
       selfEl.innerHTML = `
         <div class="card-header"><h3>${active.status === 'approved' ? '&#10003; Checked In' : '&#9203; Pending Approval'}</h3></div>
-        <p class="text-muted small">Date: ${today} &middot; Status: <strong>${active.status.toUpperCase()}</strong></p>
+        <p class="text-muted small">Date: ${today} &middot; Time: ${active.checkinTime || '—'} &middot; Status: <strong>${active.status.toUpperCase()}</strong></p>
         ${active.approvedBy ? `<p class="text-muted small">Approved by: ${active.approvedBy}</p>` : ''}
         ${active.notes ? `<p class="text-muted small">Notes: ${escHtml(active.notes)}</p>` : ''}
       `;
@@ -48,29 +45,24 @@ async function renderAttendance() {
       selfEl.innerHTML = `
         <div class="card-header"><h3>Check In for Today</h3></div>
         <div class="form-group">
-          <label>Job Site / Location</label>
-          <input type="text" id="att-site" placeholder="e.g. Hangar 3, Ramp A">
-        </div>
-        <div class="form-group">
           <label>Notes (optional)</label>
           <input type="text" id="att-notes" placeholder="e.g. Engine oil change">
         </div>
         <button class="btn btn-primary btn-block" id="att-checkin-btn">Check In</button>
       `;
       document.getElementById('att-checkin-btn').addEventListener('click', async () => {
-        const site = document.getElementById('att-site').value.trim();
-        if (!site) { showToast('Enter job site / location', 'error'); return; }
         const notes = document.getElementById('att-notes').value.trim();
+        const now = new Date();
         const record = {
           id: 'att_' + Date.now(),
           userId: user.id,
           userName: user.name,
           userRole: user.role,
           date: today,
-          site,
+          checkinTime: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           notes,
           status: 'pending',
-          createdAt: new Date().toISOString()
+          createdAt: now.toISOString()
         };
         await DB.put('attendance', record);
         await queueSync('attendance', 'create', record);
@@ -91,7 +83,7 @@ async function renderAttendance() {
       pendingEl.innerHTML = pending.map(a => `
         <div class="task-card" style="margin-bottom:8px">
           <div class="task-header"><strong>${escHtml(a.userName)}</strong> <span class="badge badge-open">${a.userRole || '?'}</span></div>
-          <div class="task-desc" style="font-size:13px">${escHtml(a.site)}${a.notes ? ' &mdash; ' + escHtml(a.notes) : ''}</div>
+          <div class="task-desc" style="font-size:13px">${a.checkinTime || '—'}${a.notes ? ' &mdash; ' + escHtml(a.notes) : ''}</div>
           <div class="task-meta">${a.date}</div>
           <div class="task-actions">
             <button class="btn btn-sm btn-success att-approve-btn" data-id="${a.id}" style="flex:1">Approve</button>
@@ -141,7 +133,7 @@ async function renderAttendance() {
       <div class="flight-row">
         <div style="flex:1;min-width:0">
           <strong>${escHtml(a.userName)}</strong>
-          <div class="flight-date">${escHtml(a.site)} ${a.notes ? '&middot; ' + escHtml(a.notes) : ''}</div>
+          <div class="flight-date">${a.checkinTime || '—'} ${a.notes ? '&middot; ' + escHtml(a.notes) : ''}</div>
         </div>
         <span class="badge ${a.status === 'approved' ? 'badge-released' : a.status === 'rejected' ? 'badge-open' : 'badge-rectified'}">${a.status.toUpperCase()}</span>
       </div>
