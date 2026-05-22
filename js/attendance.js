@@ -28,7 +28,14 @@ function attendanceView() {
 
 async function renderAttendance() {
   const user = await getCurrentUser();
-  const today = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  // Attendance day runs 4 AM to 4 AM
+  let today = now.toISOString().slice(0, 10);
+  if (now.getHours() < 4) {
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    today = yesterday.toISOString().slice(0, 10);
+  }
 
   // Self check-in card
   const selfEl = document.getElementById('attendance-self');
@@ -48,7 +55,9 @@ async function renderAttendance() {
           <label>Check-out Time</label>
           <input type="time" id="att-checkout-time-input" class="form-input">
         </div>
-        <button class="btn btn-secondary btn-block" id="att-checkout-btn">Check Out</button>` : ''}
+        <button class="btn btn-secondary btn-block" id="att-checkout-btn">Check Out</button>
+        <button class="btn btn-sm btn-danger att-del-btn" data-id="${active.id}" style="margin-top:6px">Delete</button>` : `
+        <button class="btn btn-sm btn-danger att-del-btn" data-id="${active.id}" style="margin-top:6px">Delete Record</button>`}
       `;
       if (!active.checkoutTime) {
         document.getElementById('att-checkout-time-input').valueAsDate = new Date();
@@ -93,6 +102,16 @@ async function renderAttendance() {
         await DB.put('attendance', record);
         await queueSync('attendance', 'create', record);
         showToast('Checked in — awaiting approval');
+        renderAttendance();
+      });
+    }
+    const delBtn = selfEl.querySelector('.att-del-btn');
+    if (delBtn) {
+      delBtn.addEventListener('click', async () => {
+        if (!confirm('Delete this attendance record?')) return;
+        await DB.del('attendance', active.id);
+        await queueSync('attendance', 'delete', { id: active.id });
+        showToast('Record deleted');
         renderAttendance();
       });
     }
@@ -162,7 +181,17 @@ async function renderAttendance() {
           <div class="flight-date">In: ${a.checkinTime || '—'}${a.checkoutTime ? ' &middot; Out: ' + a.checkoutTime : ''} ${a.notes ? '&middot; ' + escHtml(a.notes) : ''}</div>
         </div>
         <span class="badge ${a.status === 'approved' ? 'badge-released' : a.status === 'rejected' ? 'badge-open' : 'badge-rectified'}">${a.status.toUpperCase()}</span>
+        <button class="btn btn-sm btn-danger att-del-btn" data-id="${a.id}" style="margin-left:6px">&#10005;</button>
       </div>
     `).join('');
+    todayEl.querySelectorAll('.att-del-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Delete this attendance record?')) return;
+        await DB.del('attendance', btn.dataset.id);
+        await queueSync('attendance', 'delete', { id: btn.dataset.id });
+        showToast('Record deleted');
+        renderAttendance();
+      });
+    });
   }
 }
