@@ -390,6 +390,7 @@ function navigate(view) {
     case 'attendance': attendanceView(); break;
     case 'profile': profileView(); break;
   }
+  updateSidebarInspections();
 }
 
 let _refreshTimer = null;
