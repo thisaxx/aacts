@@ -43,13 +43,18 @@ async function renderAttendance() {
         <p class="text-muted small">Date: ${today} &middot; In: ${active.checkinTime || '—'}${active.checkoutTime ? ' &middot; Out: ' + active.checkoutTime : ''} &middot; Status: <strong>${active.status.toUpperCase()}</strong></p>
         ${active.approvedBy ? `<p class="text-muted small">Approved by: ${active.approvedBy}</p>` : ''}
         ${active.notes ? `<p class="text-muted small">Notes: ${escHtml(active.notes)}</p>` : ''}
-        ${!active.checkoutTime ? `<button class="btn btn-secondary btn-block" id="att-checkout-btn" style="margin-top:10px">Check Out</button>` : ''}
+        ${!active.checkoutTime ? `
+        <div class="form-group" style="margin-top:10px">
+          <label>Check-out Time</label>
+          <input type="time" id="att-checkout-time-input" class="form-input">
+        </div>
+        <button class="btn btn-secondary btn-block" id="att-checkout-btn">Check Out</button>` : ''}
       `;
-      const checkoutBtn = document.getElementById('att-checkout-btn');
-      if (checkoutBtn) {
-        checkoutBtn.addEventListener('click', async () => {
-          const now = new Date();
-          active.checkoutTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      if (!active.checkoutTime) {
+        document.getElementById('att-checkout-time-input').valueAsDate = new Date();
+        document.getElementById('att-checkout-btn').addEventListener('click', async () => {
+          const timeVal = document.getElementById('att-checkout-time-input').value;
+          active.checkoutTime = timeVal || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           await DB.put('attendance', active);
           await queueSync('attendance', 'update', active);
           showToast('Checked out');
@@ -60,13 +65,19 @@ async function renderAttendance() {
       selfEl.innerHTML = `
         <div class="card-header"><h3>Check In for Today</h3></div>
         <div class="form-group">
+          <label>Check-in Time</label>
+          <input type="time" id="att-checkin-time-input" class="form-input">
+        </div>
+        <div class="form-group">
           <label>Notes (optional)</label>
           <input type="text" id="att-notes" placeholder="e.g. Engine oil change">
         </div>
         <button class="btn btn-primary btn-block" id="att-checkin-btn">Check In</button>
       `;
+      document.getElementById('att-checkin-time-input').valueAsDate = new Date();
       document.getElementById('att-checkin-btn').addEventListener('click', async () => {
         const notes = document.getElementById('att-notes').value.trim();
+        const timeVal = document.getElementById('att-checkin-time-input').value;
         const now = new Date();
         const record = {
           id: 'att_' + Date.now(),
@@ -74,7 +85,7 @@ async function renderAttendance() {
           userName: user.name,
           userRole: user.role,
           date: today,
-          checkinTime: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          checkinTime: timeVal || now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           notes,
           status: 'pending',
           createdAt: now.toISOString()
