@@ -136,6 +136,20 @@ function showTopUpSheet() {
     });
     await queueSync('fuel_logs', 'create', { fuelType: type, liters });
 
+    if (type === 'mix') {
+      const half = liters / 2;
+      await DB.put('fuel_logs', {
+        id: 'fuellog_' + Date.now() + '_1', aircraftId: getCurrentAircraftKey(),
+        type: 'blend', fuelType: 'avgas', liters: -half,
+        source: `Mix blend (${liters}L mix)`, createdAt: new Date().toISOString()
+      });
+      await DB.put('fuel_logs', {
+        id: 'fuellog_' + Date.now() + '_2', aircraftId: getCurrentAircraftKey(),
+        type: 'blend', fuelType: 'mogas', liters: -half,
+        source: `Mix blend (${liters}L mix)`, createdAt: new Date().toISOString()
+      });
+    }
+
     showToast(`Added ${liters}L ${type.toUpperCase()} to stock`);
     window.__sheetClose(true);
     renderFuelStock();

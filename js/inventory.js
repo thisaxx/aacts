@@ -184,18 +184,14 @@ async function renderInventory() {
       <div class="fuel-stock-item ${low ? 'fuel-low' : ''}" style="margin-bottom:10px">
         <div class="fuel-stock-header" style="display:flex;justify-content:space-between;align-items:center">
           <strong>${escHtml(fs.name)}</strong>
-          <div style="display:flex;align-items:center;gap:6px">
-            <div class="stepper stepper-inline">
-              <button class="btn btn-sm stock-dec-inv" data-id="${fs.id}" style="padding:2px 6px;font-size:12px;background:rgba(255,255,255,0.05);border:1px solid var(--glass-border);border-radius:4px;color:var(--text);cursor:pointer">-</button>
-              <span class="stock-qty-inv" contenteditable="true" data-id="${fs.id}" style="font-size:13px;font-weight:700;min-width:40px;text-align:center;padding:2px 4px;outline:none;${low ? 'color:var(--ruby)' : 'color:var(--emerald)'}">${fs.quantityLiters}</span>
-              <button class="btn btn-sm stock-inc-inv" data-id="${fs.id}" style="padding:2px 6px;font-size:12px;background:rgba(255,255,255,0.05);border:1px solid var(--glass-border);border-radius:4px;color:var(--text);cursor:pointer">+</button>
-              <span style="font-size:11px;color:var(--text-muted);margin-left:2px">L</span>
-            </div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <span style="font-size:16px;font-weight:700;${low ? 'color:var(--ruby)' : 'color:var(--emerald)'}">${fs.quantityLiters}L</span>
             <button class="btn btn-sm btn-danger inv-del-fuel-stock-btn" data-id="${fs.id}" data-name="${escHtml(fs.name)}" style="padding:2px 6px;font-size:10px">&times;</button>
           </div>
         </div>
-        <div style="display:flex;gap:4px;margin-top:4px">
-          <button class="btn btn-sm btn-primary record-usage-btn" data-id="${fs.id}" data-name="${escHtml(fs.name)}" style="padding:2px 8px;font-size:10px;flex:1">Record Usage</button>
+        <div style="display:flex;gap:4px;margin-top:6px">
+          <button class="btn btn-sm btn-primary fuel-add-btn" data-id="${fs.id}" data-name="${escHtml(fs.name)}" style="padding:4px 8px;font-size:11px;flex:1">+ Add Stock</button>
+          <button class="btn btn-sm btn-danger fuel-reduce-btn" data-id="${fs.id}" data-name="${escHtml(fs.name)}" style="padding:4px 8px;font-size:11px;flex:1">- Reduce Stock</button>
         </div>
         <div class="progress-bar" style="margin-top:6px">
           <div class="progress-fill ${low ? 'fill-red' : 'fill-green'}"
@@ -208,40 +204,11 @@ async function renderInventory() {
     `;
     }).join('');
 
-    fuelEl.querySelectorAll('.stock-inc-inv').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = btn.dataset.id;
-        const qtyEl = fuelEl.querySelector(`.stock-qty-inv[data-id="${id}"]`);
-        if (!qtyEl) return;
-        const v = Math.max(0, (parseFloat(qtyEl.textContent) || 0) + 10);
-        qtyEl.textContent = v;
-        await updateFuelStockQty(id, v);
-      });
+    fuelEl.querySelectorAll('.fuel-add-btn').forEach(btn => {
+      btn.addEventListener('click', () => showFuelAddSheet(btn.dataset.id, btn.dataset.name));
     });
-    fuelEl.querySelectorAll('.stock-dec-inv').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = btn.dataset.id;
-        const qtyEl = fuelEl.querySelector(`.stock-qty-inv[data-id="${id}"]`);
-        if (!qtyEl) return;
-        const v = Math.max(0, (parseFloat(qtyEl.textContent) || 0) - 10);
-        qtyEl.textContent = v;
-        await updateFuelStockQty(id, v);
-      });
-    });
-    fuelEl.querySelectorAll('.stock-qty-inv').forEach(el2 => {
-      el2.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); el2.blur(); } });
-      el2.addEventListener('blur', async () => {
-        const id = el2.dataset.id;
-        const v = Math.max(0, parseFloat(el2.textContent) || 0);
-        el2.textContent = v;
-        await updateFuelStockQty(id, v);
-      });
-    });
-    fuelEl.querySelectorAll('.inv-del-fuel-stock-btn').forEach(btn => {
-      btn.addEventListener('click', () => deleteFuelStock(btn.dataset.id, btn.dataset.name));
-    });
-    fuelEl.querySelectorAll('.record-usage-btn').forEach(btn => {
-      btn.addEventListener('click', () => showRecordUsageSheet(btn.dataset.id, btn.dataset.name));
+    fuelEl.querySelectorAll('.fuel-reduce-btn').forEach(btn => {
+      btn.addEventListener('click', () => showFuelReduceSheet(btn.dataset.id, btn.dataset.name));
     });
   }
 
@@ -298,37 +265,86 @@ async function renderInventory() {
   }
 }
 
-function showRecordUsageSheet(fuelId, fuelName) {
+function logFuelEvent(fuelType, liters, source) {
+  return DB.put('fuel_logs', {
+    id: 'fuel_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+    aircraftId: getCurrentAircraftKey(),
+    fuelType,
+    liters,
+    source,
+    date: new Date().toISOString().slice(0, 10),
+    createdAt: new Date().toISOString()
+  });
+}
+
+function showFuelAddSheet(fuelId, fuelName) {
   showBottomSheet(`
-    <div class="card-header"><h3>Record Fuel Usage — ${escHtml(fuelName)}</h3></div>
-    <p class="text-muted small">Use this to deduct fuel (e.g. for a refuel, spill, or mistake).</p>
+    <div class="card-header"><h3>Add Stock — ${escHtml(fuelName)}</h3></div>
     <div class="form-group">
-      <label>Liters Used</label>
-      ${stepperHTML('usage-liters', 50, 0, 99999, 10)}
+      <label>Liters to Add</label>
+      ${stepperHTML('add-fuel-liters', 100, 0, 99999, 10)}
     </div>
-    <button class="btn btn-danger btn-block" id="confirm-usage-btn">Deduct</button>
-    <button class="btn btn-secondary btn-block" id="cancel-usage-btn" style="margin-top:8px">Cancel</button>
+    <div class="form-group">
+      <label>Source</label>
+      <input type="text" id="add-fuel-source" placeholder="e.g. Delivery, Bowser, etc." value="Delivery">
+    </div>
+    <button class="btn btn-primary btn-block" id="confirm-add-stock-btn">Add to Stock</button>
+    <button class="btn btn-secondary btn-block" id="cancel-add-stock-btn" style="margin-top:8px">Cancel</button>
   `);
   initSteppers();
-  document.getElementById('confirm-usage-btn').addEventListener('click', async () => {
-    const liters = parseFloat(document.getElementById('usage-liters').textContent) || 0;
+  document.getElementById('confirm-add-stock-btn').addEventListener('click', async () => {
+    const liters = parseFloat(document.getElementById('add-fuel-liters').textContent) || 0;
+    const source = document.getElementById('add-fuel-source').value.trim() || 'Manual add';
     if (liters <= 0) { showToast('Enter valid liters', 'error'); return; }
+
+    await addFuel(fuelId, liters);
+    await logFuelEvent(fuelId, liters, source);
+
+    if (fuelId === 'mix') {
+      const half = liters / 2;
+      await logFuelEvent('avgas', -half, `Mix blend (${fuelName})`);
+      await logFuelEvent('mogas', -half, `Mix blend (${fuelName})`);
+    }
+
+    showToast(`Added ${liters}L to ${fuelName}`);
+    window.__sheetClose(true);
+    renderInventory();
+  });
+  document.getElementById('cancel-add-stock-btn').addEventListener('click', () => window.__sheetClose(null));
+}
+
+function showFuelReduceSheet(fuelId, fuelName) {
+  showBottomSheet(`
+    <div class="card-header"><h3>Reduce Stock — ${escHtml(fuelName)}</h3></div>
+    <div class="form-group">
+      <label>Liters to Remove</label>
+      ${stepperHTML('reduce-fuel-liters', 50, 0, 99999, 10)}
+    </div>
+    <div class="form-group">
+      <label>Reason</label>
+      <input type="text" id="reduce-fuel-reason" placeholder="e.g. Spill, transfer, etc." value="Manual reduction">
+    </div>
+    <button class="btn btn-danger btn-block" id="confirm-reduce-stock-btn">Remove from Stock</button>
+    <button class="btn btn-secondary btn-block" id="cancel-reduce-stock-btn" style="margin-top:8px">Cancel</button>
+  `);
+  initSteppers();
+  document.getElementById('confirm-reduce-stock-btn').addEventListener('click', async () => {
+    const liters = parseFloat(document.getElementById('reduce-fuel-liters').textContent) || 0;
+    const reason = document.getElementById('reduce-fuel-reason').value.trim() || 'Manual reduction';
+    if (liters <= 0) { showToast('Enter valid liters', 'error'); return; }
+
     const stock = await DB.get('fuel_stock', fuelId);
     if (!stock) return;
-    const deducted = Math.min(liters, stock.quantityLiters);
+    const actual = Math.min(liters, stock.quantityLiters);
     stock.quantityLiters = Math.max(0, stock.quantityLiters - liters);
     stock.lastUpdated = new Date().toISOString();
     await DB.put('fuel_stock', stock);
     await queueSync('fuel_stock', 'update', stock);
-    await DB.put('fuel_logs', {
-      id: 'usage_' + Date.now(), aircraftId: getCurrentAircraftKey(),
-      type: 'usage', fuelType: fuelId, liters: deducted, source: 'Manual deduction',
-      createdAt: new Date().toISOString()
-    });
-    await queueSync('fuel_logs', 'create', { fuelType: fuelId, liters: deducted });
-    showToast(`Deducted ${deducted}L from ${fuelName}`);
+    await logFuelEvent(fuelId, -actual, reason);
+
+    showToast(`Removed ${actual}L from ${fuelName}`);
     window.__sheetClose(true);
     renderInventory();
   });
-  document.getElementById('cancel-usage-btn').addEventListener('click', () => window.__sheetClose(null));
+  document.getElementById('cancel-reduce-stock-btn').addEventListener('click', () => window.__sheetClose(null));
 }
