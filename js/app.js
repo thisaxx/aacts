@@ -195,6 +195,8 @@ async function dashboardView() {
   const totalHours = flights.reduce((s, f) => s + f.flownHours, 0);
   const groundingDefects = defects.filter(d => d.urgency === 'grounding' && d.status === 'open').length;
   const lowFuels = fuelStocks.filter(fs => fs.quantityLiters <= fs.minSafeLevel).length;
+  const mixStock = fuelStocks.find(fs => fs.id === 'mix');
+  const mixLow = mixStock && mixStock.quantityLiters < 50;
 
   // After-flight inspection pending
   const afterFlightPending = tasks.filter(t => t.type === 'after-flight' && t.status === 'open').length > 0;
@@ -249,7 +251,11 @@ async function dashboardView() {
 
       ${lowFuels > 0 ? `<div class="status-card" style="border-color:rgba(245,158,11,0.3)">
         <div class="status-dot orange"></div>
-        <div class="status-text text-orange">Fuel alert: ${lowFuels} fuel type(s) below minimum stock (200L)</div>
+        <div class="status-text text-orange">Fuel alert: ${lowFuels} fuel type(s) below minimum stock</div>
+      </div>` : ''}
+      ${mixLow ? `<div class="status-card" style="border-color:rgba(239,68,68,0.3)">
+        <div class="status-dot red"></div>
+        <div class="status-text text-red">Mix fuel low: ${mixStock.quantityLiters}L remaining (min 50L)</div>
       </div>` : ''}
 
       <div class="dashboard-grid">

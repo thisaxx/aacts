@@ -279,6 +279,7 @@ async function renderInventory() {
 
   const lowParts = parts.filter(p => p.quantityOnHand <= p.minSafeStock);
   const lowFuels = fuelStocks.filter(fs => fs.quantityLiters <= fs.minSafeLevel);
+  const mixStock = fuelStocks.find(fs => fs.id === 'mix');
   const allLow = [];
 
   for (const p of lowParts) {
@@ -286,6 +287,9 @@ async function renderInventory() {
   }
   for (const fs of lowFuels) {
     allLow.push(`<div class="low-stock-item" style="border-color:rgba(245,158,11,0.3)"><strong>${escHtml(fs.name)}</strong> - Bulk Fuel<br><span class="text-red">${fs.quantityLiters}L remaining (min: ${fs.minSafeLevel}L)</span></div>`);
+  }
+  if (mixStock && mixStock.quantityLiters < 50 && mixStock.quantityLiters > mixStock.minSafeLevel) {
+    allLow.push(`<div class="low-stock-item" style="border-color:rgba(239,68,68,0.3)"><strong>Mix</strong> - Bulk Fuel<br><span class="text-red">${mixStock.quantityLiters}L remaining — below 50L threshold</span></div>`);
   }
 
   if (allLow.length === 0) {
