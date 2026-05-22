@@ -12,12 +12,16 @@ let db_firestore;
 let _deviceId;
 
 async function initFirebase() {
-  firebase.initializeApp(firebaseConfig);
-  db_firestore = firebase.firestore();
-  db_firestore.settings({ merge: true });
-  await firebase.auth().signInAnonymously();
-  _deviceId = firebase.auth().currentUser.uid;
-  subscribeToAll();
+  try {
+    firebase.initializeApp(firebaseConfig);
+    db_firestore = firebase.firestore();
+    db_firestore.settings({ merge: true });
+    await firebase.auth().signInAnonymously();
+    _deviceId = firebase.auth().currentUser.uid;
+    subscribeToAll();
+  } catch (e) {
+    console.warn('Firebase init failed — offline-only mode', e);
+  }
   updateSyncBadge();
 }
 
@@ -52,6 +56,7 @@ function getDocId(collection, data) {
 }
 
 async function queueSync(collection, action, data) {
+  if (!db_firestore) { updateSyncBadge(); return; }
   if (action === 'delete') {
     try {
       await db_firestore.collection(collection).doc(getDocId(collection, data)).delete();
@@ -70,7 +75,7 @@ async function queueSync(collection, action, data) {
 function updateSyncBadge() {
   const badge = document.getElementById('sync-badge');
   if (!badge) return;
-  if (firebase.auth().currentUser && navigator.onLine) {
+  if (db_firestore && firebase.auth().currentUser && navigator.onLine) {
     badge.textContent = '✓';
     badge.style.background = 'rgba(16,185,129,0.25)';
     badge.style.color = '#10b981';
