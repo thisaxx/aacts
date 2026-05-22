@@ -482,7 +482,7 @@ function profileView() {
     if (!n) { showToast('Enter your name', 'error'); return; }
     if (!r) { showToast('Select your role', 'error'); return; }
 
-    if (r === 'admin' || r === 'engineer') {
+    if (r === 'admin' || r === 'engineer' || r === 'senior_technician') {
       const pin = localStorage.getItem('aac_pin') || '1234';
       const entered = await showPromptDialog('Pincode Required', `Enter admin pincode to set role as ${r.replace(/_/g, ' ')}:`);
       if (entered === null) { showToast('Profile save cancelled', 'warning'); return; }
