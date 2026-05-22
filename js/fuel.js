@@ -1,7 +1,6 @@
 const FUEL_TYPES = [
   { id: 'avgas', name: 'Avgas 100LL', quantityLiters: 1000, minSafeLevel: 200 },
-  { id: 'mogas', name: 'Mogas', quantityLiters: 500, minSafeLevel: 200 },
-  { id: 'mix', name: 'Mix', quantityLiters: 300, minSafeLevel: 200 }
+  { id: 'mogas', name: 'Mogas', quantityLiters: 500, minSafeLevel: 200 }
 ];
 
 async function seedFuelStock() {
@@ -47,6 +46,19 @@ async function deductFuel(fuelType, liters) {
 
 async function addFuel(fuelType, liters) {
   await seedFuelStock();
+  if (fuelType === 'mix') {
+    const half = liters / 2;
+    for (const t of ['avgas', 'mogas']) {
+      const stock = await DB.get('fuel_stock', t);
+      if (stock) {
+        stock.quantityLiters += half;
+        stock.lastUpdated = new Date().toISOString();
+        await DB.put('fuel_stock', stock);
+        await queueSync('fuel_stock', 'update', stock);
+      }
+    }
+    return;
+  }
   const stock = await DB.get('fuel_stock', fuelType);
   if (!stock) return;
   stock.quantityLiters += liters;
