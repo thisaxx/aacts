@@ -12,6 +12,8 @@ const ASSETS = [
   PREFIX + '/js/fuel.js',
   PREFIX + '/js/maintenance.js',
   PREFIX + '/js/inventory.js',
+  PREFIX + '/js/history.js',
+  PREFIX + '/js/attendance.js',
   PREFIX + '/manifest.json',
   PREFIX + '/img/aircraft.jpg',
   PREFIX + '/img/icon-192.svg',
