@@ -398,6 +398,7 @@ function onRemoteUpdate() {
     if (active) navigate(active);
   }, 1000);
 }
+function showAircraftSheet() {
   showBottomSheet(`
     <div class="card-header"><h3>Manage Aircraft</h3></div>
     <div id="ac-list-sheet"></div>
