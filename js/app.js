@@ -839,6 +839,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('sidebar-reset').addEventListener('click', async e => {
     e.preventDefault();
     closeSidebar();
+    const role = localStorage.getItem('aac_user_role');
+    if (role !== 'admin') { showToast('Only Admin can reset all data', 'error'); return; }
     const confirmed = await showConfirmDialog('Reset All Data', 'This will delete ALL data including aircraft, flights, defects, parts, and fuel. Are you sure?');
     if (confirmed) await clearAllData();
   });
