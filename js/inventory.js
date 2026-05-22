@@ -112,11 +112,13 @@ function inventoryView() {
   document.getElementById('adj-add').addEventListener('click', () => adjustPart(1));
   document.getElementById('adj-remove').addEventListener('click', () => adjustPart(-1));
 
-  seedParts().then(() => {
-    seedFuelStock().then(() => {
-      renderInventory();
-      populateAdjustSelect();
-    });
+  seedParts().then(() => seedFuelStock()).then(() => {
+    renderInventory();
+    populateAdjustSelect();
+  }).catch(e => {
+    console.error('Seed error:', e);
+    renderInventory();
+    populateAdjustSelect();
   });
 }
 
@@ -164,6 +166,7 @@ async function populateAdjustSelect() {
 }
 
 async function renderInventory() {
+  await seedFuelStock();
   const parts = await getParts();
   const list = document.getElementById('inventory-list');
   const lowEl = document.getElementById('low-stock-list');
@@ -171,9 +174,12 @@ async function renderInventory() {
 
   const fuelStocks = await getFuelStock();
 
-  fuelEl.innerHTML = fuelStocks.map(fs => {
-    const low = fs.quantityLiters <= fs.minSafeLevel;
-    return `
+  if (!fuelStocks || fuelStocks.length === 0) {
+    fuelEl.innerHTML = '<p class="text-muted small">No fuel stock configured. Add fuel via <strong>Fuel</strong> tab or record a delivery.</p>';
+  } else {
+    fuelEl.innerHTML = fuelStocks.map(fs => {
+      const low = fs.quantityLiters <= fs.minSafeLevel;
+      return `
       <div class="fuel-stock-item ${low ? 'fuel-low' : ''}" style="margin-bottom:10px">
         <div class="fuel-stock-header" style="display:flex;justify-content:space-between;align-items:center">
           <strong>${escHtml(fs.name)}</strong>
@@ -196,40 +202,41 @@ async function renderInventory() {
         </div>
       </div>
     `;
-  }).join('');
+    }).join('');
 
-  fuelEl.querySelectorAll('.stock-inc-inv').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const id = btn.dataset.id;
-      const qtyEl = fuelEl.querySelector(`.stock-qty-inv[data-id="${id}"]`);
-      if (!qtyEl) return;
-      const v = Math.max(0, (parseFloat(qtyEl.textContent) || 0) + 10);
-      qtyEl.textContent = v;
-      await updateFuelStockQty(id, v);
+    fuelEl.querySelectorAll('.stock-inc-inv').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const qtyEl = fuelEl.querySelector(`.stock-qty-inv[data-id="${id}"]`);
+        if (!qtyEl) return;
+        const v = Math.max(0, (parseFloat(qtyEl.textContent) || 0) + 10);
+        qtyEl.textContent = v;
+        await updateFuelStockQty(id, v);
+      });
     });
-  });
-  fuelEl.querySelectorAll('.stock-dec-inv').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const id = btn.dataset.id;
-      const qtyEl = fuelEl.querySelector(`.stock-qty-inv[data-id="${id}"]`);
-      if (!qtyEl) return;
-      const v = Math.max(0, (parseFloat(qtyEl.textContent) || 0) - 10);
-      qtyEl.textContent = v;
-      await updateFuelStockQty(id, v);
+    fuelEl.querySelectorAll('.stock-dec-inv').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const qtyEl = fuelEl.querySelector(`.stock-qty-inv[data-id="${id}"]`);
+        if (!qtyEl) return;
+        const v = Math.max(0, (parseFloat(qtyEl.textContent) || 0) - 10);
+        qtyEl.textContent = v;
+        await updateFuelStockQty(id, v);
+      });
     });
-  });
-  fuelEl.querySelectorAll('.stock-qty-inv').forEach(el2 => {
-    el2.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); el2.blur(); } });
-    el2.addEventListener('blur', async () => {
-      const id = el2.dataset.id;
-      const v = Math.max(0, parseFloat(el2.textContent) || 0);
-      el2.textContent = v;
-      await updateFuelStockQty(id, v);
+    fuelEl.querySelectorAll('.stock-qty-inv').forEach(el2 => {
+      el2.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); el2.blur(); } });
+      el2.addEventListener('blur', async () => {
+        const id = el2.dataset.id;
+        const v = Math.max(0, parseFloat(el2.textContent) || 0);
+        el2.textContent = v;
+        await updateFuelStockQty(id, v);
+      });
     });
-  });
-  fuelEl.querySelectorAll('.inv-del-fuel-stock-btn').forEach(btn => {
-    btn.addEventListener('click', () => deleteFuelStock(btn.dataset.id, btn.dataset.name));
-  });
+    fuelEl.querySelectorAll('.inv-del-fuel-stock-btn').forEach(btn => {
+      btn.addEventListener('click', () => deleteFuelStock(btn.dataset.id, btn.dataset.name));
+    });
+  }
 
   list.innerHTML = `
     <table class="inv-table">
