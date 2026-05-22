@@ -14,9 +14,37 @@
 <body>
   <div class="offline-banner hidden" id="offline-banner">No internet connection - working offline</div>
 
+  <!-- Sidebar -->
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-user" id="sidebar-user">
+        <div class="sidebar-avatar" id="sidebar-avatar">?</div>
+        <div>
+          <div class="sidebar-name" id="sidebar-name">No User</div>
+          <div class="sidebar-role" id="sidebar-role">—</div>
+        </div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#" class="sidebar-link" data-view="dashboard"><span class="s-icon">&#127968;</span> Home</a>
+      <a href="#" class="sidebar-link" data-view="calendar"><span class="s-icon">&#128197;</span> Calendar &amp; History</a>
+      <a href="#" class="sidebar-link" data-view="attendance"><span class="s-icon">&#10003;</span> Attendance</a>
+      <hr>
+      <a href="#" class="sidebar-link" data-view="profile"><span class="s-icon">&#128100;</span> My Profile</a>
+      <a href="#" class="sidebar-link" id="sidebar-manage-ac"><span class="s-icon">&#9992;</span> Manage Aircraft</a>
+      <a href="#" class="sidebar-link" id="sidebar-reset"><span class="s-icon">&#128260;</span> Reset All Data</a>
+      <hr>
+      <div class="sidebar-inspections" id="sidebar-inspections">
+        <div class="sidebar-insp-title">Inspections</div>
+        <div id="sidebar-insp-list"></div>
+      </div>
+    </nav>
+  </div>
+
   <header class="app-header">
     <div class="header-left">
-      <button class="header-btn" id="manage-ac-btn" title="Manage Aircraft">&#9992;</button>
+      <button class="hamburger-btn" id="hamburger-btn">&#9776;</button>
     </div>
     <h1>A.A.C</h1>
     <div class="header-right">
@@ -65,6 +93,8 @@
   <script src="js/fuel.js"></script>
   <script src="js/maintenance.js"></script>
   <script src="js/inventory.js"></script>
+  <script src="js/history.js"></script>
+  <script src="js/attendance.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
