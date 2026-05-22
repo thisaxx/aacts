@@ -1,5 +1,5 @@
 const DB_NAME = 'aac';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -29,6 +29,12 @@ function openDB() {
       }
       if (!db.objectStoreNames.contains('fuel_stock')) {
         db.createObjectStore('fuel_stock', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('users')) {
+        db.createObjectStore('users', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('attendance')) {
+        db.createObjectStore('attendance', { keyPath: 'id' });
       }
     };
     req.onsuccess = () => resolve(req.result);
