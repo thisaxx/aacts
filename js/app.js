@@ -907,7 +907,7 @@ async function checkEndOfDayData() {
 
 function scheduleEndOfDayCheck() {
   const now = new Date();
-  const endHour = 18;
+  const endHour = 19;
   const target = new Date(now);
   target.setHours(endHour, 0, 0, 0);
   if (now >= target) { target.setDate(target.getDate() + 1); }
