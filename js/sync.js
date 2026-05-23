@@ -21,6 +21,7 @@ async function initFirebase() {
     _deviceId = firebase.auth().currentUser.uid;
     subscribeToAll();
     initFCM();
+    processSyncQueue();
   } catch (e) {
     console.warn('Firebase init failed — offline-only mode', e);
   }
@@ -86,18 +87,20 @@ function getDocId(collection, data) {
 
 async function queueSync(collection, action, data) {
   if (!db_firestore) { updateSyncBadge(); return; }
-  if (action === 'delete') {
-    try {
-      await db_firestore.collection(collection).doc(getDocId(collection, data)).delete();
-    } catch (e) { /* offline */ }
-    updateSyncBadge();
-    return;
-  }
   data._deviceId = _deviceId;
   data._updatedAt = Date.now();
   try {
-    await db_firestore.collection(collection).doc(getDocId(collection, data)).set(data, { merge: true });
-  } catch (e) { /* offline */ }
+    if (action === 'delete') {
+      await db_firestore.collection(collection).doc(getDocId(collection, data)).delete();
+    } else {
+      await db_firestore.collection(collection).doc(getDocId(collection, data)).set(data, { merge: true });
+    }
+  } catch (e) {
+    // Offline — save to retry queue
+    try {
+      await DB.put('sync_queue', { collection, action, data: JSON.parse(JSON.stringify(data)), createdAt: Date.now() });
+    } catch (qe) { /* queue full */ }
+  }
   updateSyncBadge();
 }
 
@@ -117,9 +120,26 @@ function updateSyncBadge() {
   }
 }
 
-firebase.auth().onAuthStateChanged(() => { updateSyncBadge(); });
+async function processSyncQueue() {
+  if (!db_firestore || !navigator.onLine) return;
+  const entries = await DB.getAll('sync_queue');
+  for (const entry of entries) {
+    try {
+      const { collection, action, data } = entry;
+      if (action === 'delete') {
+        await db_firestore.collection(collection).doc(getDocId(collection, data)).delete();
+      } else {
+        await db_firestore.collection(collection).doc(getDocId(collection, data)).set(data, { merge: true });
+      }
+      await DB.del('sync_queue', entry.id);
+    } catch (e) { break; } // still offline, stop processing
+  }
+  updateSyncBadge();
+}
 
-window.addEventListener('online', () => { updateSyncBadge(); });
+firebase.auth().onAuthStateChanged(() => { updateSyncBadge(); processSyncQueue(); });
+
+window.addEventListener('online', () => { updateSyncBadge(); processSyncQueue(); });
 window.addEventListener('offline', () => { updateSyncBadge(); });
 
 try { updateSyncBadge(); } catch (e) { /* firebase not yet inited */ }
