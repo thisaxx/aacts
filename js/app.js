@@ -936,7 +936,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (themeLabel) themeLabel.textContent = savedTheme === 'light' ? 'Light Mode' : 'Dark Mode';
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js');
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      regs.forEach(r => r.unregister());
+    });
   }
 
   await initFirebase();
