@@ -1234,7 +1234,7 @@ function showLoginGate() {
       <div style="max-width:400px;width:100%">
         <div style="text-align:center;margin-bottom:24px">
           <div style="font-size:48px;margin-bottom:8px">&#9992;</div>
-          <h1 style="font-size:22px;margin:0">AAC Flight School</h1>
+          <h1 style="font-size:22px;margin:0">AAC Technical Services</h1>
           <p class="text-muted" style="margin-top:4px">Select your name to sign in</p>
         </div>
         <div class="card" style="padding:20px">
@@ -1326,16 +1326,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Seed user database if not yet set
   if (!localStorage.getItem('aac_users')) {
     const defaultUsers = [
-      { name: 'pasan anishka', role: 'admin' },
-      { name: 'buddika chandrarathna', role: 'engineer' },
-      { name: 'thisanga', role: 'production_planner' },
-      { name: 'chandrakeerthi', role: 'senior_technician' },
-      { name: 'deshan', role: 'technician' },
-      { name: 'shalana', role: 'technician' },
-      { name: 'rehan', role: 'technician' },
-      { name: 'binada', role: 'technician' },
-      { name: 'bihandu', role: 'technician' },
-      { name: 'ginod', role: 'technician' }
+      { name: 'Pasan Anishka', role: 'admin' },
+      { name: 'Buddika Chandrarathna', role: 'engineer' },
+      { name: 'Thisanga', role: 'production_planner' },
+      { name: 'Chandrakeerthi', role: 'senior_technician' },
+      { name: 'Deshan', role: 'technician' },
+      { name: 'Shalana', role: 'technician' },
+      { name: 'Rehan', role: 'technician' },
+      { name: 'Binada', role: 'technician' },
+      { name: 'Bihandu', role: 'technician' },
+      { name: 'Ginod', role: 'technician' }
     ];
     localStorage.setItem('aac_users', JSON.stringify(defaultUsers));
   }
