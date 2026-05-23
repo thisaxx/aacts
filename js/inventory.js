@@ -274,17 +274,14 @@ function showFuelAddSheet(fuelId, fuelName) {
     <div class="card-header"><h3>Add Stock — ${escHtml(fuelName)}</h3></div>
     <div class="form-group">
       <label>Liters to Add</label>
-      ${stepperHTML('add-fuel-liters', 100, 0, 99999, 10)}
+      ${stepperHTML('add-fuel-liters', 100, 0, 99999, 0.1)}
     </div>
-    <div class="form-group">
-      <label>Source</label>
-      <input type="text" id="add-fuel-source" placeholder="e.g. Delivery, Bowser, etc." value="Delivery">
-    </div>
-    <button class="btn btn-primary btn-block" id="confirm-add-stock-btn">Add to Stock</button>
-    <button class="btn btn-secondary btn-block" id="cancel-add-stock-btn" style="margin-top:8px">Cancel</button>
-  `);
-  initSteppers();
-  document.getElementById('confirm-add-stock-btn').addEventListener('click', async () => {
+    <button class="btn btn-primary btn-block" id="add-fuel-btn">Add Fuel Stock</button>
+  `;
+
+  document.getElementById('add-fuel-btn').addEventListener('click', async () => {
+    const sel = document.getElementById('fuel-stock-select');
+    const type = sel.value;
     const liters = parseFloat(document.getElementById('add-fuel-liters').value) || 0;
     const source = document.getElementById('add-fuel-source').value.trim() || 'Manual add';
     if (liters <= 0) { showToast('Enter valid liters', 'error'); return; }
@@ -310,7 +307,7 @@ function showFuelReduceSheet(fuelId, fuelName) {
     <div class="card-header"><h3>Reduce Stock — ${escHtml(fuelName)}</h3></div>
     <div class="form-group">
       <label>Liters to Remove</label>
-      ${stepperHTML('reduce-fuel-liters', 50, 0, 99999, 10)}
+      ${stepperHTML('reduce-fuel-liters', 50, 0, 99999, 0.1)}
     </div>
     <div class="form-group">
       <label>Reason</label>

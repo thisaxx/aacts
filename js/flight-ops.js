@@ -104,11 +104,11 @@ function flightOpsView() {
         <div class="row">
           <div class="form-group">
             <label>Left Wing (gal)</label>
-            <input type="number" id="fuel-before-left" value="0" min="0" step="1" class="form-input fuel-input">
+            <input type="number" id="fuel-before-left" value="0" min="0" step="0.1" class="form-input fuel-input">
           </div>
           <div class="form-group">
             <label>Right Wing (gal)</label>
-            <input type="number" id="fuel-before-right" value="0" min="0" step="1" class="form-input fuel-input">
+            <input type="number" id="fuel-before-right" value="0" min="0" step="0.1" class="form-input fuel-input">
           </div>
         </div>
         <button type="submit" class="btn btn-primary btn-block">Depart</button>
@@ -138,11 +138,11 @@ function flightOpsView() {
           <div class="row">
             <div class="form-group">
               <label>Left Wing (gal)</label>
-              <input type="number" id="fuel-after-left" value="0" min="0" step="1" class="form-input fuel-input">
+              <input type="number" id="fuel-after-left" value="0" min="0" step="0.1" class="form-input fuel-input">
             </div>
             <div class="form-group">
               <label>Right Wing (gal)</label>
-              <input type="number" id="fuel-after-right" value="0" min="0" step="1" class="form-input fuel-input">
+              <input type="number" id="fuel-after-right" value="0" min="0" step="0.1" class="form-input fuel-input">
             </div>
           </div>
           <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-muted);padding:6px 2px 0">
@@ -155,7 +155,7 @@ function flightOpsView() {
           <div id="refuel-fields" class="hidden">
             <div class="form-group">
               <label>Fuel Added (gal)</label>
-              ${stepperHTML('refuel-amount', 0, 0, 9999, 5, true)}
+              ${stepperHTML('refuel-amount', 0, 0, 9999, 0.1, true)}
             </div>
             <div class="row">
               <div class="form-group">
