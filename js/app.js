@@ -185,7 +185,7 @@ async function dashboardView() {
   const today = new Date().toISOString().slice(0, 10);
   const crsIssuedToday = ac.dailyCrsDate === today;
 
-  let statusClass, statusLabel, statusExtra = '';
+  let statusClass, statusLabel;
   const reasons = [];
   if (groundingDefects > 0) { reasons.push(`${groundingDefects} grounding squawk(s)`); }
   if (minRemaining <= 0) { reasons.push('Inspection overdue'); }
@@ -193,25 +193,27 @@ async function dashboardView() {
 
   if (reasons.length > 0) {
     statusClass = 'red'; statusLabel = 'Grounded';
-    statusExtra = ' &middot; ' + reasons.join(', ');
   } else if (minRemaining <= 5) {
     statusClass = 'orange'; statusLabel = 'Caution';
-    statusExtra = ` &middot; ${minRemaining.toFixed(1)} hrs until next inspection`;
   } else {
     statusClass = 'green'; statusLabel = 'Flightworthy';
-    statusExtra = ` &middot; All clear — CRS valid`;
   }
 
   app.innerHTML = `
     <div class="page">
       <div class="dashboard-hero">
-        <img src="${ac.photoData || 'img/aircraft.jpg'}" alt="${escHtml(ac.tailNumber)}" class="aircraft-image">
-        <span class="aircraft-badge">${escHtml(ac.tailNumber)}${ac.type ? ` &middot; ${escHtml(ac.type)}` : ''}</span>
-      </div>
-
-      <div class="status-card">
-        <div class="status-dot ${statusClass}"></div>
-        <div class="status-text">${statusLabel}${statusExtra}</div>
+        <div class="hero-image-wrap">
+          <img src="${ac.photoData || 'img/aircraft.jpg'}" alt="${escHtml(ac.tailNumber)}" class="aircraft-image">
+          <div class="hero-overlay"></div>
+          <div class="hero-info">
+            <span class="hero-tail">${escHtml(ac.tailNumber)}</span>
+            <span class="hero-type">${escHtml(ac.type || 'Aircraft')}</span>
+          </div>
+          <div class="hero-status ${statusClass}">
+            <span class="hero-status-dot"></span>
+            ${statusLabel}
+          </div>
+        </div>
       </div>
 
       ${!crsIssuedToday && (userRole === 'engineer' || userRole === 'admin') ? `
