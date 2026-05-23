@@ -530,7 +530,7 @@ async function onUpdateMeters() {
 async function showOilChangePrompt(currentTach) {
   const confirmed = await showConfirmDialog(
     '50hr Inspection',
-    'This sortie brings the aircraft to the 50-hour oil change interval. Did you use 1 oil filter and 6 quarts of aviation oil?'
+    'This sortie brings the aircraft to the 50-hour inspection interval. Did you use 1 oil filter and 5678 ml of aviation oil?'
   );
   if (confirmed) {
     const filter = await DB.get('parts', 'OIL-FILTER-C152');
@@ -540,8 +540,8 @@ async function showOilChangePrompt(currentTach) {
       await queueSync('parts', 'update', filter);
     }
     const oil = await DB.get('parts', 'AV-OIL-20W50');
-    if (oil && oil.quantityOnHand >= 6) {
-      oil.quantityOnHand -= 6;
+    if (oil && oil.quantityOnHand >= 5678) {
+      oil.quantityOnHand -= 5678;
       await DB.put('parts', oil);
       await queueSync('parts', 'update', oil);
     }

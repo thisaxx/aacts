@@ -406,8 +406,6 @@ async function dashboardView() {
       ${userRole === 'engineer' || userRole === 'production_planner' || userRole === 'admin' ? `
       <button class="btn btn-secondary btn-block" id="end-of-flying-btn" style="margin-bottom:14px">&#128200; End of Flying — Enter Tach &amp; Start Inspection</button>` : ''}
 
-      <button class="btn btn-secondary btn-block" id="preflight-oil-btn" style="margin-bottom:14px">&#128167; Pre-Flight Oil Check</button>
-
       <div class="quick-actions
         <a href="#" class="quick-action" onclick="navigate('flight-ops')">
           <div class="qa-icon">&#9992;</div>
@@ -587,71 +585,70 @@ async function dashboardView() {
     });
   });
 
-  document.getElementById('preflight-oil-btn').addEventListener('click', async () => {
-    const ac = await getAircraft();
-    const hoursSinceOil = (ac.totalTachTime || 0) - (ac.lastOilChangeTach || 0);
-    const oilDue = hoursSinceOil >= (ac.oilInterval || 50);
-    showBottomSheet(`
-      <div class="card-header"><h3>&#128167; Pre-Flight Oil Check — ${escHtml(ac.tailNumber)}</h3></div>
-      <p class="text-muted small" style="margin-bottom:12px">Oil change due every ${ac.oilInterval || 50} tach hrs. Current: ${hoursSinceOil.toFixed(1)} hrs since last change.${oilDue ? ' <strong class="text-red">Oil change overdue.</strong>' : ''}</p>
-      <div class="form-group">
-        <label>Oil Level</label>
-        <select id="oil-level" class="form-input">
-          <option value="ok">OK — within limits</option>
-          <option value="low">Low — needs topping up</option>
-        </select>
-      </div>
-      <div class="form-group" id="oil-qty-group" style="display:none">
-        <label>Quarts added</label>
-        ${stepperHTML('oil-qty', 1, 0, 12, 1)}
-      </div>
-      <div class="form-group">
-        <label>Remarks (optional)</label>
-        <input type="text" id="oil-remarks" class="form-input" placeholder="e.g. Topped up 2 quarts">
-      </div>
-      <button class="btn btn-primary btn-block" id="oil-check-confirm-btn">Record Oil Check</button>
-      <button class="btn btn-secondary btn-block" id="oil-check-cancel-btn" style="margin-top:8px">Cancel</button>
-    `);
-    initSteppers();
-    document.getElementById('oil-level').addEventListener('change', function() {
-      document.getElementById('oil-qty-group').style.display = this.value === 'low' ? 'block' : 'none';
-    });
-    document.getElementById('oil-check-confirm-btn').addEventListener('click', async () => {
-      const level = document.getElementById('oil-level').value;
-      const qty = level === 'low' ? (parseFloat(document.getElementById('oil-qty').value) || 0) : 0;
-      const remarks = document.getElementById('oil-remarks').value.trim();
-      const user = localStorage.getItem('aac_user') || 'Unknown';
-
-      // Deduct oil from inventory if added
-      if (qty > 0) {
-        const oilPart = await DB.get('parts', 'AV-OIL-20W50');
-        if (oilPart) {
-          if (oilPart.quantityOnHand >= qty) {
-            oilPart.quantityOnHand -= qty;
-            await DB.put('parts', oilPart);
-            await queueSync('parts', 'update', oilPart);
-          } else {
-            showToast('Not enough oil in stock!', 'error');
-          }
-        }
-      }
-
-      window.__sheetClose(true);
-      showToast(`Pre-flight oil check: ${level === 'ok' ? 'OK' : 'Topped up ' + qty + ' qt'}`);
-      logActivity('oil_check', `${user} performed pre-flight oil check on ${ac.tailNumber}: ${level === 'ok' ? 'OK' : 'Added ' + qty + ' qt'}${remarks ? ' — ' + remarks : ''}`, ac.tailNumber);
-      notifyDataChange();
-    });
-    document.getElementById('oil-check-cancel-btn').addEventListener('click', () => {
-      window.__sheetClose(null);
-    });
-  });
-
   const crsBtn = document.getElementById('issue-daily-crs-btn');
   if (crsBtn) {
     crsBtn.addEventListener('click', async () => {
+      const ac = await getAircraft();
+      const hoursSinceOil = (ac.totalTachTime || 0) - (ac.lastOilChangeTach || 0);
+      const oilDue = hoursSinceOil >= (ac.oilInterval || 50);
+
+      // Oil check step before issuing CRS
+      const oilCheckConfirm = await new Promise(resolve => {
+        showBottomSheet(`
+          <div class="card-header"><h3>&#128167; Pre-Flight Oil Check — ${escHtml(ac.tailNumber)}</h3></div>
+          <p class="text-muted small" style="margin-bottom:12px">Oil change due every ${ac.oilInterval || 50} tach hrs. Current: ${hoursSinceOil.toFixed(1)} hrs since last change.${oilDue ? ' <strong class="text-red">Oil change overdue.</strong>' : ''}</p>
+          <div class="form-group">
+            <label>Oil Level</label>
+            <select id="oil-level" class="form-input">
+              <option value="ok">OK — within limits</option>
+              <option value="low">Low — needs topping up</option>
+            </select>
+          </div>
+          <div class="form-group" id="oil-qty-group" style="display:none">
+            <label>Oil added (ml)</label>
+            ${stepperHTML('oil-qty', 0, 0, 5000, 100)}
+          </div>
+          <div class="form-group">
+            <label>Remarks (optional)</label>
+            <input type="text" id="oil-remarks" class="form-input" placeholder="e.g. Topped up">
+          </div>
+          <button class="btn btn-primary btn-block" id="oil-check-ok-btn">Record &amp; Continue to CRS</button>
+          <button class="btn btn-secondary btn-block" id="oil-check-skip-btn" style="margin-top:8px">Skip — Issue CRS Without Oil Check</button>
+        `);
+        initSteppers();
+        document.getElementById('oil-level').addEventListener('change', function() {
+          document.getElementById('oil-qty-group').style.display = this.value === 'low' ? 'block' : 'none';
+        });
+        document.getElementById('oil-check-ok-btn').addEventListener('click', async () => {
+          const level = document.getElementById('oil-level').value;
+          const qty = level === 'low' ? (parseFloat(document.getElementById('oil-qty').value) || 0) : 0;
+          const remarks = document.getElementById('oil-remarks').value.trim();
+          const user = localStorage.getItem('aac_user') || 'Unknown';
+          if (qty > 0) {
+            const oilPart = await DB.get('parts', 'AV-OIL-20W50');
+            if (oilPart) {
+              if (oilPart.quantityOnHand >= qty) {
+                oilPart.quantityOnHand -= qty;
+                await DB.put('parts', oilPart);
+                await queueSync('parts', 'update', oilPart);
+              } else {
+                showToast('Not enough oil in stock!', 'error');
+              }
+            }
+          }
+          window.__sheetClose(true);
+          logActivity('oil_check', `${user} pre-flight oil check on ${ac.tailNumber}: ${level === 'ok' ? 'OK' : 'Added ' + qty + 'ml'}${remarks ? ' — ' + remarks : ''}`, ac.tailNumber);
+          resolve(true);
+        });
+        document.getElementById('oil-check-skip-btn').addEventListener('click', () => {
+          window.__sheetClose(true);
+          resolve(true);
+        });
+      });
+      if (!oilCheckConfirm) return;
+
       const confirmed = await showConfirmDialog('Issue Daily CRS', 'Confirm you are authorized to issue the Certificate of Release to Service for today?');
       if (!confirmed) return;
-      const ac = await getAircraft();
       ac.dailyCrsDate = new Date().toISOString().slice(0, 10);
       ac.dailyCrsBy = localStorage.getItem('aac_user') || 'Engineer';
       ac.groundedAfterInspection = false;
@@ -1254,9 +1251,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (isLight) {
     document.documentElement.setAttribute('data-theme', 'light');
   }
-  // Set sidebar theme label and toggle icon
-  const themeLabel = document.getElementById('sidebar-theme-label');
-  if (themeLabel) themeLabel.textContent = isLight ? 'Light Mode' : 'Dark Mode';
+  // Set sidebar theme toggle icon
   const themeToggle = document.getElementById('sidebar-theme-toggle');
   if (themeToggle) themeToggle.innerHTML = isLight ? '&#127774;' : '&#127769;';
 
@@ -1334,17 +1329,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (isLight) {
       html.removeAttribute('data-theme');
       localStorage.setItem('aac_theme', 'dark');
-      document.getElementById('sidebar-theme-label').textContent = 'Dark Mode';
       document.getElementById('sidebar-theme-toggle').innerHTML = '&#127769;';
     } else {
       html.setAttribute('data-theme', 'light');
       localStorage.setItem('aac_theme', 'light');
-      document.getElementById('sidebar-theme-label').textContent = 'Light Mode';
       document.getElementById('sidebar-theme-toggle').innerHTML = '&#127774;';
     }
     showToast(isLight ? 'Dark mode' : 'Light mode');
   }
-  document.getElementById('sidebar-theme').addEventListener('click', e => {
+  document.getElementById('sidebar-theme')?.addEventListener('click', e => {
     e.preventDefault();
     toggleTheme();
   });

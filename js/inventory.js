@@ -1,6 +1,6 @@
 const DEFAULT_PARTS = [
   { partNumber: 'OIL-FILTER-C152', description: 'Oil Filter - Cessna 152', quantityOnHand: 10, minSafeStock: 3 },
-  { partNumber: 'AV-OIL-20W50', description: 'Aviation Oil 20W-50 (qt)', quantityOnHand: 24, minSafeStock: 6 },
+  { partNumber: 'AV-OIL-20W50', description: 'Aviation Oil 20W-50 (ml)', quantityOnHand: 22712, minSafeStock: 5678 },
   { partNumber: 'SPARK-PLUG-C152', description: 'Spark Plug - Cessna 152', quantityOnHand: 16, minSafeStock: 4 },
   { partNumber: 'AIR-FILTER-C152', description: 'Air Filter - Cessna 152', quantityOnHand: 5, minSafeStock: 2 },
   { partNumber: 'TIRE-6006', description: 'Main Tire 6.00-6', quantityOnHand: 4, minSafeStock: 2 },
