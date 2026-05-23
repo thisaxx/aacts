@@ -1086,17 +1086,4 @@ select {
 .sidebar-insp-item { font-family: var(--mono); font-size: 10px; padding: 4px 0; color: var(--text-secondary); display: flex; justify-content: space-between; }
 
 /* ── Profile Page ── */
-.profile-role-select { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
-.profile-role-option {
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  cursor: pointer;
-  transition: all 0.15s;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.profile-role-option.selected { border-color: var(--text); background: var(--surface-hover); }
-.profile-role-option input { display: none; }
-.profile-role-label { font-family: var(--mono); font-size: 12px; font-weight: 700; }
-.profile-role-desc { font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
+
