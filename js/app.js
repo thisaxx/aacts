@@ -1014,7 +1014,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   document.getElementById('sidebar-theme').addEventListener('click', e => {
     e.preventDefault();
-    closeSidebar();
     const html = document.documentElement;
     const isLight = html.getAttribute('data-theme') === 'light';
     if (isLight) {
@@ -1026,6 +1025,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       localStorage.setItem('aac_theme', 'light');
       document.getElementById('sidebar-theme-label').textContent = 'Light Mode';
     }
+    showToast(isLight ? 'Dark mode' : 'Light mode');
   });
   document.getElementById('sidebar-pincode').addEventListener('click', async e => {
     e.preventDefault();
