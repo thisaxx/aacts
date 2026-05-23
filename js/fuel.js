@@ -117,7 +117,7 @@ function showTopUpSheet() {
 
   document.getElementById('confirm-topup-btn').addEventListener('click', async () => {
     const type = document.getElementById('topup-type').value;
-    const liters = parseFloat(document.getElementById('topup-liters').textContent) || 0;
+    const liters = parseFloat(document.getElementById('topup-liters').value) || 0;
     if (liters <= 0) { showToast('Enter valid liters', 'error'); return; }
 
     await addFuel(type, liters);
@@ -183,11 +183,7 @@ async function renderFuelStock() {
         <div class="fuel-stock-header">
           <strong>${escHtml(s.name)}</strong>
           <div style="display:flex;align-items:center;gap:6px">
-            <div class="stepper stepper-inline" data-stock-id="${s.id}">
-              <button class="stepper-btn stock-dec" style="flex:0 0 28px;height:28px;font-size:14px">-</button>
-              <span class="stepper-value stock-qty" contenteditable="true" data-id="${s.id}" style="font-size:14px;min-width:50px;padding:2px 4px">${s.quantityLiters}</span>
-              <button class="stepper-btn stock-inc" style="flex:0 0 28px;height:28px;font-size:14px">+</button>
-            </div>
+            <input type="number" class="form-input stock-qty-input" data-id="${s.id}" value="${s.quantityLiters}" min="0" style="width:70px;font-size:14px;text-align:center">
             <span style="font-size:12px;color:var(--text-muted)">L</span>
             <button class="btn btn-sm btn-danger del-fuel-stock-btn" data-id="${s.id}" data-name="${escHtml(s.name)}" style="padding:2px 6px;font-size:10px">&times;</button>
           </div>
@@ -201,30 +197,11 @@ async function renderFuelStock() {
     `;
   }).join('');
 
-  el.querySelectorAll('.stock-inc').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const id = btn.closest('.stepper').dataset.stockId;
-      const qtyEl = btn.parentElement.querySelector('.stock-qty');
-      const v = (parseFloat(qtyEl.textContent) || 0) + 10;
-      qtyEl.textContent = v;
-      await updateFuelStockQty(id, v);
-    });
-  });
-  el.querySelectorAll('.stock-dec').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const id = btn.closest('.stepper').dataset.stockId;
-      const qtyEl = btn.parentElement.querySelector('.stock-qty');
-      const v = Math.max(0, (parseFloat(qtyEl.textContent) || 0) - 10);
-      qtyEl.textContent = v;
-      await updateFuelStockQty(id, v);
-    });
-  });
-  el.querySelectorAll('.stock-qty').forEach(el2 => {
-    el2.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); el2.blur(); } });
-    el2.addEventListener('blur', async () => {
-      const id = el2.dataset.id;
-      const v = Math.max(0, parseFloat(el2.textContent) || 0);
-      el2.textContent = v;
+  el.querySelectorAll('.stock-qty-input').forEach(input => {
+    input.addEventListener('change', async () => {
+      const id = input.dataset.id;
+      const v = Math.max(0, parseFloat(input.value) || 0);
+      input.value = v;
       await updateFuelStockQty(id, v);
     });
   });

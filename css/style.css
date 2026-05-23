@@ -404,45 +404,6 @@ body {
 .row .form-group { flex: 1; }
 
 /* ── Stepper (+/-) ── */
-.stepper {
-  display: flex;
-  align-items: center;
-  background: #000;
-  border: 1px solid var(--border);
-  width: 100%;
-}
-.stepper-btn {
-  flex: 0 0 44px;
-  height: 44px;
-  border: none;
-  background: var(--surface);
-  color: var(--text);
-  font-size: 18px;
-  font-family: var(--mono);
-  cursor: pointer;
-  transition: all 0.15s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.stepper-btn:active { background: var(--surface-hover); }
-.stepper-value {
-  flex: 1;
-  text-align: center;
-  font-family: var(--mono);
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text);
-  padding: 0 4px;
-  min-width: 60px;
-  outline: none;
-  cursor: text;
-  user-select: text;
-  -webkit-user-select: text;
-}
-.stepper-value:focus { background: var(--surface); }
-.stepper-mini .stepper-btn { flex: 0 0 36px; height: 36px; font-size: 16px; }
-
 /* ── Calc Display ── */
 .calc-display {
   padding: 14px;

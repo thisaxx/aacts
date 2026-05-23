@@ -285,7 +285,7 @@ function showFuelAddSheet(fuelId, fuelName) {
   `);
   initSteppers();
   document.getElementById('confirm-add-stock-btn').addEventListener('click', async () => {
-    const liters = parseFloat(document.getElementById('add-fuel-liters').textContent) || 0;
+    const liters = parseFloat(document.getElementById('add-fuel-liters').value) || 0;
     const source = document.getElementById('add-fuel-source').value.trim() || 'Manual add';
     if (liters <= 0) { showToast('Enter valid liters', 'error'); return; }
 
@@ -321,7 +321,7 @@ function showFuelReduceSheet(fuelId, fuelName) {
   `);
   initSteppers();
   document.getElementById('confirm-reduce-stock-btn').addEventListener('click', async () => {
-    const liters = parseFloat(document.getElementById('reduce-fuel-liters').textContent) || 0;
+    const liters = parseFloat(document.getElementById('reduce-fuel-liters').value) || 0;
     const reason = document.getElementById('reduce-fuel-reason').value.trim() || 'Manual reduction';
     if (liters <= 0) { showToast('Enter valid liters', 'error'); return; }
 

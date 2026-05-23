@@ -305,27 +305,33 @@ async function showArrivalForm(flightId) {
   if (toggle) toggle.classList.remove('on');
   document.getElementById('refuel-fields').classList.add('hidden');
   const sv = document.getElementById('refuel-amount');
-  if (sv) sv.textContent = '0';
+  if (sv) sv.value = '0';
 }
 
 function updateArrivalCalc() {
-  const t = timeToMin('takeoff-time');
-  const l = timeToMin('landing-time');
-  const durationEl = document.getElementById('calc-duration');
-  if (!t || !l || l <= t) { durationEl.textContent = '—'; return; }
-  durationEl.textContent = (l - t) + ' min';
+  const flightId = document.getElementById('arrival-flight-id')?.value;
+  if (!flightId) return;
+  DB.get('flights', flightId).then(flight => {
+    if (!flight) return;
+    const l = timeToMin('landing-time');
+    const takeoffParts = (flight.takeoffTime || '').split(':').map(Number);
+    const t = takeoffParts[0]*60 + takeoffParts[1];
+    const durationEl = document.getElementById('calc-duration');
+    if (!t || !l || l <= t) { durationEl.textContent = '—'; return; }
+    durationEl.textContent = (l - t) + ' min';
 
-  const beforeLeft = parseFloat(document.getElementById('fuel-before-left')?.value) || 0;
-  const beforeRight = parseFloat(document.getElementById('fuel-before-right')?.value) || 0;
-  const afterLeft = fuelVal('fuel-after-left');
-  const afterRight = fuelVal('fuel-after-right');
-  const consumed = Math.max(0, (beforeLeft + beforeRight) - (afterLeft + afterRight));
-  const durationH = (l - t) / 60;
+    const beforeLeft = flight.fuelBeforeLeft || 0;
+    const beforeRight = flight.fuelBeforeRight || 0;
+    const afterLeft = fuelVal('fuel-after-left');
+    const afterRight = fuelVal('fuel-after-right');
+    const consumed = Math.max(0, (beforeLeft + beforeRight) - (afterLeft + afterRight));
+    const durationH = (l - t) / 60;
 
-  document.getElementById('calc-consumed').textContent = consumed > 0 ? consumed.toFixed(1) + ' gal' : '—';
-  document.getElementById('calc-rate').textContent = (consumed > 0 && durationH > 0)
-    ? (consumed / durationH).toFixed(1) + ' gal/hr'
-    : '—';
+    document.getElementById('calc-consumed').textContent = consumed > 0 ? consumed.toFixed(1) + ' gal' : '—';
+    document.getElementById('calc-rate').textContent = (consumed > 0 && durationH > 0)
+      ? (consumed / durationH).toFixed(1) + ' gal/hr'
+      : '—';
+  });
 }
 
 async function onDepartureSubmit(e) {
@@ -383,20 +389,21 @@ async function onArrivalSubmit(e) {
   if (!flight) { showToast('Flight record not found', 'error'); return; }
 
   const landingTime = document.getElementById('landing-time').value;
-  const durationMin = timeToMin('landing-time') - timeToMin('takeoff-time');
-  const duration = durationMin > 0 ? durationMin / 60 : 0;
-
-  if (!landingTime || durationMin <= 0) {
+  if (!landingTime) {
     showToast('Enter valid arrival time', 'error');
     return;
   }
+  const takeoffParts = (flight.takeoffTime || '').split(':').map(Number);
+  const landingParts = landingTime.split(':').map(Number);
+  const durationMin = (landingParts[0]*60 + landingParts[1]) - (takeoffParts[0]*60 + takeoffParts[1]);
+  const duration = durationMin > 0 ? durationMin / 60 : 0;
 
   const fuelAfterLeft = fuelVal('fuel-after-left');
   const fuelAfterRight = fuelVal('fuel-after-right');
   const fuelConsumed = Math.max(0, (flight.fuelBeforeLeft + flight.fuelBeforeRight) - (fuelAfterLeft + fuelAfterRight));
   const refuelToggle = document.querySelector('[data-toggle-id="refueled-check"]');
   const refueled = refuelToggle?.querySelector('.toggle-track')?.classList.contains('on') || false;
-  const refuelAmt = refueled ? parseFloat(document.getElementById('refuel-amount')?.textContent) || 0 : 0;
+  const refuelAmt = refueled ? parseFloat(document.getElementById('refuel-amount')?.value) || 0 : 0;
   const refuelSrc = refueled ? document.getElementById('refuel-source')?.value : '';
   const fuelType = refueled ? document.getElementById('fuel-type')?.value : '';
 
@@ -496,8 +503,8 @@ async function onArrivalSubmit(e) {
 
 async function onUpdateMeters() {
   const ac = await getAircraft();
-  const newTach = parseFloat(document.getElementById('eod-tach').textContent) || 0;
-  const newHobbs = parseFloat(document.getElementById('eod-hobbs').textContent) || 0;
+  const newTach = parseFloat(document.getElementById('eod-tach').value) || 0;
+  const newHobbs = parseFloat(document.getElementById('eod-hobbs').value) || 0;
   if (newTach <= 0) { showToast('Enter current tach reading', 'error'); return; }
   ac.totalTachTime = newTach;
   await DB.put('aircraft', ac);

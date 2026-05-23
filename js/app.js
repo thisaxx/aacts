@@ -115,53 +115,12 @@ function showBottomSheet(html) {
 }
 
 function stepperHTML(id, value, min = 0, max = 999, step = 1, mini = false) {
-  const cls = mini ? 'stepper stepper-mini' : 'stepper';
-  return `<div class="${cls}" data-stepper-id="${id}" data-min="${min}" data-max="${max}" data-step="${step}">
-    <button class="stepper-btn stepper-dec">-</button>
-    <span class="stepper-value" id="${id}" contenteditable="true">${value}</span>
-    <button class="stepper-btn stepper-inc">+</button>
-  </div>`;
+  const cls = mini ? 'form-input input-sm' : 'form-input';
+  return `<input type="number" id="${id}" class="${cls}" value="${value}" min="${min}" max="${max}" step="${step}">`;
 }
 
 function initSteppers() {
-  document.querySelectorAll('.stepper').forEach(el => {
-    const min = parseFloat(el.dataset.min);
-    const max = parseFloat(el.dataset.max);
-    const step = parseFloat(el.dataset.step);
-    const valEl = el.querySelector('.stepper-value');
-
-    function getStepDecimals() {
-      const s = step.toString();
-      const i = s.indexOf('.');
-      return i === -1 ? 1 : s.length - i - 1;
-    }
-    function snap(v) {
-      const d = getStepDecimals();
-      return Math.round(Math.max(min, Math.min(max, v)) * (10 ** d)) / (10 ** d);
-    }
-    function readVal() {
-      const v = parseFloat(valEl.textContent);
-      return isNaN(v) ? min : v;
-    }
-
-    el.querySelector('.stepper-dec').addEventListener('click', () => {
-      valEl.textContent = snap(readVal() - step);
-      valEl.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-    el.querySelector('.stepper-inc').addEventListener('click', () => {
-      valEl.textContent = snap(readVal() + step);
-      valEl.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-
-    valEl.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); valEl.blur(); }
-    });
-    valEl.addEventListener('blur', () => {
-      const v = parseFloat(valEl.textContent);
-      valEl.textContent = isNaN(v) ? min : snap(v);
-      valEl.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-  });
+  // steppers replaced with plain number inputs
 }
 
 function toggleSwitchHTML(id, label, on = false) {
@@ -686,8 +645,8 @@ function showAircraftSheet() {
     if (!tail) { showToast('Enter a tail number', 'error'); return; }
     const existing = await DB.get('aircraft', tail);
     if (existing) { showToast('Aircraft already exists', 'error'); return; }
-    const etbo = parseFloat(document.getElementById('new-ac-etbo').textContent) || 2000;
-    const ptbo = parseFloat(document.getElementById('new-ac-ptbo').textContent) || 2000;
+    const etbo = parseFloat(document.getElementById('new-ac-etbo').value) || 2000;
+    const ptbo = parseFloat(document.getElementById('new-ac-ptbo').value) || 2000;
     const ac = {
       tailNumber: tail,
       type,
@@ -891,15 +850,15 @@ function showEditAircraftForm(ac) {
         ...ac,
         tailNumber: tail,
         type: document.getElementById('edit-ac-type').value.trim() || ac.type,
-        totalTachTime: parseFloat(document.getElementById('edit-ac-tach').textContent) || 0,
-        lastOilChangeTach: parseFloat(document.getElementById('edit-ac-oil').textContent) || 0,
-        last100hrTach: parseFloat(document.getElementById('edit-ac-100hr').textContent) || 0,
-        oilInterval: parseInt(document.getElementById('edit-ac-oil-int').textContent) || 50,
-        structInterval: parseInt(document.getElementById('edit-ac-struct-int').textContent) || 100,
-        engineETSO: parseFloat(document.getElementById('edit-ac-etso').textContent) || 0,
-        propellerPTSO: parseFloat(document.getElementById('edit-ac-ptso').textContent) || 0,
-        engineTBO: parseInt(document.getElementById('edit-ac-etbo').textContent) || 2000,
-        propellerTBO: parseInt(document.getElementById('edit-ac-ptbo').textContent) || 2000
+        totalTachTime: parseFloat(document.getElementById('edit-ac-tach').value) || 0,
+        lastOilChangeTach: parseFloat(document.getElementById('edit-ac-oil').value) || 0,
+        last100hrTach: parseFloat(document.getElementById('edit-ac-100hr').value) || 0,
+        oilInterval: parseInt(document.getElementById('edit-ac-oil-int').value) || 50,
+        structInterval: parseInt(document.getElementById('edit-ac-struct-int').value) || 100,
+        engineETSO: parseFloat(document.getElementById('edit-ac-etso').value) || 0,
+        propellerPTSO: parseFloat(document.getElementById('edit-ac-ptso').value) || 0,
+        engineTBO: parseInt(document.getElementById('edit-ac-etbo').value) || 2000,
+        propellerTBO: parseInt(document.getElementById('edit-ac-ptbo').value) || 2000
       };
       if (tail !== ac.tailNumber) {
         const existing = await DB.get('aircraft', tail);
@@ -1078,7 +1037,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Global haptic on actionable elements
   document.addEventListener('click', e => {
-    const t = e.target.closest('.btn, .quick-action, .sidebar-link, .header-btn, .hamburger-btn, .stepper-btn');
+    const t = e.target.closest('.btn, .quick-action, .sidebar-link, .header-btn, .hamburger-btn');
     if (t) haptic();
   });
 
