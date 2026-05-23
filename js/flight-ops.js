@@ -124,6 +124,8 @@ function flightOpsView() {
         <div id="departed-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line" style="width:40%"></div></div>
       </div>
 
+      <button class="btn btn-secondary btn-block" id="flight-ops-eof-btn" style="margin-bottom:14px">&#128200; End of Flying — Enter Tach &amp; Start Inspection</button>
+
       <div class="card hidden" id="arrival-card">
         <div class="card-header">
           <h3>Record Arrival <span id="arrival-flight-ref" style="font-weight:400;font-size:12px"></span></h3>
@@ -210,7 +212,6 @@ function flightOpsView() {
         </div>
         <div id="recent-flights"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line" style="width:40%"></div></div>
       </div>
-      <button class="btn btn-secondary btn-block" id="flight-ops-eof-btn" style="margin-bottom:14px">&#128200; End of Flying — Enter Tach &amp; Start Inspection</button>
     </div>
   `;
 
