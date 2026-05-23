@@ -927,30 +927,89 @@ function scheduleEndOfDayCheck() {
 }
 
 async function showExportSheet() {
+  const today = new Date().toISOString().slice(0, 10);
+  const firstOfMonth = new Date(); firstOfMonth.setDate(1);
+  const fromDefault = firstOfMonth.toISOString().slice(0, 10);
+
+  const storeDefs = [
+    { key: 'aircraft', label: 'Aircraft', hasDate: false },
+    { key: 'flights', label: 'Flights', hasDate: true, dateField: 'flightDate' },
+    { key: 'defects', label: 'Defects', hasDate: true, dateField: 'createdAt' },
+    { key: 'maintenance_tasks', label: 'Maintenance Tasks', hasDate: true, dateField: 'createdAt' },
+    { key: 'fuel_stock', label: 'Fuel Stock', hasDate: false },
+    { key: 'fuel_logs', label: 'Fuel Logs', hasDate: true, dateField: 'createdAt' },
+    { key: 'parts', label: 'Parts', hasDate: false },
+    { key: 'users', label: 'Users', hasDate: false },
+    { key: 'attendance', label: 'Attendance', hasDate: true, dateField: 'date' }
+  ];
+
   showBottomSheet(`
     <div class="card-header"><h3>Export Data</h3></div>
-    <p class="text-muted small" style="margin-bottom:14px">Generate a sorted PDF report of all data.</p>
+    <div style="margin-bottom:14px">
+      <div class="row">
+        <div class="form-group">
+          <label>From Date</label>
+          <input type="date" id="export-from" class="form-input" value="${fromDefault}">
+        </div>
+        <div class="form-group">
+          <label>To Date</label>
+          <input type="date" id="export-to" class="form-input" value="${today}">
+        </div>
+      </div>
+    </div>
+    <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px;display:block;margin-bottom:6px">Include:</label>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+      ${storeDefs.map(s => `
+        <label style="flex:0 0 auto;display:flex;align-items:center;gap:6px;background:var(--glass-bg);padding:4px 10px;border-radius:8px;font-size:13px">
+          <input type="checkbox" class="export-store-cb" data-key="${s.key}" checked> ${s.label}
+        </label>
+      `).join('')}
+    </div>
     <button class="btn btn-primary btn-block" id="export-all-btn">Generate PDF Report</button>
     <button class="btn btn-secondary btn-block" id="close-export-btn" style="margin-top:8px">Close</button>
   `);
+
   document.getElementById('export-all-btn').addEventListener('click', async () => {
+    const fromVal = document.getElementById('export-from').value;
+    const toVal = document.getElementById('export-to').value;
+    if (!fromVal || !toVal) { showToast('Select from and to dates', 'error'); return; }
+    const from = new Date(fromVal);
+    const to = new Date(toVal + 'T23:59:59');
+
+    const selected = [...document.querySelectorAll('.export-store-cb:checked')].map(cb => cb.dataset.key);
+    if (selected.length === 0) { showToast('Select at least one data type', 'error'); return; }
+
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const stores = ['aircraft', 'flights', 'defects', 'maintenance_tasks', 'fuel_stock', 'fuel_logs', 'parts', 'users', 'attendance'];
     const data = {};
-    for (const name of stores) {
+    for (const name of selected) {
       data[name] = await DB.getAll(name);
+    }
+
+    // Filter by date range
+    const defsMap = Object.fromEntries(storeDefs.map(s => [s.key, s]));
+    for (const name of selected) {
+      const def = defsMap[name];
+      if (def && def.hasDate && data[name].length > 0) {
+        data[name] = data[name].filter(item => {
+          const raw = item[def.dateField];
+          if (!raw) return false;
+          const d = new Date(raw.slice(0, 10));
+          return d >= from && d <= to;
+        });
+      }
     }
 
     doc.setFontSize(18);
     doc.text('AAC — Data Export', 14, 20);
     doc.setFontSize(10);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
-    doc.line(14, 32, 196, 32);
+    doc.text(`Period: ${fromVal} to ${toVal}`, 14, 28);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 34);
+    doc.line(14, 38, 196, 38);
 
-    let y = 40;
+    let y = 44;
 
-    for (const name of stores) {
+    for (const name of selected) {
       const items = data[name] || [];
       if (items.length === 0) continue;
 
@@ -988,7 +1047,7 @@ async function showExportSheet() {
       y = doc.lastAutoTable.finalY + 8;
     }
 
-    doc.save(`aac-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+    doc.save(`aac-report-${fromVal}_to_${toVal}.pdf`);
     showToast('PDF report downloaded');
     window.__sheetClose(true);
   });
