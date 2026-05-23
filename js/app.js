@@ -744,12 +744,13 @@ async function renderACListSheet() {
         ${ac.photoData ? `<img src="${ac.photoData}" alt="" class="ac-thumb">` : ''}
         <strong>${escHtml(ac.tailNumber)}</strong>
         <div class="text-muted small">${escHtml(ac.type || 'Aircraft')}</div>
-        ${ac.tailNumber === current ? `<div class="ac-list-tso">
+        ${ac.tailNumber === current ? `      <div class="ac-list-tso">
           <span>Engine TSO: ${(ac.engineETSO || 0).toFixed(1)}h</span>
           <span>Prop TSO: ${(ac.propellerPTSO || 0).toFixed(1)}h</span>
         </div>` : ''}
-        ${canEdit ? `<div style="margin-top:6px">
-          <button class="btn btn-ghost change-photo-btn" data-tail="${ac.tailNumber}" style="font-size:10px;padding:4px 10px">Change Photo</button>
+        ${canEdit ? `<div style="margin-top:6px;display:flex;gap:4px">
+          <button class="btn btn-ghost edit-ac-btn" data-tail="${ac.tailNumber}" style="font-size:9px;padding:4px 8px">Edit</button>
+          <button class="btn btn-ghost change-photo-btn" data-tail="${ac.tailNumber}" style="font-size:9px;padding:4px 8px">Photo</button>
         </div>` : ''}
       </div>
       <div class="ac-list-actions">
@@ -795,6 +796,13 @@ async function renderACListSheet() {
       document.getElementById('ac-photo-input').click();
     });
   });
+  el.querySelectorAll('.edit-ac-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const ac = await DB.get('aircraft', btn.dataset.tail);
+      if (!ac) return;
+      showEditAircraftForm(ac);
+    });
+  });
   el.querySelectorAll('.switch-ac-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const tail = btn.dataset.tail;
@@ -821,6 +829,118 @@ async function renderACListSheet() {
       renderACListSheet();
     });
   });
+}
+
+function showEditAircraftForm(ac) {
+  const sheetInner = document.querySelector('.sheet-inner');
+  if (sheetInner) {
+    sheetInner.innerHTML = `
+      <div class="sheet-handle"></div>
+      <div class="card-header"><h3>Edit Aircraft</h3></div>
+      <p class="text-muted small" style="margin-bottom:14px">${escHtml(ac.tailNumber)}</p>
+      <div class="form-group">
+        <label>Tail Number</label>
+        <input type="text" id="edit-ac-tail" value="${escHtml(ac.tailNumber)}" class="form-input">
+      </div>
+      <div class="form-group">
+        <label>Aircraft Type</label>
+        <input type="text" id="edit-ac-type" value="${escHtml(ac.type || '')}" class="form-input">
+      </div>
+      <div class="form-group">
+        <label>Total Tach Time (hrs)</label>
+        ${stepperHTML('edit-ac-tach', ac.totalTachTime || 0, 0, 99999, 0.1)}
+      </div>
+      <div class="row">
+        <div class="form-group">
+          <label>Last Oil Change (tach hrs)</label>
+          ${stepperHTML('edit-ac-oil', ac.lastOilChangeTach || 0, 0, 99999, 0.1)}
+        </div>
+        <div class="form-group">
+          <label>Last 100hr Insp (tach hrs)</label>
+          ${stepperHTML('edit-ac-100hr', ac.last100hrTach || 0, 0, 99999, 0.1)}
+        </div>
+      </div>
+      <div class="row">
+        <div class="form-group">
+          <label>Oil Interval (hrs)</label>
+          ${stepperHTML('edit-ac-oil-int', ac.oilInterval || 50, 1, 999, 1)}
+        </div>
+        <div class="form-group">
+          <label>Structural Interval (hrs)</label>
+          ${stepperHTML('edit-ac-struct-int', ac.structInterval || 100, 1, 999, 1)}
+        </div>
+      </div>
+      <div class="row">
+        <div class="form-group">
+          <label>Engine TSO (hrs)</label>
+          ${stepperHTML('edit-ac-etso', ac.engineETSO || 0, 0, 99999, 0.1)}
+        </div>
+        <div class="form-group">
+          <label>Prop TSO (hrs)</label>
+          ${stepperHTML('edit-ac-ptso', ac.propellerPTSO || 0, 0, 99999, 0.1)}
+        </div>
+      </div>
+      <div class="row">
+        <div class="form-group">
+          <label>Engine TBO (hrs)</label>
+          ${stepperHTML('edit-ac-etbo', ac.engineTBO || 2000, 100, 99999, 100)}
+        </div>
+        <div class="form-group">
+          <label>Prop TBO (hrs)</label>
+          ${stepperHTML('edit-ac-ptbo', ac.propellerTBO || 2000, 100, 99999, 100)}
+        </div>
+      </div>
+      <button class="btn btn-primary btn-block" id="save-edit-ac-btn">Save Changes</button>
+      <button class="btn btn-secondary btn-block" id="cancel-edit-ac-btn" style="margin-top:8px">Cancel</button>
+    `;
+    initSteppers();
+    document.getElementById('save-edit-ac-btn').addEventListener('click', async () => {
+      const tail = document.getElementById('edit-ac-tail').value.trim().toUpperCase();
+      if (!tail) { showToast('Tail number required', 'error'); return; }
+      const updated = {
+        ...ac,
+        tailNumber: tail,
+        type: document.getElementById('edit-ac-type').value.trim() || ac.type,
+        totalTachTime: parseFloat(document.getElementById('edit-ac-tach').textContent) || 0,
+        lastOilChangeTach: parseFloat(document.getElementById('edit-ac-oil').textContent) || 0,
+        last100hrTach: parseFloat(document.getElementById('edit-ac-100hr').textContent) || 0,
+        oilInterval: parseInt(document.getElementById('edit-ac-oil-int').textContent) || 50,
+        structInterval: parseInt(document.getElementById('edit-ac-struct-int').textContent) || 100,
+        engineETSO: parseFloat(document.getElementById('edit-ac-etso').textContent) || 0,
+        propellerPTSO: parseFloat(document.getElementById('edit-ac-ptso').textContent) || 0,
+        engineTBO: parseInt(document.getElementById('edit-ac-etbo').textContent) || 2000,
+        propellerTBO: parseInt(document.getElementById('edit-ac-ptbo').textContent) || 2000
+      };
+      if (tail !== ac.tailNumber) {
+        const existing = await DB.get('aircraft', tail);
+        if (existing) { showToast('Tail number already exists', 'error'); return; }
+        await DB.del('aircraft', ac.tailNumber);
+        await queueSync('aircraft', 'delete', { id: ac.tailNumber });
+        // Update all flights/defects/tasks referencing old tail
+        for (const store of ['flights', 'defects', 'maintenance_tasks', 'fuel_logs']) {
+          const items = await DB.getAll(store);
+          for (const item of items.filter(i => i.aircraftId === ac.tailNumber)) {
+            item.aircraftId = tail;
+            await DB.put(store, item);
+            await queueSync(store, 'update', item);
+          }
+        }
+      }
+      await DB.put('aircraft', updated);
+      await queueSync('aircraft', 'update', updated);
+      if (getCurrentAircraftKey() === ac.tailNumber && tail !== ac.tailNumber) {
+        setCurrentAircraftKey(tail);
+      }
+      populateACSelector();
+      showToast('Aircraft updated');
+      window.__sheetClose(true);
+      showAircraftSheet();
+    });
+    document.getElementById('cancel-edit-ac-btn').addEventListener('click', () => {
+      window.__sheetClose(true);
+      showAircraftSheet();
+    });
+  }
 }
 
 async function clearAllData() {
