@@ -29,13 +29,13 @@ function inventoryView() {
   app.innerHTML = `
     <div class="page">
       <div class="page-header">
-        <h2>Parts &amp; Stock</h2>
-        <div class="subtitle">Parts inventory management</div>
+        <h2>Component Inventory</h2>
+        <div class="subtitle">Component inventory management</div>
       </div>
 
       <div class="card">
         <div class="card-header">
-          <h3>Parts Inventory</h3>
+          <h3>Component Catalog</h3>
           <button class="btn btn-sm btn-primary" id="add-part-btn">+ Add Part</button>
         </div>
         <div id="add-part-form" class="hidden" style="margin-bottom:14px">
@@ -53,7 +53,7 @@ function inventoryView() {
               <input type="number" id="part-qty" value="1" min="0">
             </div>
             <div class="form-group">
-              <label>Min Safe Stock</label>
+              <label>Min Stock Level</label>
               <input type="number" id="part-min" value="1" min="0">
             </div>
           </div>
@@ -65,7 +65,7 @@ function inventoryView() {
         <div id="inventory-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line" style="width:40%"></div></div>
       </div>
       <div class="card">
-        <div class="card-header"><h3>Low Stock Alerts</h3></div>
+        <div class="card-header"><h3>Low Inventory Alerts</h3></div>
         <div id="low-stock-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>
       </div>
 

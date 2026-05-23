@@ -14,14 +14,14 @@ function maintenanceView() {
         <div class="subtitle">Maintenance &amp; Release Tracking</div>
       </div>
 
-      <button class="btn btn-primary btn-block" id="new-task-btn">+ New Maintenance Task</button>
+      <button class="btn btn-primary btn-block" id="new-task-btn">+ New Work Order</button>
 
       <div id="new-task-form" class="card hidden">
         <div class="card-header">
-          <h3>Create Task</h3>
+          <h3>Work Order Entry</h3>
         </div>
         <div class="form-group">
-          <label for="task-description">Task Description</label>
+          <label for="task-description">Work Description</label>
           <textarea id="task-description" rows="3" placeholder="Describe the maintenance issue..."></textarea>
         </div>
         <div class="form-group">
@@ -33,13 +33,13 @@ function maintenanceView() {
             <option value="critical">Critical</option>
           </select>
         </div>
-        <button class="btn btn-primary" id="save-task-btn">Save Task</button>
+        <button class="btn btn-primary" id="save-task-btn">Create Work Order</button>
         <button class="btn btn-secondary" id="cancel-task-btn">Cancel</button>
       </div>
 
       <div class="card">
         <div class="card-header">
-          <h3>Open Tasks</h3>
+          <h3>Open Work Orders</h3>
         </div>
       <div id="tasks-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line" style="width:40%"></div></div>
       <div class="card">
@@ -81,7 +81,9 @@ async function onNewTask() {
 
   await DB.put('maintenance_tasks', task);
   await queueSync('maintenance_tasks', 'create', task);
-  showToast('Task created');
+  showToast('Work order created');
+  const user = localStorage.getItem('aac_user') || 'Unknown';
+  createNotification('task', 'Work Order Created', `${user} created work order on ${task.aircraftId}: ${task.description}`, 'maintenance');
   document.getElementById('new-task-form').classList.add('hidden');
   document.getElementById('task-description').value = '';
   renderTasks();
@@ -97,14 +99,14 @@ async function renderTasks() {
   const completedEl = document.getElementById('completed-tasks');
 
   if (open.length === 0) {
-    openEl.innerHTML = '<p class="muted">No open tasks</p>';
+    openEl.innerHTML = '<p class="muted">No open work orders</p>';
   } else {
     openEl.innerHTML = open.map(t => taskCard(t)).join('');
   }
 
   const done = [...rectified, ...released];
   if (done.length === 0) {
-    completedEl.innerHTML = '<p class="muted">No completed tasks</p>';
+    completedEl.innerHTML = '<p class="muted">No completed work orders</p>';
   } else {
     completedEl.innerHTML = done.map(t => taskCard(t)).join('');
   }
@@ -118,11 +120,11 @@ async function renderTasks() {
   document.querySelectorAll('.del-task-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const id = btn.dataset.id;
-      const confirmed = await showConfirmDialog('Delete Task', 'Delete this maintenance task permanently?');
+      const confirmed = await showConfirmDialog('Delete Work Order', 'Delete this work order permanently?');
       if (!confirmed) return;
       await DB.del('maintenance_tasks', id);
       await queueSync('maintenance_tasks', 'delete', { id });
-      showToast('Task deleted');
+      showToast('Work order deleted');
       renderTasks();
     });
   });
@@ -176,7 +178,9 @@ async function showTaskDetail(taskId) {
 
   await DB.put('maintenance_tasks', task);
   await queueSync('maintenance_tasks', 'update', task);
-  showToast('Task marked as rectified');
+  showToast('Work order marked as rectified');
+  const user = localStorage.getItem('aac_user') || 'Unknown';
+  createNotification('task', 'Work Order Rectified', `${user} completed work on ${task.aircraftId}: ${task.description}`, 'maintenance');
   renderTasks();
 }
 
@@ -194,7 +198,7 @@ async function onRelease(taskId) {
   }
 
   const confirmed = await showConfirmDialog(
-    isAfterFlight ? 'Sign After-Flight Inspection' : 'Certificate of Release to Service',
+    isAfterFlight ? 'Sign After-Flight Inspection' : 'Certificate of Release to Service (CRS)',
     `Confirm you are signing as ${userRole.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}?`
   );
   if (!confirmed) return;
@@ -206,7 +210,9 @@ async function onRelease(taskId) {
 
   await DB.put('maintenance_tasks', task);
   await queueSync('maintenance_tasks', 'update', task);
-  showToast('Task released to service');
+  showToast('Work order released to service');
+  const user = localStorage.getItem('aac_user') || 'Unknown';
+  createNotification('crs', task.type === 'after-flight' ? 'After-Flight Inspection Signed' : 'CRS Issued', `${user} released ${task.description} to service on ${task.aircraftId}`, 'maintenance');
   renderTasks();
 }
 

@@ -15,11 +15,11 @@ function defectsView() {
   app.innerHTML = `
     <div class="page">
       <div class="page-header">
-        <h2>Defects &amp; Squawks</h2>
+        <h2>Squawks</h2>
         <div class="subtitle">Report issues &amp; track resolutions</div>
       </div>
 
-      <button class="btn btn-primary btn-block" id="report-defect-btn">+ Report Defect</button>
+      <button class="btn btn-primary btn-block" id="report-defect-btn">+ Report Squawk</button>
 
       <div class="card">
         <div class="card-header">
@@ -40,9 +40,9 @@ function defectsView() {
 
 function showDefectSheet() {
   showBottomSheet(`
-    <div class="card-header"><h3>Report New Defect</h3></div>
+    <div class="card-header"><h3>Report New Squawk</h3></div>
     <div class="form-group">
-      <label for="defect-desc">Description of Issue</label>
+      <label for="defect-desc">Description of Squawk</label>
       <textarea id="defect-desc" rows="3" placeholder="e.g. Rough engine idle, Fuel gauge fluctuating..."></textarea>
     </div>
     <div class="form-group">
@@ -58,7 +58,7 @@ function showDefectSheet() {
         </label>
       </div>
     </div>
-    <button class="btn btn-primary btn-block" id="save-defect-btn">Submit Defect</button>
+    <button class="btn btn-primary btn-block" id="save-defect-btn">Submit Squawk</button>
     <button class="btn btn-secondary btn-block" id="cancel-defect-btn" style="margin-top:8px">Cancel</button>
   `);
 
@@ -66,7 +66,7 @@ function showDefectSheet() {
     const desc = document.getElementById('defect-desc').value.trim();
     const urgencyEl = document.querySelector('input[name="urgency"]:checked');
     const urgency = urgencyEl ? urgencyEl.value : 'monitor';
-    if (!desc) { showToast('Please describe the defect', 'error'); return; }
+    if (!desc) {     showToast('Please describe the squawk', 'error'); return; }
 
     const defect = {
       id: 'def_' + Date.now(),
@@ -83,6 +83,7 @@ function showDefectSheet() {
     await DB.put('defects', defect);
     await queueSync('defects', 'create', defect);
 
+    const user = localStorage.getItem('aac_user') || 'Unknown';
     if (urgency === 'grounding') {
       const task = {
         id: 'mnt_' + Date.now(),
@@ -103,9 +104,11 @@ function showDefectSheet() {
       defect.workOrderId = task.id;
       await DB.put('defects', defect);
       await queueSync('defects', 'update', defect);
-      showToast('Grounding defect reported & work order created', 'warning');
+      showToast('Grounding squawk reported & work order created', 'warning');
+      createNotification('squawk', 'Grounding Squawk Reported', `${user} reported a grounding squawk on ${defect.aircraftId}: ${desc}`, 'defects');
     } else {
-      showToast('Monitor defect reported');
+      showToast('Monitor squawk reported');
+      createNotification('squawk', 'Squawk Reported', `${user} reported a squawk on ${defect.aircraftId}: ${desc}`, 'defects');
     }
 
     window.__sheetClose(true);
@@ -134,7 +137,7 @@ async function renderDefects() {
   }
 
   if (resolved.length === 0) {
-    resolvedEl.innerHTML = '<p class="text-muted small">No resolved defects</p>';
+    resolvedEl.innerHTML = '<p class="text-muted small">No resolved squawks</p>';
   } else {
     resolvedEl.innerHTML = resolved.map(d => defectCard(d)).join('');
   }
@@ -146,15 +149,15 @@ async function renderDefects() {
     btn.addEventListener('click', async () => {
       const role = localStorage.getItem('aac_user_role');
       if (role !== 'engineer' && role !== 'admin') {
-        showToast('Only Engineer or Admin can delete defects');
+        showToast('Only Engineer or Admin can delete squawks');
         return;
       }
       const id = btn.dataset.id;
-      const confirmed = await showConfirmDialog('Delete Defect', 'Delete this defect permanently?');
+      const confirmed = await showConfirmDialog('Delete Squawk', 'Delete this squawk permanently?');
       if (!confirmed) return;
       await DB.del('defects', id);
       await queueSync('defects', 'delete', { id });
-      showToast('Defect deleted');
+      showToast('Squawk deleted');
       renderDefects();
     });
   });
@@ -193,16 +196,18 @@ function defectCard(defect) {
 async function resolveDefect(defectId) {
   const role = localStorage.getItem('aac_user_role');
   if (role !== 'engineer' && role !== 'senior_technician' && role !== 'admin') {
-    showToast('Only Engineer or Senior Technician can resolve defects');
+    showToast('Only Engineer or Senior Technician can resolve squawks');
     return;
   }
-  const confirmed = await showConfirmDialog('Resolve Defect', 'Mark this defect as rectified?');
+  const confirmed = await showConfirmDialog('Resolve Squawk', 'Mark this squawk as rectified?');
   if (!confirmed) return;
   const defect = await DB.get('defects', defectId);
   if (!defect) return;
   defect.status = 'rectified';
   await DB.put('defects', defect);
   await queueSync('defects', 'update', defect);
-  showToast('Defect resolved');
+  showToast('Squawk resolved');
+  const user = localStorage.getItem('aac_user') || 'Unknown';
+  createNotification('squawk', 'Squawk Resolved', `${user} resolved squawk on ${defect.aircraftId}: ${defect.description}`, 'defects');
   renderDefects();
 }

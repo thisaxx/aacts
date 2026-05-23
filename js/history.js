@@ -15,11 +15,11 @@ async function logHistory(type, description, relatedId, aircraftId) {
 async function getAllHistory() {
   const ac = getCurrentAircraftKey();
   const [flights, defects, tasks, fuelLogs, attendance] = await Promise.all([
-    DB.getAll('flights').then(l => l.filter(f => f.aircraftId === ac || !f.aircraftId).map(f => ({ ...f, _type: 'flight', _desc: `Flight: ${f.pilotName || 'Unknown'} — ${f.flownHours ? (f.flownHours * 60).toFixed(0) + 'min' : ''}`, _date: f.flightDate || f.createdAt }))),
-    DB.getAll('defects').then(l => l.filter(d => d.aircraftId === ac || !d.aircraftId).map(d => ({ ...d, _type: 'defect', _desc: `Defect: ${d.description}`, _date: d.createdAt || d.flightDate }))),
-    DB.getAll('maintenance_tasks').then(l => l.filter(t => t.aircraftId === ac || !t.aircraftId).map(t => ({ ...t, _type: 'task', _desc: `Task: ${t.description} (${t.status})`, _date: t.createdAt }))),
-    DB.getAll('fuel_logs').then(l => l.filter(f => f.aircraftId === ac || !f.aircraftId).map(f => ({ ...f, _type: 'fuel', _desc: `Fuel: ${f.type || 'refuel'} — ${f.liters || 0}L`, _date: f.createdAt }))),
-    DB.getAll('attendance').then(l => l.map(a => ({ ...a, _type: 'attendance', _desc: `Attendance: ${a.userName || a.userId} — ${a.status}`, _date: a.date || a.createdAt })))
+    DB.getAll('flights').then(l => l.filter(f => f.aircraftId === ac || !f.aircraftId).map(f => ({ ...f, _type: 'flight', _desc: `Sortie: ${f.pilotName || 'Unknown'} — ${f.flownHours ? (f.flownHours * 60).toFixed(0) + 'min' : ''}`, _date: f.flightDate || f.createdAt }))),
+    DB.getAll('defects').then(l => l.filter(d => d.aircraftId === ac || !d.aircraftId).map(d => ({ ...d, _type: 'defect', _desc: `Squawk: ${d.description}`, _date: d.createdAt || d.flightDate }))),
+    DB.getAll('maintenance_tasks').then(l => l.filter(t => t.aircraftId === ac || !t.aircraftId).map(t => ({ ...t, _type: 'task', _desc: `Work Order: ${t.description} (${t.status})`, _date: t.createdAt }))),
+    DB.getAll('fuel_logs').then(l => l.filter(f => f.aircraftId === ac || !f.aircraftId).map(f => ({ ...f, _type: 'fuel', _desc: `Fuel Ops: ${f.type || 'refuel'} — ${f.liters || 0}L`, _date: f.createdAt }))),
+    DB.getAll('attendance').then(l => l.map(a => ({ ...a, _type: 'attendance', _desc: `Crew: ${a.userName || a.userId} — ${a.status}`, _date: a.date || a.createdAt })))
   ]);
   return [...flights, ...defects, ...tasks, ...fuelLogs, ...attendance]
     .filter(e => e._date)

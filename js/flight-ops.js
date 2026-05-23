@@ -60,13 +60,22 @@ async function getFlights() {
     .sort((a, b) => b.flightDate.localeCompare(a.flightDate));
 }
 
+function timeToMin(id) {
+  const v = document.getElementById(id).value;
+  if (!v) return 0;
+  const [h, m] = v.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function fuelVal(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
+
 function flightOpsView() {
   const app = document.getElementById('app');
   getAircraft().then(ac => {
     app.innerHTML = `
     <div class="page">
       <div class="page-header">
-        <h2>Flight Logging</h2>
+        <h2>Flight Operations</h2>
         <div class="subtitle">${escHtml(ac.type || 'Aircraft')} &middot; ${escHtml(ac.tailNumber)}</div>
       </div>
 
@@ -75,33 +84,23 @@ function flightOpsView() {
         <div class="status-text" id="status-text"><span class="skeleton" style="display:inline-block;width:140px;height:14px;vertical-align:middle"></span></div>
       </div>
 
-      <form id="flight-form" class="card">
+      <form id="depart-form" class="card">
         <div class="card-header">
-          <h3>Log New Flight</h3>
+          <h3>Record Departure</h3>
         </div>
         <div class="form-group">
           <label for="flight-date">Flight Date</label>
           <input type="date" id="flight-date" required>
         </div>
         <div class="form-group">
-          <label for="pilot-name">Pilot Name <span class="text-muted small">(optional)</span></label>
+          <label for="pilot-name">Pilot <span class="text-muted small">(optional)</span></label>
           <input type="text" id="pilot-name" placeholder="e.g. John Smith">
         </div>
-        <div class="row">
-          <div class="form-group">
-            <label for="takeoff-time">Takeoff Time</label>
-            <input type="time" id="takeoff-time" class="form-input">
-          </div>
-          <div class="form-group">
-            <label for="landing-time">Landing Time</label>
-            <input type="time" id="landing-time" class="form-input">
-          </div>
+        <div class="form-group">
+          <label for="takeoff-time">Departure Time</label>
+          <input type="time" id="takeoff-time" class="form-input">
         </div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-muted);padding:0 2px 14px;border-bottom:1px solid var(--glass-border);margin-bottom:14px">
-          <span>Duration: <strong id="calc-duration" style="color:var(--gold)">—</strong></span>
-        </div>
-        <div class="card-header"><h3>Fuel</h3></div>
-        <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px;display:block;margin-bottom:8px">Before Flight</label>
+        <div class="card-header" style="margin-top:6px"><h3>Pre-flight Fuel</h3></div>
         <div class="row">
           <div class="form-group">
             <label>Left Wing (gal)</label>
@@ -112,46 +111,70 @@ function flightOpsView() {
             <input type="number" id="fuel-before-right" value="0" min="0" step="1" class="form-input fuel-input">
           </div>
         </div>
-        <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px;display:block;margin:10px 0 8px">After Flight</label>
-        <div class="row">
-          <div class="form-group">
-            <label>Left Wing (gal)</label>
-            <input type="number" id="fuel-after-left" value="0" min="0" step="1" class="form-input fuel-input">
-          </div>
-          <div class="form-group">
-            <label>Right Wing (gal)</label>
-            <input type="number" id="fuel-after-right" value="0" min="0" step="1" class="form-input fuel-input">
-          </div>
+        <button type="submit" class="btn btn-primary btn-block">Record Departure</button>
+      </form>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>Awaiting Arrival</h3>
         </div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-muted);padding:6px 2px 0">
-          <span>Consumed: <strong id="calc-consumed" style="color:var(--text)">—</strong></span>
-          <span>Rate: <strong id="calc-rate" style="color:var(--text)">—</strong></span>
+        <div id="departed-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line" style="width:40%"></div></div>
+      </div>
+
+      <div class="card hidden" id="arrival-card">
+        <div class="card-header">
+          <h3>Record Arrival <span id="arrival-flight-ref" style="font-weight:400;font-size:12px"></span></h3>
         </div>
-        <div class="form-group" id="refuel-toggle-wrap" style="margin-top:14px">
-          ${toggleSwitchHTML('refueled-check', 'Aircraft was refueled', false)}
-        </div>
-        <div id="refuel-fields" class="hidden">
+        <form id="arrival-form">
+          <input type="hidden" id="arrival-flight-id">
           <div class="form-group">
-            <label>Gallons Added</label>
-            ${stepperHTML('refuel-amount', 0, 0, 9999, 5, true)}
+            <label for="landing-time">Arrival Time</label>
+            <input type="time" id="landing-time" class="form-input" required>
           </div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-muted);padding:0 2px 14px;border-bottom:1px solid var(--glass-border);margin-bottom:14px">
+            <span>Duration: <strong id="calc-duration" style="color:var(--gold)">—</strong></span>
+          </div>
+          <div class="card-header"><h3>Post-flight Fuel</h3></div>
           <div class="row">
             <div class="form-group">
-              <label for="refuel-source">Source</label>
-              <select id="refuel-source">
-                <option value="Main Pump">Main Pump</option>
-              </select>
+              <label>Left Wing (gal)</label>
+              <input type="number" id="fuel-after-left" value="0" min="0" step="1" class="form-input fuel-input">
             </div>
             <div class="form-group">
-              <label for="fuel-type">Fuel Type</label>
-              <select id="fuel-type">
-                <option value="mix">Mix</option>
-              </select>
+              <label>Right Wing (gal)</label>
+              <input type="number" id="fuel-after-right" value="0" min="0" step="1" class="form-input fuel-input">
             </div>
           </div>
-        </div>
-        <button type="submit" class="btn btn-primary btn-block">Log Flight</button>
-      </form>
+          <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-muted);padding:6px 2px 0">
+            <span>Consumed: <strong id="calc-consumed" style="color:var(--text)">—</strong></span>
+            <span>Rate: <strong id="calc-rate" style="color:var(--text)">—</strong></span>
+          </div>
+          <div class="form-group" id="refuel-toggle-wrap" style="margin-top:14px">
+            ${toggleSwitchHTML('refueled-check', 'Aircraft was refueled', false)}
+          </div>
+          <div id="refuel-fields" class="hidden">
+            <div class="form-group">
+              <label>Fuel Added (gal)</label>
+              ${stepperHTML('refuel-amount', 0, 0, 9999, 5, true)}
+            </div>
+            <div class="row">
+              <div class="form-group">
+                <label for="refuel-source">Source</label>
+                <select id="refuel-source">
+                  <option value="Main Pump">Main Pump</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="fuel-type">Fuel Type</label>
+                <select id="fuel-type">
+                  <option value="mix">Mix</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-success btn-block">Complete Sortie</button>
+        </form>
+      </div>
 
       <div class="card">
         <div class="card-header">
@@ -187,112 +210,288 @@ function flightOpsView() {
 
       <div class="card">
         <div class="card-header">
-          <h3>Recent Flights</h3>
+          <h3>Recent Sorties</h3>
         </div>
         <div id="recent-flights"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line" style="width:40%"></div></div>
       </div>
     </div>
   `;
 
-  document.getElementById('flight-form').addEventListener('submit', onFlightSubmit);
+  document.getElementById('depart-form').addEventListener('submit', onDepartureSubmit);
+  document.getElementById('arrival-form').addEventListener('submit', onArrivalSubmit);
   document.getElementById('update-meters-btn').addEventListener('click', onUpdateMeters);
   initSteppers();
   initToggles();
-  document.querySelector('[data-toggle-id="refueled-check"]').addEventListener('change', function(e) {
+  document.querySelector('[data-toggle-id="refueled-check"]')?.addEventListener('change', function(e) {
     document.getElementById('refuel-fields').classList.toggle('hidden', !e.checked);
   });
-  ['takeoff-time','landing-time'].forEach(id => {
-    document.getElementById(id).addEventListener('change', updateCalcDuration);
+  document.getElementById('landing-time')?.addEventListener('change', updateArrivalCalc);
+  ['fuel-after-left','fuel-after-right'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', updateArrivalCalc);
   });
-  ['fuel-before-left','fuel-before-right','fuel-after-left','fuel-after-right'].forEach(id => {
-    document.getElementById(id).addEventListener('change', updateFuelCalc);
-  });
-
-  // Auto-save draft to localStorage
-  const draftKey = 'aac_flight_draft';
-  const formInputs = document.querySelectorAll('#flight-form input, #flight-form select');
-  const saveDraft = () => {
-    const draft = {};
-    formInputs.forEach(el => {
-      if (el.type === 'checkbox') draft[el.id] = el.checked;
-      else if (el.type === 'date' || el.type === 'time' || el.type === 'text' || el.type === 'number') draft[el.id] = el.value;
-    });
-    // Save stepper values
-    document.querySelectorAll('.stepper-value').forEach(el => { draft[el.id] = el.textContent; });
-    // Save toggle state
-    const toggle = document.querySelector('[data-toggle-id="refueled-check"] .toggle-track');
-    if (toggle) draft['refueled-check'] = toggle.classList.contains('on');
-    localStorage.setItem(draftKey, JSON.stringify(draft));
-  };
-  formInputs.forEach(el => el.addEventListener('input', saveDraft));
-  document.querySelectorAll('.stepper-btn').forEach(el => el.addEventListener('click', () => setTimeout(saveDraft, 50)));
-
-  // Restore draft
-  try {
-    const saved = JSON.parse(localStorage.getItem(draftKey));
-    if (saved) {
-      Object.entries(saved).forEach(([id, val]) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        if (id === 'refueled-check') {
-          // handled below
-        } else if (el.classList.contains('stepper-value')) {
-          el.textContent = val;
-        } else if (el.type === 'checkbox') {
-          el.checked = val;
-        } else {
-          el.value = val;
-        }
-      });
-      if (saved['refueled-check']) {
-        const toggle = document.querySelector('[data-toggle-id="refueled-check"] .toggle-track');
-        if (toggle && saved['refueled-check']) {
-          toggle.classList.add('on');
-          document.getElementById('refuel-fields').classList.remove('hidden');
-        }
-      }
-    }
-  } catch(e) {}
 
   document.getElementById('flight-date').valueAsDate = new Date();
-  updateFuelCalc();
 
-    renderAircraftStatus();
-    renderIntervalBars();
-    renderETSO_PTSO();
-    renderRecentFlights();
+  renderAircraftStatus();
+  renderIntervalBars();
+  renderETSO_PTSO();
+  renderRecentFlights();
+  renderDepartedList();
   });
 }
 
-function timeToMin(id) {
-  const v = document.getElementById(id).value;
-  if (!v) return 0;
-  const [h, m] = v.split(':').map(Number);
-  return h * 60 + m;
+async function renderDepartedList() {
+  const ac = await getAircraft();
+  const el = document.getElementById('departed-list');
+  if (!el) return;
+  const departed = (await DB.getAll('flights'))
+    .filter(f => f.aircraftId === ac.tailNumber && f.status === 'departed')
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  if (departed.length === 0) {
+    el.innerHTML = '<p class="text-muted small">No flights awaiting arrival data</p>';
+    return;
+  }
+  el.innerHTML = departed.map(f => `
+    <div class="flight-row departed-item" data-id="${f.id}" style="cursor:pointer;border-left:3px solid var(--gold);padding-left:10px;margin-bottom:6px">
+      <div style="flex:1;min-width:0">
+        <div class="flight-pilot">${escHtml(f.pilotName)} &middot; ${f.flightDate}</div>
+        <div class="flight-date">Departed ${f.takeoffTime} &middot; Pre-flight: ${((f.fuelBeforeLeft||0)+(f.fuelBeforeRight||0)).toFixed(1)} gal</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <span class="badge badge-rectified" style="font-size:9px">DEPARTED</span>
+        <button class="btn btn-sm btn-danger del-departed-btn" data-id="${f.id}" style="padding:4px 8px;font-size:11px">&times;</button>
+      </div>
+    </div>
+  `).join('');
+
+  el.querySelectorAll('.departed-item').forEach(row => {
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('.del-departed-btn')) return;
+      showArrivalForm(row.dataset.id);
+    });
+  });
+  el.querySelectorAll('.del-departed-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const confirmed = await showConfirmDialog('Delete Departure', 'Delete this departure record? Arrival data will be lost.');
+      if (!confirmed) return;
+      await DB.del('flights', btn.dataset.id);
+      await queueSync('flights', 'delete', { id: btn.dataset.id });
+      showToast('Departure deleted');
+      renderDepartedList();
+      renderRecentFlights();
+    });
+  });
 }
 
-function updateCalcDuration() {
+async function showArrivalForm(flightId) {
+  const flight = await DB.get('flights', flightId);
+  if (!flight) return;
+  const card = document.getElementById('arrival-card');
+  const ref = document.getElementById('arrival-flight-ref');
+  card.classList.remove('hidden');
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.getElementById('arrival-flight-id').value = flightId;
+  ref.textContent = `— ${escHtml(flight.pilotName)} &middot; ${flight.flightDate} &middot; Dep ${flight.takeoffTime}`;
+  document.getElementById('landing-time').value = '';
+  document.getElementById('landing-time').focus();
+  document.getElementById('calc-duration').textContent = '—';
+  document.getElementById('fuel-after-left').value = 0;
+  document.getElementById('fuel-after-right').value = 0;
+  document.getElementById('calc-consumed').textContent = '—';
+  document.getElementById('calc-rate').textContent = '—';
+  const toggle = document.querySelector('[data-toggle-id="refueled-check"] .toggle-track');
+  if (toggle) toggle.classList.remove('on');
+  document.getElementById('refuel-fields').classList.add('hidden');
+  const sv = document.getElementById('refuel-amount');
+  if (sv) sv.textContent = '0';
+}
+
+function updateArrivalCalc() {
   const t = timeToMin('takeoff-time');
   const l = timeToMin('landing-time');
-  const el = document.getElementById('calc-duration');
-  if (!t || !l || l <= t) { el.textContent = '—'; return; }
-  el.textContent = (l - t) + ' min';
-  updateFuelCalc();
-}
+  const durationEl = document.getElementById('calc-duration');
+  if (!t || !l || l <= t) { durationEl.textContent = '—'; return; }
+  durationEl.textContent = (l - t) + ' min';
 
-function fuelVal(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
-
-function updateFuelCalc() {
-  const before = fuelVal('fuel-before-left') + fuelVal('fuel-before-right');
-  const after = fuelVal('fuel-after-left') + fuelVal('fuel-after-right');
-  const consumed = Math.max(0, before - after);
-  const durationMin = timeToMin('landing-time') - timeToMin('takeoff-time');
-  const durationH = durationMin > 0 ? durationMin / 60 : 0;
+  const beforeLeft = parseFloat(document.getElementById('fuel-before-left')?.value) || 0;
+  const beforeRight = parseFloat(document.getElementById('fuel-before-right')?.value) || 0;
+  const afterLeft = fuelVal('fuel-after-left');
+  const afterRight = fuelVal('fuel-after-right');
+  const consumed = Math.max(0, (beforeLeft + beforeRight) - (afterLeft + afterRight));
+  const durationH = (l - t) / 60;
 
   document.getElementById('calc-consumed').textContent = consumed > 0 ? consumed.toFixed(1) + ' gal' : '—';
   document.getElementById('calc-rate').textContent = (consumed > 0 && durationH > 0)
     ? (consumed / durationH).toFixed(1) + ' gal/hr'
     : '—';
+}
+
+async function onDepartureSubmit(e) {
+  e.preventDefault();
+  const pilot = document.getElementById('pilot-name').value.trim() || 'Unknown';
+  const takeoffTime = document.getElementById('takeoff-time').value;
+  const flightDate = document.getElementById('flight-date').value;
+
+  if (!takeoffTime) {
+    showToast('Enter departure time', 'error');
+    return;
+  }
+
+  const ac = await getAircraft();
+  const flight = {
+    id: 'flt_' + Date.now(),
+    aircraftId: ac.tailNumber,
+    flightDate,
+    pilotName: pilot,
+    takeoffTime,
+    landingTime: null,
+    flownHours: 0,
+    fuelBeforeLeft: fuelVal('fuel-before-left'),
+    fuelBeforeRight: fuelVal('fuel-before-right'),
+    fuelAfterLeft: 0,
+    fuelAfterRight: 0,
+    fuelConsumed: 0,
+    status: 'departed',
+    refueled: false,
+    refuelAmount: 0,
+    refuelSource: '',
+    fuelType: '',
+    createdAt: new Date().toISOString()
+  };
+
+  await DB.put('flights', flight);
+  await queueSync('flights', 'create', flight);
+
+  document.getElementById('depart-form').reset();
+  document.getElementById('flight-date').valueAsDate = new Date();
+
+  showToast('Departure recorded — awaiting arrival');
+
+  const user = localStorage.getItem('aac_user') || 'Unknown';
+  createNotification('sortie', 'Departure Recorded', `${user} departed in ${ac.tailNumber} at ${takeoffTime}`, 'flight-ops');
+
+  renderDepartedList();
+  renderRecentFlights();
+}
+
+async function onArrivalSubmit(e) {
+  e.preventDefault();
+  const flightId = document.getElementById('arrival-flight-id').value;
+  const flight = await DB.get('flights', flightId);
+  if (!flight) { showToast('Flight record not found', 'error'); return; }
+
+  const landingTime = document.getElementById('landing-time').value;
+  const durationMin = timeToMin('landing-time') - timeToMin('takeoff-time');
+  const duration = durationMin > 0 ? durationMin / 60 : 0;
+
+  if (!landingTime || durationMin <= 0) {
+    showToast('Enter valid arrival time', 'error');
+    return;
+  }
+
+  const fuelAfterLeft = fuelVal('fuel-after-left');
+  const fuelAfterRight = fuelVal('fuel-after-right');
+  const fuelConsumed = Math.max(0, (flight.fuelBeforeLeft + flight.fuelBeforeRight) - (fuelAfterLeft + fuelAfterRight));
+  const refuelToggle = document.querySelector('[data-toggle-id="refueled-check"]');
+  const refueled = refuelToggle?.querySelector('.toggle-track')?.classList.contains('on') || false;
+  const refuelAmt = refueled ? parseFloat(document.getElementById('refuel-amount')?.textContent) || 0 : 0;
+  const refuelSrc = refueled ? document.getElementById('refuel-source')?.value : '';
+  const fuelType = refueled ? document.getElementById('fuel-type')?.value : '';
+
+  flight.landingTime = landingTime;
+  flight.flownHours = duration;
+  flight.fuelAfterLeft = fuelAfterLeft;
+  flight.fuelAfterRight = fuelAfterRight;
+  flight.fuelConsumed = fuelConsumed;
+  flight.refueled = refueled;
+  flight.refuelAmount = refuelAmt;
+  flight.refuelSource = refuelSrc;
+  flight.fuelType = fuelType;
+  flight.status = 'completed';
+
+  await DB.put('flights', flight);
+  await queueSync('flights', 'update', flight);
+
+  const ac = await getAircraft();
+  ac.engineETSO = (ac.engineETSO || 0) + duration;
+  ac.propellerPTSO = (ac.propellerPTSO || 0) + duration;
+  ac.totalTachTime = (ac.totalTachTime || 0) + duration;
+  await DB.put('aircraft', ac);
+  await queueSync('aircraft', 'update', ac);
+
+  const hoursSinceOil = ac.totalTachTime - ac.lastOilChangeTach;
+  const hoursSince100hr = ac.totalTachTime - ac.last100hrTach;
+  if (hoursSinceOil >= 50) {
+    await showOilChangePrompt(ac.totalTachTime);
+  }
+  if (hoursSince100hr >= 100) {
+    await show100hrPrompt(ac.totalTachTime);
+  }
+
+  if (refueled && refuelAmt > 0 && fuelType) {
+    const refuelLiters = refuelAmt * GAL_TO_L;
+    await deductFuel(fuelType, refuelLiters);
+    await DB.put('fuel_logs', {
+      id: 'fuellog_' + Date.now(),
+      aircraftId: ac.tailNumber,
+      type: 'refuel',
+      flightId: flight.id,
+      fuelType,
+      liters: refuelLiters,
+      source: refuelSrc,
+      createdAt: new Date().toISOString()
+    });
+    await queueSync('fuel_logs', 'create', { flightId: flight.id, fuelType, liters: refuelLiters, source: refuelSrc });
+    showToast(`Sortie completed & ${refuelAmt.toFixed(1)} gal deducted from stock`);
+  } else {
+    showToast('Sortie completed');
+  }
+
+  // After-flight inspection
+  const flightDate = flight.flightDate;
+  const crsToday = ac.dailyCrsDate === flightDate;
+  const releasedTasksToday = (await DB.getAll('maintenance_tasks')).filter(t =>
+    t.aircraftId === ac.tailNumber && t.status === 'released' &&
+    t.releasedAt && t.releasedAt.slice(0, 10) === flightDate
+  );
+  if (crsToday || releasedTasksToday.length > 0) {
+    const inspTask = {
+      id: 'insp_' + Date.now(),
+      type: 'after-flight',
+      aircraftId: ac.tailNumber,
+      description: `After-flight inspection for ${flight.flightDate} sortie (${(duration * 60).toFixed(0)} min)`,
+      priority: 'medium',
+      status: 'open',
+      notes: '',
+      rectifiedBy: '',
+      rectifiedAt: '',
+      rectifiedRole: '',
+      createdAt: new Date().toISOString()
+    };
+    await DB.put('maintenance_tasks', inspTask);
+    await queueSync('maintenance_tasks', 'create', inspTask);
+  }
+
+  const user = localStorage.getItem('aac_user') || 'Unknown';
+  createNotification('sortie', 'Sortie Completed', `${user} completed sortie in ${ac.tailNumber} (${(duration*60).toFixed(0)} min)`, 'flight-ops');
+
+  // Reset arrival form
+  document.getElementById('arrival-card').classList.add('hidden');
+  document.getElementById('arrival-flight-id').value = '';
+  document.getElementById('landing-time').value = '';
+  document.getElementById('fuel-after-left').value = 0;
+  document.getElementById('fuel-after-right').value = 0;
+  document.getElementById('calc-duration').textContent = '—';
+  document.getElementById('calc-consumed').textContent = '—';
+  document.getElementById('calc-rate').textContent = '—';
+
+  renderAircraftStatus();
+  renderIntervalBars();
+  renderETSO_PTSO();
+  renderRecentFlights();
+  renderDepartedList();
 }
 
 async function onUpdateMeters() {
@@ -319,135 +518,10 @@ async function onUpdateMeters() {
   renderETSO_PTSO();
 }
 
-async function onFlightSubmit(e) {
-  e.preventDefault();
-  localStorage.removeItem('aac_flight_draft');
-  const pilot = document.getElementById('pilot-name').value.trim() || 'Unknown';
-  const takeoffTime = document.getElementById('takeoff-time').value;
-  const landingTime = document.getElementById('landing-time').value;
-  const durationMin = timeToMin('landing-time') - timeToMin('takeoff-time');
-  const duration = durationMin > 0 ? durationMin / 60 : 0;
-
-  if (durationMin <= 0 || !takeoffTime || !landingTime) {
-    showToast('Enter valid takeoff and landing times', 'error');
-    return;
-  }
-
-  const fuelBeforeLeft = fuelVal('fuel-before-left');
-  const fuelBeforeRight = fuelVal('fuel-before-right');
-  const fuelAfterLeft = fuelVal('fuel-after-left');
-  const fuelAfterRight = fuelVal('fuel-after-right');
-  const fuelConsumed = Math.max(0, (fuelBeforeLeft + fuelBeforeRight) - (fuelAfterLeft + fuelAfterRight));
-  const refuelToggle = document.querySelector('[data-toggle-id="refueled-check"]');
-  const refueled = refuelToggle.querySelector('.toggle-track').classList.contains('on');
-  const refuelAmt = refueled ? parseFloat(document.getElementById('refuel-amount').textContent) || 0 : 0;
-  const refuelSrc = refueled ? document.getElementById('refuel-source').value : '';
-  const fuelType = refueled ? document.getElementById('fuel-type').value : '';
-
-  const ac = await getAircraft();
-  const flight = {
-    id: 'flt_' + Date.now(),
-    aircraftId: ac.tailNumber,
-    flightDate: document.getElementById('flight-date').value,
-    pilotName: pilot,
-    takeoffTime,
-    landingTime,
-    flownHours: duration,
-    fuelBeforeLeft,
-    fuelBeforeRight,
-    fuelAfterLeft,
-    fuelAfterRight,
-    fuelConsumed,
-    refueled,
-    refuelAmount: refuelAmt,
-    refuelSource: refuelSrc,
-    fuelType,
-    createdAt: new Date().toISOString()
-  };
-
-  await DB.put('flights', flight);
-  await queueSync('flights', 'create', flight);
-
-  ac.engineETSO = (ac.engineETSO || 0) + duration;
-  ac.propellerPTSO = (ac.propellerPTSO || 0) + duration;
-  ac.totalTachTime = (ac.totalTachTime || 0) + duration;
-  await DB.put('aircraft', ac);
-  await queueSync('aircraft', 'update', ac);
-
-  const hoursSinceOil = ac.totalTachTime - ac.lastOilChangeTach;
-  const hoursSince100hr = ac.totalTachTime - ac.last100hrTach;
-  if (hoursSinceOil >= 50) {
-    await showOilChangePrompt(ac.totalTachTime);
-  }
-  if (hoursSince100hr >= 100) {
-    await show100hrPrompt(ac.totalTachTime);
-  }
-
-  if (refueled && refuelAmt > 0 && fuelType) {
-    const refuelLiters = refuelAmt * GAL_TO_L;
-    await deductFuel(fuelType, refuelLiters);
-      await DB.put('fuel_logs', {
-        id: 'fuellog_' + Date.now(),
-        aircraftId: ac.tailNumber,
-        type: 'refuel',
-      flightId: flight.id,
-      fuelType,
-      liters: refuelLiters,
-      source: refuelSrc,
-      createdAt: new Date().toISOString()
-    });
-    await queueSync('fuel_logs', 'create', { flightId: flight.id, fuelType, liters: refuelLiters, source: refuelSrc });
-    showToast(`Flight logged & ${refuelAmt.toFixed(1)} gal deducted from stock`);
-  } else {
-    showToast('Flight logged successfully');
-  }
-
-  // Create after-flight inspection only if CRS was issued today
-  const flightDate = flight.flightDate;
-  const crsToday = ac.dailyCrsDate === flightDate;
-  const releasedTasksToday = (await DB.getAll('maintenance_tasks')).filter(t =>
-    t.aircraftId === ac.tailNumber && t.status === 'released' &&
-    t.releasedAt && t.releasedAt.slice(0, 10) === flightDate
-  );
-  if (crsToday || releasedTasksToday.length > 0) {
-    const inspTask = {
-      id: 'insp_' + Date.now(),
-      type: 'after-flight',
-      aircraftId: ac.tailNumber,
-      description: `After-flight inspection for ${flight.flightDate} flight (${(duration * 60).toFixed(0)} min)`,
-      priority: 'medium',
-      status: 'open',
-      notes: '',
-      rectifiedBy: '',
-      rectifiedAt: '',
-      rectifiedRole: '',
-      createdAt: new Date().toISOString()
-    };
-    await DB.put('maintenance_tasks', inspTask);
-    await queueSync('maintenance_tasks', 'create', inspTask);
-  }
-
-  document.getElementById('flight-form').reset();
-  document.getElementById('flight-date').valueAsDate = new Date();
-  document.getElementById('takeoff-time').value = '';
-  document.getElementById('landing-time').value = '';
-  ['fuel-before-left','fuel-before-right','fuel-after-left','fuel-after-right','refuel-amount'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = 0;
-  });
-  document.getElementById('calc-duration').textContent = '—';
-  document.getElementById('calc-consumed').textContent = '—';
-  document.getElementById('calc-rate').textContent = '—';
-  renderAircraftStatus();
-  renderIntervalBars();
-  renderETSO_PTSO();
-  renderRecentFlights();
-}
-
 async function showOilChangePrompt(currentTach) {
   const confirmed = await showConfirmDialog(
     '50-Hour Oil Change',
-    'This flight brings the aircraft to the 50-hour oil change interval. Did you use 1 oil filter and 6 quarts of aviation oil?'
+    'This sortie brings the aircraft to the 50-hour oil change interval. Did you use 1 oil filter and 6 quarts of aviation oil?'
   );
   if (confirmed) {
     const filter = await DB.get('parts', 'OIL-FILTER-C152');
@@ -476,7 +550,7 @@ async function showOilChangePrompt(currentTach) {
 async function show100hrPrompt(currentTach) {
   const confirmed = await showConfirmDialog(
     '100-Hour Structural Inspection',
-    'This flight brings the aircraft to the 100-hour structural inspection interval. Has the inspection been completed?'
+    'This sortie brings the aircraft to the 100-hour structural inspection interval. Has the inspection been completed?'
   );
   if (confirmed) {
     const ac = await getAircraft();
@@ -602,10 +676,12 @@ async function deleteFlight(flightId) {
   const flight = await DB.get('flights', flightId);
   if (!flight) return;
   const h = flight.flownHours || 0;
-  const confirmed = await showConfirmDialog('Delete Flight', `Delete this ${(h * 60).toFixed(0)} min flight and reverse ETSO/PTSO?`);
+  const isDeparted = flight.status === 'departed';
+  const confirmed = await showConfirmDialog(isDeparted ? 'Delete Departure' : 'Delete Sortie',
+    isDeparted ? 'Delete this departure record?' : `Delete this ${(h * 60).toFixed(0)} min sortie and reverse ETSO/PTSO?`);
   if (!confirmed) return;
-  const ac = await getAircraft();
-  if (h > 0) {
+  if (!isDeparted && h > 0) {
+    const ac = await getAircraft();
     ac.engineETSO = Math.max(0, (ac.engineETSO || 0) - h);
     ac.propellerPTSO = Math.max(0, (ac.propellerPTSO || 0) - h);
     await DB.put('aircraft', ac);
@@ -613,8 +689,9 @@ async function deleteFlight(flightId) {
   }
   await DB.del('flights', flightId);
   await queueSync('flights', 'delete', { id: flightId });
-  showToast('Flight deleted & ETSO/PTSO reversed');
+  showToast(isDeparted ? 'Departure deleted' : 'Sortie deleted & ETSO/PTSO reversed');
   renderRecentFlights();
+  renderDepartedList();
   renderAircraftStatus();
   renderIntervalBars();
   renderETSO_PTSO();
@@ -624,22 +701,24 @@ async function renderRecentFlights() {
   const flights = await getFlights();
   const el = document.getElementById('recent-flights');
   if (flights.length === 0) {
-    el.innerHTML = emptyState('&#9992;', 'No flights logged yet');
+    el.innerHTML = emptyState('&#9992;', 'No sorties recorded yet');
     return;
   }
-  el.innerHTML = flights.slice(0, 20).map(f => `
+  el.innerHTML = flights.slice(0, 20).map(f => {
+    const isDeparted = f.status === 'departed';
+    return `
     <div class="flight-row">
       <div style="flex:1;min-width:0">
-        <div class="flight-pilot">${escHtml(f.pilotName)}</div>
-        <div class="flight-date">${f.flightDate}${f.takeoffTime ? ` &middot; ${f.takeoffTime}-${f.landingTime}` : ''}</div>
-        ${f.fuelConsumed ? `<div class="flight-date">Fuel: ${f.fuelConsumed.toFixed(1)} gal ${f.fuelConsumed > 0 && f.flownHours > 0 ? `&middot; ${(f.fuelConsumed / f.flownHours).toFixed(1)} gal/hr` : ''}</div>` : ''}
+        <div class="flight-pilot">${escHtml(f.pilotName)}${isDeparted ? ' <span class="badge badge-rectified" style="font-size:9px">DEP</span>' : ''}</div>
+        <div class="flight-date">${f.flightDate}${f.takeoffTime ? ` &middot; ${f.takeoffTime}${f.landingTime ? '-' + f.landingTime : '...'}` : ''}</div>
+        ${f.fuelConsumed ? `<div class="flight-date">Fuel: ${f.fuelConsumed.toFixed(1)} gal${f.fuelConsumed > 0 && f.flownHours > 0 ? ` &middot; ${(f.fuelConsumed / f.flownHours).toFixed(1)} gal/hr` : ''}</div>` : ''}
       </div>
       <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
-        <div class="flight-hours">${(f.flownHours * 60).toFixed(0)}m</div>
+        ${!isDeparted ? `<div class="flight-hours">${(f.flownHours * 60).toFixed(0)}m</div>` : '<div class="flight-hours" style="opacity:0.4">—</div>'}
         <button class="btn btn-sm btn-danger del-flight-btn" data-id="${f.id}" style="padding:4px 8px;font-size:11px">&times;</button>
       </div>
     </div>
-  `).join('');
+  `}).join('');
 
   el.querySelectorAll('.del-flight-btn').forEach(btn => {
     btn.addEventListener('click', () => deleteFlight(btn.dataset.id));

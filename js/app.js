@@ -228,7 +228,7 @@ async function dashboardView() {
 
   let statusClass, statusLabel, statusExtra = '';
   const reasons = [];
-  if (groundingDefects > 0) { reasons.push(`${groundingDefects} grounding defect(s)`); }
+  if (groundingDefects > 0) { reasons.push(`${groundingDefects} grounding squawk(s)`); }
   if (minRemaining <= 0) { reasons.push('Inspection overdue'); }
   if (afterFlightPending) { reasons.push('After-flight inspection pending'); }
   if (!crsIssuedToday) { reasons.push('No daily CRS issued'); }
@@ -284,44 +284,44 @@ async function dashboardView() {
         <div class="stat-card">
           <div class="stat-icon">&#9992;</div>
           <div class="stat-value">${flights.length}</div>
-          <div class="stat-label">Total Flights</div>
+          <div class="stat-label">Total Sorties</div>
         </div>
         <div class="stat-card">
           <div class="stat-icon">&#9201;</div>
           <div class="stat-value">${totalHours.toFixed(1)}</div>
-          <div class="stat-label">Total Hours</div>
+          <div class="stat-label">Total Flight Time</div>
         </div>
         <div class="stat-card">
           <div class="stat-icon">&#128197;</div>
           <div class="stat-value">${monthFlights.length}</div>
-          <div class="stat-label">Flights This Month</div>
+          <div class="stat-label">Monthly Sorties</div>
         </div>
         <div class="stat-card">
           <div class="stat-icon">&#9200;</div>
           <div class="stat-value">${monthHours.toFixed(1)}</div>
-          <div class="stat-label">Hours This Month</div>
+          <div class="stat-label">Monthly Flight Time</div>
         </div>
         <div class="stat-card">
           <div class="stat-icon">&#9881;</div>
           <div class="stat-value ${openTasks > 0 ? 'text-red' : 'text-green'}">${openTasks}</div>
-          <div class="stat-label">Open Tasks</div>
+          <div class="stat-label">Open Work Orders</div>
         </div>
         <div class="stat-card">
           <div class="stat-icon">&#9888;</div>
           <div class="stat-value ${openDefects > 0 ? 'text-red' : 'text-green'}">${openDefects}</div>
-          <div class="stat-label">Open Defects</div>
+          <div class="stat-label">Open Squawks</div>
         </div>
         <div class="stat-card">
           <div class="stat-icon">&#128230;</div>
           <div class="stat-value ${(lowParts + lowFuels) > 0 ? 'text-red' : 'text-green'}">${lowParts + lowFuels}</div>
-          <div class="stat-label">Low Stock</div>
+          <div class="stat-label">Low Inventory</div>
         </div>
       </div>
 
       <div class="quick-actions">
         <a href="#" class="quick-action" onclick="navigate('flight-ops')">
           <div class="qa-icon">&#9992;</div>
-          <div class="qa-label">Log Flight</div>
+          <div class="qa-label">Record Sortie</div>
         </a>
         <a href="#" class="quick-action" onclick="navigate('defects')">
           <div class="qa-icon">&#9888;</div>
@@ -333,11 +333,11 @@ async function dashboardView() {
         </a>
         <a href="#" class="quick-action" onclick="navigate('inventory')">
           <div class="qa-icon">&#128230;</div>
-          <div class="qa-label">Stock</div>
+          <div class="qa-label">Parts</div>
         </a>
         <a href="#" class="quick-action" onclick="navigate('fuel')">
           <div class="qa-icon">&#9981;</div>
-          <div class="qa-label">Fuel</div>
+          <div class="qa-label">Fuel Ops</div>
         </a>
       </div>
 
@@ -412,19 +412,19 @@ async function dashboardView() {
 
       <div class="card">
         <div class="card-header">
-          <h3>Recent Flights</h3>
+          <h3>Recent Sorties</h3>
         </div>
         <div id="dash-flights">
-          ${flights.length === 0 ? emptyState('&#9992;', 'No flights logged yet') :
+          ${flights.length === 0 ? emptyState('&#9992;', 'No sorties recorded yet') :
             flights.slice(0, 5).map(f => `
               <div class="flight-row">
                 <div style="flex:1;min-width:0">
-                  <div class="flight-pilot">${escHtml(f.pilotName)}</div>
-                  <div class="flight-date">${f.flightDate}${f.takeoffTime ? ` &middot; ${f.takeoffTime}-${f.landingTime}` : ''}</div>
+                  <div class="flight-pilot">${escHtml(f.pilotName)}${f.status === 'departed' ? ' <span class="badge badge-rectified" style="font-size:9px">DEP</span>' : ''}</div>
+                  <div class="flight-date">${f.flightDate}${f.takeoffTime ? ` &middot; ${f.takeoffTime}${f.landingTime ? '-' + f.landingTime : '...'}` : ''}</div>
                   ${f.fuelConsumed ? `<div class="flight-date" style="font-size:10px">${f.fuelConsumed.toFixed(1)} gal consumed</div>` : ''}
                 </div>
                 <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
-                  <div class="flight-hours">${(f.flownHours * 60).toFixed(0)}m</div>
+                  ${f.status !== 'departed' ? `<div class="flight-hours">${(f.flownHours * 60).toFixed(0)}m</div>` : '<div class="flight-hours" style="opacity:0.4">—</div>'}
                   <button class="btn btn-sm btn-danger dash-del-flight-btn" data-id="${f.id}" style="padding:4px 8px;font-size:11px">&times;</button>
                 </div>
               </div>
@@ -453,6 +453,8 @@ async function dashboardView() {
       await DB.put('aircraft', ac);
       await queueSync('aircraft', 'update', ac);
       showToast('Daily CRS issued — aircraft is flightworthy');
+      const user = localStorage.getItem('aac_user') || 'Unknown';
+      createNotification('crs', 'Daily CRS Issued', `${user} issued daily CRS for ${ac.tailNumber}`, 'dashboard');
       notifyDataChange();
     });
   }
@@ -475,6 +477,7 @@ function navigate(view) {
     case 'calendar': calendarView(); break;
     case 'attendance': attendanceView(); break;
     case 'profile': profileView(); break;
+    case 'notifications': notificationsView(); break;
   }
   updateSidebarInspections();
 }
@@ -555,14 +558,14 @@ function profileView() {
   const role = localStorage.getItem('aac_user_role') || '';
   const photo = localStorage.getItem('aac_user_photo') || '';
   const roles = [
-    { value: 'technician', label: 'Technician', desc: 'Can log flights, report defects, view data' },
-    { value: 'senior_technician', label: 'Senior Technician', desc: 'Above + can approve attendance' },
+    { value: 'technician', label: 'Technician', desc: 'Can record sorties, report squawks, view data' },
+    { value: 'senior_technician', label: 'Senior Technician', desc: 'Above + can approve sign-ins' },
     { value: 'engineer', label: 'Engineer', desc: 'Above + can approve CRS (Release to Service)' },
     { value: 'admin', label: 'Admin', desc: 'Full access to all features' }
   ];
   app.innerHTML = `
     <div class="page">
-      <div class="page-header"><h2>My Profile</h2></div>
+      <div class="page-header"><h2>Crew Profile</h2></div>
       <div class="card">
         <div style="text-align:center;margin-bottom:16px">
           <div id="profile-photo-preview" style="width:80px;height:80px;border-radius:50%;margin:0 auto 10px;overflow:hidden;border:1px solid var(--border);background:var(--glass);display:flex;align-items:center;justify-content:center;font-size:32px">
@@ -638,9 +641,9 @@ function profileView() {
 
     if (r === 'admin' || r === 'engineer' || r === 'senior_technician') {
       const pin = localStorage.getItem('aac_pin') || '1234';
-      const entered = await showPromptDialog('Pincode Required', `Enter admin pincode to set role as ${r.replace(/_/g, ' ')}:`);
+      const entered = await showPromptDialog('PIN Required', `Enter admin PIN to set role as ${r.replace(/_/g, ' ')}:`);
       if (entered === null) { showToast('Profile save cancelled', 'warning'); return; }
-      if (entered.trim() !== pin) { showToast('Incorrect pincode', 'error'); return; }
+      if (entered.trim() !== pin) { showToast('Incorrect PIN', 'error'); return; }
     }
 
     const preview = document.getElementById('profile-photo-preview');
@@ -678,7 +681,7 @@ function showAircraftSheet() {
   const role = localStorage.getItem('aac_user_role');
   const canEdit = role === 'engineer' || role === 'admin';
   showBottomSheet(`
-    <div class="card-header"><h3>Manage Aircraft</h3></div>
+    <div class="card-header"><h3>Fleet Manager</h3></div>
     <div id="ac-list-sheet"></div>
     ${canEdit ? `
     <hr>
@@ -964,7 +967,7 @@ function showEditAircraftForm(ac) {
 }
 
 async function clearAllData() {
-  const stores = ['flights','aircraft','defects','fuel_logs','fuel_stock','maintenance_tasks','parts','sync_queue','users','attendance'];
+  const stores = ['flights','aircraft','defects','fuel_logs','fuel_stock','maintenance_tasks','parts','sync_queue','users','attendance','notifications'];
   const db = await openDB();
   for (const s of stores) {
     await new Promise((res, rej) => {
@@ -1071,22 +1074,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     closeSidebar();
     const role = localStorage.getItem('aac_user_role');
     if (role !== 'admin') { showToast('Only Admin can reset all data', 'error'); return; }
-    const confirmed = await showConfirmDialog('Reset All Data', 'This will delete ALL data including aircraft, flights, defects, parts, and fuel. Are you sure?');
+    const confirmed = await showConfirmDialog('Factory Reset', 'This will delete ALL data including aircraft, sorties, defects, parts, and fuel. Are you sure?');
     if (confirmed) await clearAllData();
   });
   document.getElementById('sidebar-pincode').addEventListener('click', async e => {
     e.preventDefault();
     closeSidebar();
     const current = localStorage.getItem('aac_pin') || '1234';
-    const old = await showPromptDialog('Change Pincode', 'Enter current pincode:');
+    const old = await showPromptDialog('Change PIN', 'Enter current PIN:');
     if (old === null) return;
-    if (old.trim() !== current) { showToast('Incorrect pincode', 'error'); return; }
-    const newPin = await showPromptDialog('Change Pincode', 'Enter new pincode:');
-    if (newPin === null || newPin.trim().length < 4) { showToast('Pincode must be at least 4 characters', 'error'); return; }
-    const confirmPin = await showPromptDialog('Change Pincode', 'Confirm new pincode:');
-    if (confirmPin === null || confirmPin.trim() !== newPin.trim()) { showToast('Pincodes do not match', 'error'); return; }
+    if (old.trim() !== pin) { showToast('Incorrect PIN', 'error'); return; }
+    const newPin = await showPromptDialog('Change PIN', 'Enter new PIN:');
+    if (newPin === null) return;
+    if (!newPin.trim()) { showToast('PIN cannot be empty', 'error'); return; }
+    const confirmPin = await showPromptDialog('Change PIN', 'Confirm new PIN:');
+    if (confirmPin === null || confirmPin.trim() !== newPin.trim()) { showToast('PINs do not match', 'error'); return; }
     localStorage.setItem('aac_pin', newPin.trim());
-    showToast('Pincode changed successfully');
+    showToast('PIN changed successfully');
   });
   document.getElementById('sidebar-export').addEventListener('click', async e => {
     e.preventDefault();
@@ -1126,15 +1130,18 @@ async function checkEndOfDayData() {
 
   const missing = [];
   const todaysFlights = flights.filter(f => f.flightDate === today);
-  if (todaysFlights.length === 0) missing.push('No flights logged today');
+  if (todaysFlights.length === 0) missing.push('No sorties recorded today');
+
+  const departedNoArrival = flights.filter(f => f.flightDate === today && f.status === 'departed');
+  if (departedNoArrival.length > 0) missing.push(`${departedNoArrival.length} departure(s) awaiting arrival data`);
 
   const todaysAttendance = allAttendance.filter(a => a.date === today);
-  if (todaysAttendance.length === 0) missing.push('No attendance check-in today');
+  if (todaysAttendance.length === 0) missing.push('No sign-in recorded today');
 
   if (ac.dailyCrsDate !== today) missing.push('Daily CRS not issued');
 
   const openDefects = allDefects.filter(d => d.status === 'open');
-  if (openDefects.length > 0) missing.push(`${openDefects.length} open defect(s) unresolved`);
+  if (openDefects.length > 0) missing.push(`${openDefects.length} open squawk(s) unresolved`);
 
   const pendingAfterFlight = allTasks.filter(t => t.type === 'after-flight' && t.status === 'open');
   if (pendingAfterFlight.length > 0) missing.push(`${pendingAfterFlight.length} after-flight inspection(s) pending`);
@@ -1158,6 +1165,7 @@ function scheduleEndOfDayCheck() {
         new Notification('AAC — End of Day Reminder', { body, icon: '/aacts/img/icon-192.png' });
       }
       showNotification('End of Day Reminder', missing.join(' · '));
+      createNotification('system', 'End of Day Reminder', missing.join(' · '), 'dashboard');
     }
     scheduleEndOfDayCheck();
   }, ms);
@@ -1170,18 +1178,18 @@ async function showExportSheet() {
 
   const storeDefs = [
     { key: 'aircraft', label: 'Aircraft', hasDate: false },
-    { key: 'flights', label: 'Flights', hasDate: true, dateField: 'flightDate' },
-    { key: 'defects', label: 'Defects', hasDate: true, dateField: 'createdAt' },
-    { key: 'maintenance_tasks', label: 'Maintenance Tasks', hasDate: true, dateField: 'createdAt' },
+    { key: 'flights', label: 'Sorties', hasDate: true, dateField: 'flightDate' },
+    { key: 'defects', label: 'Squawks', hasDate: true, dateField: 'createdAt' },
+    { key: 'maintenance_tasks', label: 'Work Orders', hasDate: true, dateField: 'createdAt' },
     { key: 'fuel_stock', label: 'Fuel Stock', hasDate: false },
     { key: 'fuel_logs', label: 'Fuel Logs', hasDate: true, dateField: 'createdAt' },
-    { key: 'parts', label: 'Parts', hasDate: false },
-    { key: 'users', label: 'Users', hasDate: false },
-    { key: 'attendance', label: 'Attendance', hasDate: true, dateField: 'date' }
+    { key: 'parts', label: 'Components', hasDate: false },
+    { key: 'users', label: 'Crew', hasDate: false },
+    { key: 'attendance', label: 'Crew Log', hasDate: true, dateField: 'date' }
   ];
 
   showBottomSheet(`
-    <div class="card-header"><h3>Export Data</h3></div>
+    <div class="card-header"><h3>Export Records</h3></div>
     <div style="margin-bottom:14px">
       <div class="row">
         <div class="form-group">

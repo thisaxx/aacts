@@ -21,8 +21,8 @@ function attendanceView() {
   app.innerHTML = `
     <div class="page">
       <div class="page-header">
-        <h2>Attendance</h2>
-        <div class="subtitle">Check in / track attendance</div>
+        <h2>Crew Log</h2>
+        <div class="subtitle">Sign in / crew tracking</div>
       </div>
       <div class="card" style="padding:10px 16px">
         <div class="row" style="align-items:center;gap:8px">
@@ -37,7 +37,7 @@ function attendanceView() {
       </div>
       <div id="attendance-self" class="card"></div>
       <div id="attendance-pending" class="card">
-        <div class="card-header"><h3>Pending Approvals</h3></div>
+        <div class="card-header"><h3>Pending Authorization</h3></div>
         <div id="attendance-pending-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line" style="width:40%"></div></div>
       </div>
       <div class="card">
@@ -91,19 +91,19 @@ async function renderAttendance(viewDate) {
     const active = existing.find(a => a.status === 'pending' || a.status === 'approved');
     if (active) {
       selfEl.innerHTML = `
-        <div class="card-header"><h3>${active.status === 'approved' ? '&#10003; Checked In' : '&#9203; Pending Approval'}</h3></div>
+        <div class="card-header"><h3>${active.status === 'approved' ? '&#10003; Signed In' : '&#9203; Pending Authorization'}</h3></div>
         <p class="text-muted small">Date: ${today} &middot; In: ${active.checkinTime || '—'}${active.checkoutTime ? ' &middot; Out: ' + active.checkoutTime : ''} &middot; Status: <strong>${active.status.toUpperCase()}</strong></p>
         ${active.approvedBy ? `<p class="text-muted small">Approved by: ${active.approvedBy}</p>` : ''}
-        ${active.notes ? `<p class="text-muted small">Notes: ${escHtml(active.notes)}</p>` : ''}
+        ${active.notes ? `<p class="text-muted small">Remarks: ${escHtml(active.notes)}</p>` : ''}
         ${!active.checkoutTime ? `
         <div class="form-group" style="margin-top:10px">
-          <label>Check-out Time</label>
+          <label>Sign-out Time</label>
           <div class="row" style="gap:6px">
             <input type="time" id="att-checkout-time-input" class="form-input" style="flex:1">
             <button class="btn btn-sm btn-ghost" id="att-now-checkout-btn" style="padding:4px 8px;flex-shrink:0">Now</button>
           </div>
         </div>
-        <button class="btn btn-secondary btn-block" id="att-checkout-btn">Check Out</button>
+        <button class="btn btn-secondary btn-block" id="att-checkout-btn">Sign Out</button>
         <button class="btn btn-sm btn-danger att-del-btn" data-id="${active.id}" style="margin-top:6px">Delete</button>` : `
         <button class="btn btn-sm btn-danger att-del-btn" data-id="${active.id}" style="margin-top:6px">Delete Record</button>`}
       `;
@@ -119,25 +119,25 @@ async function renderAttendance(viewDate) {
           active.checkoutTime = timeVal || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           await DB.put('attendance', active);
           await queueSync('attendance', 'update', active);
-          showToast('Checked out');
+          showToast('Signed out');
           renderAttendance(_attViewDate);
         });
       }
     } else {
       selfEl.innerHTML = `
-        <div class="card-header"><h3>Check In for Today</h3></div>
+        <div class="card-header"><h3>Sign In</h3></div>
         <div class="form-group">
-          <label>Check-in Time</label>
+          <label>Sign-in Time</label>
           <div class="row" style="gap:6px">
             <input type="time" id="att-checkin-time-input" class="form-input" style="flex:1">
             <button class="btn btn-sm btn-ghost" id="att-now-checkin-btn" style="padding:4px 8px;flex-shrink:0">Now</button>
           </div>
         </div>
         <div class="form-group">
-          <label>Notes (optional)</label>
+          <label>Remarks (optional)</label>
           <input type="text" id="att-notes" placeholder="e.g. Engine oil change">
         </div>
-        <button class="btn btn-primary btn-block" id="att-checkin-btn">Check In</button>
+        <button class="btn btn-primary btn-block" id="att-checkin-btn">Sign In</button>
       `;
       document.getElementById('att-checkin-time-input').valueAsDate = new Date();
       document.getElementById('att-now-checkin-btn').addEventListener('click', () => {
@@ -162,14 +162,14 @@ async function renderAttendance(viewDate) {
         };
         await DB.put('attendance', record);
         await queueSync('attendance', 'create', record);
-        showToast('Checked in — awaiting approval');
+        showToast('Signed in — awaiting authorization');
         renderAttendance(_attViewDate);
       });
     }
     const delBtn = selfEl.querySelector('.att-del-btn');
     if (delBtn) {
       delBtn.addEventListener('click', async () => {
-        if (!confirm('Delete this attendance record?')) return;
+        if (!confirm('Delete this crew record?')) return;
         await DB.del('attendance', active.id);
         await queueSync('attendance', 'delete', { id: active.id });
         showToast('Record deleted');
@@ -207,7 +207,9 @@ async function renderAttendance(viewDate) {
           rec.approvedAt = new Date().toISOString();
           await DB.put('attendance', rec);
           await queueSync('attendance', 'update', rec);
-          showToast('Attendance approved');
+          showToast('Sign-in approved');
+          const user2 = localStorage.getItem('aac_user') || 'Unknown';
+          createNotification('attendance', 'Sign-In Approved', `${user2} approved sign-in for ${rec.userName}`, 'attendance');
           renderAttendance(_attViewDate);
         });
       });
@@ -220,20 +222,22 @@ async function renderAttendance(viewDate) {
           rec.approvedAt = new Date().toISOString();
           await DB.put('attendance', rec);
           await queueSync('attendance', 'update', rec);
-          showToast('Attendance rejected');
+          showToast('Sign-in rejected');
+          const user2 = localStorage.getItem('aac_user') || 'Unknown';
+          createNotification('attendance', 'Sign-In Rejected', `${user2} rejected sign-in for ${rec.userName}`, 'attendance');
           renderAttendance(_attViewDate);
         });
       });
     }
   } else {
-    pendingEl.innerHTML = '<p class="text-muted small">Only engineers/senior technicians can approve attendance</p>';
+    pendingEl.innerHTML = '<p class="text-muted small">Only engineers/senior technicians can approve sign-ins</p>';
   }
 
   // Today's records
   const todayEl = document.getElementById('attendance-today-list');
   const records = (await DB.getAll('attendance')).filter(a => a.date === today);
   if (records.length === 0) {
-    todayEl.innerHTML = '<p class="text-muted small">No attendance records for today</p>';
+    todayEl.innerHTML = '<p class="text-muted small">No crew records for today</p>';
   } else {
     todayEl.innerHTML = records.map(a => `
       <div class="flight-row">
@@ -247,7 +251,7 @@ async function renderAttendance(viewDate) {
     `).join('');
     todayEl.querySelectorAll('.att-del-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        if (!confirm('Delete this attendance record?')) return;
+        if (!confirm('Delete this crew record?')) return;
         await DB.del('attendance', btn.dataset.id);
         await queueSync('attendance', 'delete', { id: btn.dataset.id });
         showToast('Record deleted');
