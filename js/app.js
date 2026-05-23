@@ -1021,6 +1021,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     showToast(isLight ? 'Dark mode' : 'Light mode');
   });
+  document.getElementById('sidebar-user').addEventListener('click', e => {
+    e.preventDefault();
+    closeSidebar();
+    navigate('profile');
+  });
   document.getElementById('sidebar-pincode').addEventListener('click', async e => {
     e.preventDefault();
     closeSidebar();
