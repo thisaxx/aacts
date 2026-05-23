@@ -56,18 +56,22 @@ const FIRESTORE_COLLECTIONS = [
 
 function subscribeToAll() {
   FIRESTORE_COLLECTIONS.forEach(name => {
-    db_firestore.collection(name).onSnapshot(snapshot => {
+    db_firestore.collection(name).onSnapshot(async snapshot => {
       let hadRemote = false;
-      snapshot.docChanges().forEach(async change => {
-        if (change.type === 'removed') return;
+      for (const change of snapshot.docChanges()) {
+        if (change.type === 'removed') {
+          await DB.del(name, change.doc.id);
+          hadRemote = true;
+          continue;
+        }
         const data = change.doc.data();
-        if (data._deviceId === _deviceId) return;
+        if (data._deviceId === _deviceId) continue;
         const local = await DB.get(name, change.doc.id);
         if (!local || (data._updatedAt && (!local._updatedAt || data._updatedAt >= local._updatedAt))) {
           await DB.put(name, data);
           hadRemote = true;
         }
-      });
+      }
       updateSyncBadge();
       if (hadRemote && typeof onRemoteUpdate === 'function') onRemoteUpdate();
     }, () => { updateSyncBadge(); });
