@@ -1,4 +1,4 @@
-const CACHE = 'aac-v4';
+const CACHE = 'aac-v5';
 const PREFIX = '/aacts';
 const ASSETS = [
   PREFIX + '/',
@@ -14,6 +14,7 @@ const ASSETS = [
   PREFIX + '/js/inventory.js',
   PREFIX + '/js/history.js',
   PREFIX + '/js/attendance.js',
+  PREFIX + '/js/notifications.js',
   PREFIX + '/manifest.json',
   PREFIX + '/img/aircraft.jpg',
   PREFIX + '/img/icon-192.png',
