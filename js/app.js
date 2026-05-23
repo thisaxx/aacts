@@ -1310,7 +1310,6 @@ function showLoginGate() {
           </div>
           <div id="login-error" class="text-red small" style="display:none;margin-bottom:8px"></div>
           <button class="btn btn-primary btn-block" id="login-btn">Sign In</button>
-          <div class="text-muted" style="font-size:9px;margin-top:12px;text-align:center">Cessna 152 icon by FlyingPete (CC BY-SA 4.0)</div>
         </div>
       </div>
     </div>
