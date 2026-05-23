@@ -316,6 +316,21 @@ async function onRelease(taskId) {
     }
   }
 
+  // Reset inspection counters when a 50hr or 100hr inspection is released
+  if (task.type === 'inspection_50hr' || task.type === 'inspection_100hr') {
+    const ac2 = await DB.get('aircraft', task.aircraftId);
+    if (ac2) {
+      if (task.type === 'inspection_50hr') {
+        ac2.lastOilChangeTach = ac2.totalTachTime || 0;
+      } else {
+        ac2.last100hrTach = ac2.totalTachTime || 0;
+      }
+      await DB.put('aircraft', ac2);
+      await queueSync('aircraft', 'update', ac2);
+      showToast(`${task.type === 'inspection_50hr' ? '50hr' : '100hr'} inspection counter reset`);
+    }
+  }
+
   renderTasks();
 }
 

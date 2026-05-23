@@ -89,8 +89,9 @@ function notificationsView() {
         <h2>Notifications</h2>
         <div class="subtitle">Alerts &amp; reminders</div>
       </div>
-      <div style="text-align:right;margin-bottom:14px">
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:14px">
         <button class="btn btn-sm btn-ghost" id="mark-all-read-btn" style="font-size:11px">Mark All Read</button>
+        <button class="btn btn-sm btn-ghost" id="clear-all-notifs-btn" style="font-size:11px;color:var(--danger)">Clear All</button>
       </div>
       <div id="notif-list"></div>
     </div>
@@ -100,6 +101,20 @@ function notificationsView() {
     await markAllNotifsRead();
     renderNotifList();
     showToast('All notifications marked read');
+  });
+  document.getElementById('clear-all-notifs-btn').addEventListener('click', async () => {
+    const role = localStorage.getItem('aac_user_role');
+    if (role !== 'admin') { showToast('Only Admin can clear all notifications', 'error'); return; }
+    const confirmed = await showConfirmDialog('Clear All Notifications', 'Delete all notifications? This cannot be undone.');
+    if (!confirmed) return;
+    const all = await DB.getAll('notifications');
+    for (const n of all) {
+      await DB.del('notifications', n.id);
+      await queueSync('notifications', 'delete', { id: n.id });
+    }
+    updateNotifBadge();
+    renderNotifList();
+    showToast('All notifications cleared');
   });
 
   renderNotifList();
