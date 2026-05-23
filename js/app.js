@@ -259,69 +259,46 @@ async function dashboardView() {
       ${!crsIssuedToday && (userRole === 'engineer' || userRole === 'admin') ? `
       <div class="card" style="border-color:rgba(10,132,255,0.2);text-align:center">
         <button class="btn btn-primary btn-block" id="issue-daily-crs-btn">Issue Daily CRS</button>
-        <p class="text-muted small" style="margin-top:6px">Aircraft is grounded until daily CRS is issued</p>
-      </div>` : crsIssuedToday ? `
-      <div class="status-card" style="border-color:rgba(48,209,88,0.2)">
-        <div class="status-dot green"></div>
-        <div class="status-text">&#10003; Daily CRS issued today by ${escHtml(ac.dailyCrsBy || 'Engineer')}</div>
+        <p class="text-muted small" style="margin-top:6px">Aircraft grounded until daily CRS issued</p>
       </div>` : ''}
       ${afterFlightPending ? `
       <div class="status-card" style="border-color:rgba(255,159,10,0.3)">
         <div class="status-dot orange"></div>
-        <div class="status-text">&#9888; After-flight inspection pending &mdash; requires sign-off</div>
+        <div class="status-text">&#9888; After-flight inspection pending</div>
       </div>` : ''}
-
-      ${lowFuels > 0 ? `<div class="status-card" style="border-color:rgba(245,158,11,0.3)">
+      ${lowFuels > 0 || mixLow ? `
+      <div class="status-card" style="border-color:rgba(245,158,11,0.3)">
         <div class="status-dot orange"></div>
-        <div class="status-text text-orange">Fuel alert: ${lowFuels} fuel type(s) below minimum stock</div>
-      </div>` : ''}
-      ${mixLow ? `<div class="status-card" style="border-color:rgba(239,68,68,0.3)">
-        <div class="status-dot red"></div>
-        <div class="status-text text-red">Mix fuel low: ${mixQty}L remaining (needs at least 50L)</div>
+        <div class="status-text">Fuel alert: ${lowFuels} low stock${mixLow ? ', Mix below 50L' : ''}</div>
       </div>` : ''}
 
       <div class="dashboard-grid">
         <div class="stat-card">
           <div class="stat-icon">&#9992;</div>
           <div class="stat-value">${flights.length}</div>
-          <div class="stat-label">Total Sorties</div>
+          <div class="stat-label">Total Flights</div>
         </div>
         <div class="stat-card">
           <div class="stat-icon">&#9201;</div>
           <div class="stat-value">${totalHours.toFixed(1)}</div>
-          <div class="stat-label">Total Flight Time</div>
+          <div class="stat-label">Total Hours</div>
         </div>
         <div class="stat-card">
           <div class="stat-icon">&#128197;</div>
           <div class="stat-value">${monthFlights.length}</div>
-          <div class="stat-label">Monthly Sorties</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">&#9200;</div>
-          <div class="stat-value">${monthHours.toFixed(1)}</div>
-          <div class="stat-label">Monthly Flight Time</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">&#9881;</div>
-          <div class="stat-value ${openTasks > 0 ? 'text-red' : 'text-green'}">${openTasks}</div>
-          <div class="stat-label">Open Work Orders</div>
+          <div class="stat-label">This Month</div>
         </div>
         <div class="stat-card">
           <div class="stat-icon">&#9888;</div>
           <div class="stat-value ${openDefects > 0 ? 'text-red' : 'text-green'}">${openDefects}</div>
           <div class="stat-label">Open Squawks</div>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon">&#128230;</div>
-          <div class="stat-value ${(lowParts + lowFuels) > 0 ? 'text-red' : 'text-green'}">${lowParts + lowFuels}</div>
-          <div class="stat-label">Low Inventory</div>
-        </div>
       </div>
 
       <div class="quick-actions">
         <a href="#" class="quick-action" onclick="navigate('flight-ops')">
           <div class="qa-icon">&#9992;</div>
-          <div class="qa-label">Record Sortie</div>
+          <div class="qa-label">Log Flight</div>
         </a>
         <a href="#" class="quick-action" onclick="navigate('defects')">
           <div class="qa-icon">&#9888;</div>
@@ -337,13 +314,13 @@ async function dashboardView() {
         </a>
         <a href="#" class="quick-action" onclick="navigate('fuel')">
           <div class="qa-icon">&#9981;</div>
-          <div class="qa-label">Fuel Ops</div>
+          <div class="qa-label">Fuel</div>
         </a>
       </div>
 
       <div class="card">
         <div class="card-header">
-          <h3>Inspection Intervals</h3>
+          <h3>Maintenance Status</h3>
         </div>
         <div id="dash-intervals">
           <div class="interval-item">
@@ -370,62 +347,52 @@ async function dashboardView() {
                    style="width:${Math.min(100, (hoursSince100hr / ac.structInterval) * 100)}%"></div>
             </div>
           </div>
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--glass-border)">
+            ${(() => {
+              const etso = ac.engineETSO || 0;
+              const ptso = ac.propellerPTSO || 0;
+              const eTBO = ac.engineTBO || 2000;
+              const pTBO = ac.propellerTBO || 2000;
+              const ePct = Math.min(100, (etso / eTBO) * 100);
+              const pPct = Math.min(100, (ptso / pTBO) * 100);
+              return `
+              <div class="interval-item">
+                <div class="interval-label">
+                  <span class="label">Engine TSO</span>
+                  <span class="interval-value ${etso >= eTBO ? 'text-red' : etso >= eTBO - 50 ? 'text-orange' : 'text-green'}">${etso.toFixed(1)}h / ${eTBO}h</span>
+                </div>
+                <div class="progress-bar">
+                  <div class="progress-fill ${etso >= eTBO ? 'fill-red' : etso >= eTBO - 50 ? 'fill-orange' : 'fill-green'}" style="width:${ePct}%"></div>
+                </div>
+              </div>
+              <div class="interval-item">
+                <div class="interval-label">
+                  <span class="label">Propeller TSO</span>
+                  <span class="interval-value ${ptso >= pTBO ? 'text-red' : ptso >= pTBO - 50 ? 'text-orange' : 'text-green'}">${ptso.toFixed(1)}h / ${pTBO}h</span>
+                </div>
+                <div class="progress-bar">
+                  <div class="progress-fill ${ptso >= pTBO ? 'fill-red' : ptso >= pTBO - 50 ? 'fill-orange' : 'fill-green'}" style="width:${pPct}%"></div>
+                </div>
+              </div>`;
+            })()}
+          </div>
         </div>
       </div>
 
       <div class="card">
         <div class="card-header">
-          <h3>Engine &amp; Propeller</h3>
-        </div>
-        <div id="dash-etso-ptso">
-          ${(() => {
-            const etso = ac.engineETSO || 0;
-            const ptso = ac.propellerPTSO || 0;
-            const eTBO = ac.engineTBO || 2000;
-            const pTBO = ac.propellerTBO || 2000;
-            const ePct = Math.min(100, (etso / eTBO) * 100);
-            const pPct = Math.min(100, (ptso / pTBO) * 100);
-            return `
-            <div class="interval-item">
-              <div class="interval-label">
-                <span class="label">Engine TSO</span>
-                <span class="interval-value ${etso >= eTBO ? 'text-red' : etso >= eTBO - 50 ? 'text-orange' : 'text-green'}">${etso.toFixed(1)}h / ${eTBO}h</span>
-              </div>
-              <div class="progress-bar">
-                <div class="progress-fill ${etso >= eTBO ? 'fill-red' : etso >= eTBO - 50 ? 'fill-orange' : 'fill-green'}" style="width:${ePct}%"></div>
-              </div>
-              <div style="font-size:11px;color:var(--text-muted);margin-top:4px">${etso >= eTBO ? '<span class="text-red">Overhaul Due</span>' : `${(eTBO - etso).toFixed(1)}h until TBO`}</div>
-            </div>
-            <div class="interval-item">
-              <div class="interval-label">
-                <span class="label">Propeller TSO</span>
-                <span class="interval-value ${ptso >= pTBO ? 'text-red' : ptso >= pTBO - 50 ? 'text-orange' : 'text-green'}">${ptso.toFixed(1)}h / ${pTBO}h</span>
-              </div>
-              <div class="progress-bar">
-                <div class="progress-fill ${ptso >= pTBO ? 'fill-red' : ptso >= pTBO - 50 ? 'fill-orange' : 'fill-green'}" style="width:${pPct}%"></div>
-              </div>
-              <div style="font-size:11px;color:var(--text-muted);margin-top:4px">${ptso >= pTBO ? '<span class="text-red">Overhaul Due</span>' : `${(pTBO - ptso).toFixed(1)}h until TBO`}</div>
-            </div>`;
-          })()}
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <h3>Recent Sorties</h3>
+          <h3>Recent Flights</h3>
         </div>
         <div id="dash-flights">
-          ${flights.length === 0 ? emptyState('&#9992;', 'No sorties recorded yet') :
+          ${flights.length === 0 ? emptyState('&#9992;', 'No flights recorded yet') :
             flights.slice(0, 5).map(f => `
               <div class="flight-row">
                 <div style="flex:1;min-width:0">
                   <div class="flight-pilot">${escHtml(f.pilotName)}${f.status === 'departed' ? ' <span class="badge badge-rectified" style="font-size:9px">DEP</span>' : ''}</div>
                   <div class="flight-date">${f.flightDate}${f.takeoffTime ? ` &middot; ${f.takeoffTime}${f.landingTime ? '-' + f.landingTime : '...'}` : ''}</div>
-                  ${f.fuelConsumed ? `<div class="flight-date" style="font-size:10px">${f.fuelConsumed.toFixed(1)} gal consumed</div>` : ''}
                 </div>
                 <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
                   ${f.status !== 'departed' ? `<div class="flight-hours">${(f.flownHours * 60).toFixed(0)}m</div>` : '<div class="flight-hours" style="opacity:0.4">—</div>'}
-                  <button class="btn btn-sm btn-danger dash-del-flight-btn" data-id="${f.id}" style="padding:4px 8px;font-size:11px">&times;</button>
                 </div>
               </div>
             `).join('')

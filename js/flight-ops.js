@@ -75,7 +75,7 @@ function flightOpsView() {
     app.innerHTML = `
     <div class="page">
       <div class="page-header">
-        <h2>Flight Operations</h2>
+        <h2>Log Flights</h2>
         <div class="subtitle">${escHtml(ac.type || 'Aircraft')} &middot; ${escHtml(ac.tailNumber)}</div>
       </div>
 
@@ -86,7 +86,7 @@ function flightOpsView() {
 
       <form id="depart-form" class="card">
         <div class="card-header">
-          <h3>Record Departure</h3>
+          <h3>Departure</h3>
         </div>
         <div class="form-group">
           <label for="flight-date">Flight Date</label>
@@ -111,7 +111,7 @@ function flightOpsView() {
             <input type="number" id="fuel-before-right" value="0" min="0" step="1" class="form-input fuel-input">
           </div>
         </div>
-        <button type="submit" class="btn btn-primary btn-block">Record Departure</button>
+        <button type="submit" class="btn btn-primary btn-block">Depart</button>
       </form>
 
       <div class="card">

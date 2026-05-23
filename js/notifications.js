@@ -71,15 +71,6 @@ async function updateNotifBadge() {
       sidebarNotif.style.display = 'none';
     }
   }
-  const navNotif = document.getElementById('notif-badge-nav');
-  if (navNotif) {
-    if (count > 0) {
-      navNotif.textContent = count > 99 ? '99+' : count;
-      navNotif.style.display = 'flex';
-    } else {
-      navNotif.style.display = 'none';
-    }
-  }
 }
 
 function notifTypeIcon(type) {
