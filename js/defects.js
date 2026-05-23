@@ -217,7 +217,7 @@ async function renderDefects() {
   document.querySelectorAll('.del-defect-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const role = localStorage.getItem('aac_user_role');
-      if (role !== 'engineer' && role !== 'admin') {
+      if (role !== 'engineer' && role !== 'admin' && role !== 'production_planner') {
         showToast('Only Engineer or Admin can delete squawks');
         return;
       }
@@ -234,7 +234,7 @@ async function renderDefects() {
 
 function defectCard(defect) {
   const role = localStorage.getItem('aac_user_role');
-  const canResolve = role === 'engineer' || role === 'senior_technician' || role === 'admin';
+  const canResolve = role === 'engineer' || role === 'senior_technician' || role === 'production_planner' || role === 'admin';
   const canDelete = role === 'engineer' || role === 'admin';
   const urgencyLabel = defect.urgency === 'grounding'
     ? '<span class="badge badge-open" style="border-color:rgba(239,68,68,0.3)">GROUNDING</span>'
@@ -268,7 +268,7 @@ function defectCard(defect) {
 
 async function resolveDefect(defectId) {
   const role = localStorage.getItem('aac_user_role');
-  if (role !== 'engineer' && role !== 'senior_technician' && role !== 'admin') {
+  if (role !== 'engineer' && role !== 'senior_technician' && role !== 'production_planner' && role !== 'admin') {
     showToast('Only Engineer or Senior Technician can resolve squawks');
     return;
   }

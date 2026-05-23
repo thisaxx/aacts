@@ -1046,8 +1046,14 @@ select {
 .sidebar-header {
   padding: 24px 16px 16px;
   border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
 }
-.sidebar-user { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.sidebar-user { display: flex; align-items: center; gap: 12px; cursor: pointer; flex:1; }
+.sidebar-theme-toggle {
+  background: none; border: none; color: var(--text); font-size: 22px;
+  cursor: pointer; padding: 4px 8px; border-radius: 6px; line-height:1;
+}
+.sidebar-theme-toggle:hover { background: var(--glass-hover); }
 .sidebar-avatar {
   width: 44px;
   height: 44px;

@@ -403,9 +403,12 @@ async function dashboardView() {
         <button class="btn btn-primary btn-block" id="issue-daily-crs-btn" style="margin-top:8px">Issue Daily CRS</button>` : ''}
       </div>` : ''}
 
-      <button class="btn btn-secondary btn-block" id="end-of-flying-btn" style="margin-bottom:14px">&#128200; End of Flying — Enter Tach &amp; Start Inspection</button>
+      ${userRole === 'engineer' || userRole === 'production_planner' || userRole === 'admin' ? `
+      <button class="btn btn-secondary btn-block" id="end-of-flying-btn" style="margin-bottom:14px">&#128200; End of Flying — Enter Tach &amp; Start Inspection</button>` : ''}
 
-      <div class="quick-actions">
+      <button class="btn btn-secondary btn-block" id="preflight-oil-btn" style="margin-bottom:14px">&#128167; Pre-Flight Oil Check</button>
+
+      <div class="quick-actions
         <a href="#" class="quick-action" onclick="navigate('flight-ops')">
           <div class="qa-icon">&#9992;</div>
           <div class="qa-label">Log Flight</div>
@@ -435,7 +438,7 @@ async function dashboardView() {
         <div id="dash-intervals">
           <div class="interval-item">
             <div class="interval-label">
-              <span class="label">Oil Change (50 hrs)</span>
+              <span class="label">50hr Inspection</span>
               <span class="interval-value ${hoursSinceOil >= ac.oilInterval ? 'text-red' : hoursSinceOil >= ac.oilInterval - 5 ? 'text-orange' : 'text-green'}">
                 ${oilRemaining.toFixed(1)}h left
               </span>
@@ -447,7 +450,7 @@ async function dashboardView() {
           </div>
           <div class="interval-item">
             <div class="interval-label">
-              <span class="label">Structural (100 hrs)</span>
+              <span class="label">100hr Inspection</span>
               <span class="interval-value ${hoursSince100hr >= ac.structInterval ? 'text-red' : hoursSince100hr >= ac.structInterval - 5 ? 'text-orange' : 'text-green'}">
                 ${structRemaining.toFixed(1)}h left
               </span>
@@ -514,7 +517,12 @@ async function dashboardView() {
 
   document.getElementById('dashboard-hero').addEventListener('click', () => showAircraftSheet());
 
-  document.getElementById('end-of-flying-btn').addEventListener('click', async () => {
+  document.getElementById('end-of-flying-btn')?.addEventListener('click', async () => {
+    const userRole2 = localStorage.getItem('aac_user_role');
+    if (userRole2 !== 'engineer' && userRole2 !== 'production_planner' && userRole2 !== 'admin') {
+      showToast('Only Engineer or Production Planner can end flying', 'error');
+      return;
+    }
     const ac = await getAircraft();
     const currentTach = ac.totalTachTime || 0;
     showBottomSheet(`
@@ -575,6 +583,65 @@ async function dashboardView() {
       notifyDataChange();
     });
     document.getElementById('eof-cancel-btn').addEventListener('click', () => {
+      window.__sheetClose(null);
+    });
+  });
+
+  document.getElementById('preflight-oil-btn').addEventListener('click', async () => {
+    const ac = await getAircraft();
+    const hoursSinceOil = (ac.totalTachTime || 0) - (ac.lastOilChangeTach || 0);
+    const oilDue = hoursSinceOil >= (ac.oilInterval || 50);
+    showBottomSheet(`
+      <div class="card-header"><h3>&#128167; Pre-Flight Oil Check — ${escHtml(ac.tailNumber)}</h3></div>
+      <p class="text-muted small" style="margin-bottom:12px">Oil change due every ${ac.oilInterval || 50} tach hrs. Current: ${hoursSinceOil.toFixed(1)} hrs since last change.${oilDue ? ' <strong class="text-red">Oil change overdue.</strong>' : ''}</p>
+      <div class="form-group">
+        <label>Oil Level</label>
+        <select id="oil-level" class="form-input">
+          <option value="ok">OK — within limits</option>
+          <option value="low">Low — needs topping up</option>
+        </select>
+      </div>
+      <div class="form-group" id="oil-qty-group" style="display:none">
+        <label>Quarts added</label>
+        ${stepperHTML('oil-qty', 1, 0, 12, 1)}
+      </div>
+      <div class="form-group">
+        <label>Remarks (optional)</label>
+        <input type="text" id="oil-remarks" class="form-input" placeholder="e.g. Topped up 2 quarts">
+      </div>
+      <button class="btn btn-primary btn-block" id="oil-check-confirm-btn">Record Oil Check</button>
+      <button class="btn btn-secondary btn-block" id="oil-check-cancel-btn" style="margin-top:8px">Cancel</button>
+    `);
+    initSteppers();
+    document.getElementById('oil-level').addEventListener('change', function() {
+      document.getElementById('oil-qty-group').style.display = this.value === 'low' ? 'block' : 'none';
+    });
+    document.getElementById('oil-check-confirm-btn').addEventListener('click', async () => {
+      const level = document.getElementById('oil-level').value;
+      const qty = level === 'low' ? (parseFloat(document.getElementById('oil-qty').value) || 0) : 0;
+      const remarks = document.getElementById('oil-remarks').value.trim();
+      const user = localStorage.getItem('aac_user') || 'Unknown';
+
+      // Deduct oil from inventory if added
+      if (qty > 0) {
+        const oilPart = await DB.get('parts', 'AV-OIL-20W50');
+        if (oilPart) {
+          if (oilPart.quantityOnHand >= qty) {
+            oilPart.quantityOnHand -= qty;
+            await DB.put('parts', oilPart);
+            await queueSync('parts', 'update', oilPart);
+          } else {
+            showToast('Not enough oil in stock!', 'error');
+          }
+        }
+      }
+
+      window.__sheetClose(true);
+      showToast(`Pre-flight oil check: ${level === 'ok' ? 'OK' : 'Topped up ' + qty + ' qt'}`);
+      logActivity('oil_check', `${user} performed pre-flight oil check on ${ac.tailNumber}: ${level === 'ok' ? 'OK' : 'Added ' + qty + ' qt'}${remarks ? ' — ' + remarks : ''}`, ac.tailNumber);
+      notifyDataChange();
+    });
+    document.getElementById('oil-check-cancel-btn').addEventListener('click', () => {
       window.__sheetClose(null);
     });
   });
@@ -645,6 +712,7 @@ function refreshView(view) {
 // Call after any local write to trigger instant refresh (debounced)
 let _notifyTimer = null;
 function notifyDataChange() {
+  updateSidebarInspections();
   if (_notifyTimer) return;
   _notifyTimer = setTimeout(() => {
     _notifyTimer = null;
@@ -685,7 +753,7 @@ function updateSidebarUser() {
     avatar.style.background = '';
   }
   // Role-based sidebar visibility
-  const isPrivileged = role === 'engineer' || role === 'admin';
+  const isPrivileged = role === 'engineer' || role === 'admin' || role === 'production_planner';
   document.querySelectorAll('#sidebar-pincode, #sidebar-reset').forEach(el => {
     el.style.display = isPrivileged ? '' : 'none';
   });
@@ -700,8 +768,8 @@ async function updateSidebarInspections() {
     const el = document.getElementById('sidebar-insp-list');
     if (!el) return;
     el.innerHTML = `
-      <div class="sidebar-insp-item"><span>50hr Oil</span><span class="${insp.oilClass}">${insp.oilRemaining.toFixed(1)}h</span></div>
-      <div class="sidebar-insp-item"><span>100hr Structural</span><span class="${insp.structClass}">${insp.structRemaining.toFixed(1)}h</span></div>
+      <div class="sidebar-insp-item"><span>50hr Inspection</span><span class="${insp.oilClass}">${insp.oilRemaining.toFixed(1)}h</span></div>
+      <div class="sidebar-insp-item"><span>100hr Inspection</span><span class="${insp.structClass}">${insp.structRemaining.toFixed(1)}h</span></div>
     `;
   } catch (e) {}
 }
@@ -715,6 +783,7 @@ function profileView() {
   const roles = [
     { value: 'technician', label: 'Technician', desc: 'Can record sorties, report squawks, view data' },
     { value: 'senior_technician', label: 'Senior Technician', desc: 'Above + can approve sign-ins' },
+    { value: 'production_planner', label: 'Production Planner', desc: 'Above + can end flying day, schedule maintenance' },
     { value: 'engineer', label: 'Engineer', desc: 'Above + can approve CRS (Release to Service)' },
     { value: 'admin', label: 'Admin', desc: 'Full access to all features' }
   ];
@@ -786,7 +855,7 @@ function profileView() {
     if (!n) { showToast('Enter your name', 'error'); return; }
     if (!r) { showToast('Select your role', 'error'); return; }
 
-    if (r === 'admin' || r === 'engineer' || r === 'senior_technician') {
+    if (r === 'admin' || r === 'engineer' || r === 'production_planner' || r === 'senior_technician') {
       const pin = localStorage.getItem('aac_pin') || '1234';
       const entered = await showPromptDialog('PIN Required', `Enter admin PIN to set role as ${r.replace(/_/g, ' ')}:`);
       if (entered === null) { showToast('Profile save cancelled', 'warning'); return; }
@@ -1039,7 +1108,7 @@ function showEditAircraftForm(ac) {
       </div>
       <div class="row">
         <div class="form-group">
-          <label>Last Oil Change (tach hrs)</label>
+          <label>Last 50hr Insp (tach hrs)</label>
           ${stepperHTML('edit-ac-oil', ac.lastOilChangeTach || 0, 0, 99999, 0.1)}
         </div>
         <div class="form-group">
@@ -1049,11 +1118,11 @@ function showEditAircraftForm(ac) {
       </div>
       <div class="row">
         <div class="form-group">
-          <label>Oil Interval (hrs)</label>
+          <label>50hr Interval (hrs)</label>
           ${stepperHTML('edit-ac-oil-int', ac.oilInterval || 50, 1, 999, 1)}
         </div>
         <div class="form-group">
-          <label>Structural Interval (hrs)</label>
+          <label>100hr Interval (hrs)</label>
           ${stepperHTML('edit-ac-struct-int', ac.structInterval || 100, 1, 999, 1)}
         </div>
       </div>
@@ -1173,12 +1242,15 @@ async function populateACSelector() {
 document.addEventListener('DOMContentLoaded', async () => {
   // Apply saved theme
   const savedTheme = localStorage.getItem('aac_theme');
-  if (savedTheme === 'light') {
+  const isLight = savedTheme === 'light';
+  if (isLight) {
     document.documentElement.setAttribute('data-theme', 'light');
   }
-  // Set sidebar theme label
+  // Set sidebar theme label and toggle icon
   const themeLabel = document.getElementById('sidebar-theme-label');
-  if (themeLabel) themeLabel.textContent = savedTheme === 'light' ? 'Light Mode' : 'Dark Mode';
+  if (themeLabel) themeLabel.textContent = isLight ? 'Light Mode' : 'Dark Mode';
+  const themeToggle = document.getElementById('sidebar-theme-toggle');
+  if (themeToggle) themeToggle.innerHTML = isLight ? '&#127774;' : '&#127769;';
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js');
@@ -1248,20 +1320,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     const confirmed = await showConfirmDialog('Factory Reset', 'This will delete ALL data including aircraft, sorties, defects, parts, and fuel. Are you sure?');
     if (confirmed) await clearAllData();
   });
-  document.getElementById('sidebar-theme').addEventListener('click', e => {
-    e.preventDefault();
+  function toggleTheme() {
     const html = document.documentElement;
     const isLight = html.getAttribute('data-theme') === 'light';
     if (isLight) {
       html.removeAttribute('data-theme');
       localStorage.setItem('aac_theme', 'dark');
       document.getElementById('sidebar-theme-label').textContent = 'Dark Mode';
+      document.getElementById('sidebar-theme-toggle').innerHTML = '&#127769;';
     } else {
       html.setAttribute('data-theme', 'light');
       localStorage.setItem('aac_theme', 'light');
       document.getElementById('sidebar-theme-label').textContent = 'Light Mode';
+      document.getElementById('sidebar-theme-toggle').innerHTML = '&#127774;';
     }
     showToast(isLight ? 'Dark mode' : 'Light mode');
+  }
+  document.getElementById('sidebar-theme').addEventListener('click', e => {
+    e.preventDefault();
+    toggleTheme();
+  });
+  document.getElementById('sidebar-theme-toggle').addEventListener('click', e => {
+    toggleTheme();
   });
   document.getElementById('sidebar-user').addEventListener('click', e => {
     e.preventDefault();

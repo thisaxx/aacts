@@ -63,8 +63,8 @@ function calendarView() {
     const insp = getInspectionStatus(ac);
     html += `<div class="card"><div class="card-header"><h3>Inspections on ${dateStr}</h3></div>`;
     if (dateStr === new Date().toISOString().slice(0, 10)) {
-      html += `<div class="interval-item"><div class="interval-label"><span class="label">Oil Change (50hr)</span><span class="interval-value ${insp.oilClass}">${insp.oilRemaining.toFixed(1)}h left</span></div><div class="progress-bar"><div class="progress-fill ${insp.oilFill}" style="width:${insp.oilPct}%"></div></div></div>`;
-      html += `<div class="interval-item"><div class="interval-label"><span class="label">Structural (100hr)</span><span class="interval-value ${insp.structClass}">${insp.structRemaining.toFixed(1)}h left</span></div><div class="progress-bar"><div class="progress-fill ${insp.structFill}" style="width:${insp.structPct}%"></div></div></div>`;
+      html += `<div class="interval-item"><div class="interval-label"><span class="label">50hr Inspection</span><span class="interval-value ${insp.oilClass}">${insp.oilRemaining.toFixed(1)}h left</span></div><div class="progress-bar"><div class="progress-fill ${insp.oilFill}" style="width:${insp.oilPct}%"></div></div></div>`;
+      html += `<div class="interval-item"><div class="interval-label"><span class="label">100hr Inspection</span><span class="interval-value ${insp.structClass}">${insp.structRemaining.toFixed(1)}h left</span></div><div class="progress-bar"><div class="progress-fill ${insp.structFill}" style="width:${insp.structPct}%"></div></div></div>`;
     } else {
       html += `<p class="text-muted small">No inspection data for this date</p>`;
     }
@@ -118,9 +118,9 @@ function getInspectionStatus(ac) {
 function checkInspectionNotifications() {
   getAircraft().then(ac => {
     const insp = getInspectionStatus(ac);
-    if (insp.oilRemaining <= 0) showToast('⚠ OIL CHANGE OVERDUE — 50hr interval exceeded', 'error');
-    else if (insp.oilRemaining <= 5) showToast(`⚙ Oil change due in ${insp.oilRemaining.toFixed(1)}h`, 'warning');
-    if (insp.structRemaining <= 0) showToast('⚠ STRUCTURAL INSPECTION OVERDUE — 100hr interval exceeded', 'error');
+    if (insp.oilRemaining <= 0) showToast('⚠ 50hr inspection overdue', 'error');
+    ...
+    if (insp.structRemaining <= 0) showToast('⚠ 100hr inspection overdue', 'error');
     else if (insp.structRemaining <= 5) showToast(`🔧 Structural inspection due in ${insp.structRemaining.toFixed(1)}h`, 'warning');
   });
 }

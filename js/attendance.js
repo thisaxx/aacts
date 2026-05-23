@@ -185,7 +185,7 @@ async function renderAttendance(viewDate) {
 
   // Pending approvals (for engineers / senior techs)
   const pendingEl = document.getElementById('attendance-pending-list');
-  if (user && (user.role === 'engineer' || user.role === 'admin' || user.role === 'senior_technician')) {
+  if (user && (user.role === 'engineer' || user.role === 'admin' || user.role === 'senior_technician' || user.role === 'production_planner')) {
     const all = await DB.getAll('attendance');
     const pending = all.filter(a => a.status === 'pending');
     if (pending.length === 0) {

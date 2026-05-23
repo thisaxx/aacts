@@ -484,6 +484,7 @@ async function onArrivalSubmit(e) {
 
   createNotification('sortie', 'Sortie Completed', `${flight.pilotName} completed sortie in ${ac.tailNumber} (${(duration*60).toFixed(0)} min)`, 'flight-ops');
   logActivity('arrival', `${flight.pilotName} completed sortie in ${ac.tailNumber} (${(duration*60).toFixed(0)} min)`, flight.id);
+  notifyDataChange();
 
   // Reset arrival form
   document.getElementById('arrival-card').classList.add('hidden');
@@ -519,16 +520,16 @@ async function onUpdateMeters() {
   if (hoursSince100hr >= 100) {
     await show100hrPrompt(newTach);
   }
-
-  showToast(`Tach updated to ${newTach.toFixed(1)}h${newHobbs > 0 ? `, Hobbs ${newHobbs.toFixed(1)}h` : ''}`);
+  showToast('Meters updated');
   renderAircraftStatus();
   renderIntervalBars();
+  notifyDataChange();
   renderETSO_PTSO();
 }
 
 async function showOilChangePrompt(currentTach) {
   const confirmed = await showConfirmDialog(
-    '50-Hour Oil Change',
+    '50hr Inspection',
     'This sortie brings the aircraft to the 50-hour oil change interval. Did you use 1 oil filter and 6 quarts of aviation oil?'
   );
   if (confirmed) {
@@ -557,7 +558,7 @@ async function showOilChangePrompt(currentTach) {
 
 async function show100hrPrompt(currentTach) {
   const confirmed = await showConfirmDialog(
-    '100-Hour Structural Inspection',
+    '100hr Inspection',
     'This sortie brings the aircraft to the 100-hour structural inspection interval. Has the inspection been completed?'
   );
   if (confirmed) {
@@ -610,7 +611,7 @@ async function renderIntervalBars() {
   el.innerHTML = `
     <div class="interval-item">
       <div class="interval-label">
-        <span class="label">Oil Change (50 hrs)</span>
+        <span class="label">50hr Inspection</span>
         <span class="interval-value ${hoursSinceOil >= ac.oilInterval ? 'text-red' : hoursSinceOil >= ac.oilInterval - 5 ? 'text-orange' : 'text-green'}">
           ${oilRemaining.toFixed(1)}h left
         </span>
@@ -622,7 +623,7 @@ async function renderIntervalBars() {
     </div>
     <div class="interval-item">
       <div class="interval-label">
-        <span class="label">Structural Inspection (100 hrs)</span>
+        <span class="label">100hr Inspection</span>
         <span class="interval-value ${hoursSince100hr >= ac.structInterval ? 'text-red' : hoursSince100hr >= ac.structInterval - 5 ? 'text-orange' : 'text-green'}">
           ${structRemaining.toFixed(1)}h left
         </span>

@@ -270,7 +270,7 @@ async function onRelease(taskId) {
 
   const userRole = localStorage.getItem('aac_user_role');
   const isAfterFlight = task.type === 'after-flight';
-  const allowedRoles = isAfterFlight ? ['engineer', 'senior_technician', 'admin'] : ['engineer', 'admin'];
+  const allowedRoles = isAfterFlight ? ['engineer', 'senior_technician', 'production_planner', 'admin'] : ['engineer', 'admin'];
 
   if (!allowedRoles.includes(userRole)) {
     showToast(`Only ${isAfterFlight ? 'Senior Technician or Engineer' : 'engineers'} can release to service (CRS)`, 'error');
@@ -297,13 +297,15 @@ async function onRelease(taskId) {
 
   // If this is an after-flight inspection being released, ground the aircraft until next daily CRS
   if (task.type === 'after-flight') {
-    const ac = await getAircraft();
-    ac.groundedAfterInspection = true;
-    ac.groundedAfterInspAt = new Date().toISOString();
-    await DB.put('aircraft', ac);
-    await queueSync('aircraft', 'update', ac);
-    showToast('Aircraft grounded — daily CRS required before next flight');
-    createNotification('system', 'Aircraft Grounded', `${ac.tailNumber} grounded after after-flight inspection. Daily CRS required.`, 'dashboard');
+    const ac2 = await DB.get('aircraft', task.aircraftId);
+    if (ac2) {
+      ac2.groundedAfterInspection = true;
+      ac2.groundedAfterInspAt = new Date().toISOString();
+      await DB.put('aircraft', ac2);
+      await queueSync('aircraft', 'update', ac2);
+      showToast('Aircraft grounded — daily CRS required before next flight');
+      createNotification('system', 'Aircraft Grounded', `${ac2.tailNumber} grounded after after-flight inspection. Daily CRS required.`, 'dashboard');
+    }
   }
 
   renderTasks();
