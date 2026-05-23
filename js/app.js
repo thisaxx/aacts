@@ -1292,7 +1292,7 @@ function showLoginGate() {
     <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:var(--bg)">
       <div style="max-width:400px;width:100%">
         <div style="text-align:center;margin-bottom:24px">
-          <img src="img/cessna152-badge.svg" alt="Cessna 152" style="width:80px;height:80px;margin-bottom:8px">
+          <img src="img/logo.jpg" alt="AACTS" style="width:80px;height:80px;border-radius:50%;margin-bottom:8px;object-fit:cover;border:2px solid var(--border)">
           <h1 style="font-size:22px;margin:0">AAC Technical Services</h1>
           <p class="text-muted" style="margin-top:4px">Select your name to sign in</p>
         </div>
@@ -1338,7 +1338,9 @@ function showLoginGate() {
     if (!name) { showToast('Select a user', 'error'); return; }
     if (privilegedRoles.includes(role)) {
       const pin = document.getElementById('login-pin').value.trim();
-      const storedPin = localStorage.getItem('aac_pin') || '1234';
+      let userPins = {};
+      try { userPins = JSON.parse(localStorage.getItem('aac_user_pins')) || {}; } catch(e) {}
+      const storedPin = userPins[name] || '1234';
       if (!pin) { error.textContent = 'PIN required for this role'; error.style.display = ''; return; }
       if (pin !== storedPin) { error.textContent = 'Incorrect PIN'; error.style.display = ''; return; }
     }
@@ -1382,6 +1384,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   await populateACSelector();
+
+  // Seed per-user PINs if not yet set
+  if (!localStorage.getItem('aac_user_pins')) {
+    const pins = {};
+    let users = [];
+    try { users = JSON.parse(localStorage.getItem('aac_users')) || []; } catch(e) {}
+    users.forEach(u => { pins[u.name] = '1234'; });
+    localStorage.setItem('aac_user_pins', JSON.stringify(pins));
+  }
 
   // Seed user database if not yet set
   if (!localStorage.getItem('aac_users')) {
@@ -1476,7 +1487,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('sidebar-pincode').addEventListener('click', async e => {
     e.preventDefault();
     closeSidebar();
-    const current = localStorage.getItem('aac_pin') || '1234';
+    const currentUser = localStorage.getItem('aac_user');
+    if (!currentUser) { showToast('No user logged in', 'error'); return; }
+    let userPins = {};
+    try { userPins = JSON.parse(localStorage.getItem('aac_user_pins')) || {}; } catch(e) {}
+    const current = userPins[currentUser] || '1234';
     const old = await showPromptDialog('Change PIN', 'Enter current PIN:');
     if (old === null) return;
     if (old.trim() !== current) { showToast('Incorrect PIN', 'error'); return; }
@@ -1485,7 +1500,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!newPin.trim()) { showToast('PIN cannot be empty', 'error'); return; }
     const confirmPin = await showPromptDialog('Change PIN', 'Confirm new PIN:');
     if (confirmPin === null || confirmPin.trim() !== newPin.trim()) { showToast('PINs do not match', 'error'); return; }
-    localStorage.setItem('aac_pin', newPin.trim());
+    userPins[currentUser] = newPin.trim();
+    localStorage.setItem('aac_user_pins', JSON.stringify(userPins));
     showToast('PIN changed successfully');
   });
   document.getElementById('sidebar-export').addEventListener('click', async e => {
