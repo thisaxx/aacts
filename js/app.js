@@ -426,23 +426,23 @@ async function dashboardView() {
 
 
       <div class="quick-actions">
-        <a href="#" class="quick-action" onclick="return navigate('flight-ops')">
+        <a href="#" class="quick-action" data-view="flight-ops">
           <div class="qa-icon">&#9992;</div>
           <div class="qa-label">Log Flight</div>
         </a>
-        <a href="#" class="quick-action" onclick="return navigate('defects')">
+        <a href="#" class="quick-action" data-view="defects">
           <div class="qa-icon">&#9888;</div>
           <div class="qa-label">Squawks</div>
         </a>
-        <a href="#" class="quick-action" onclick="return navigate('maintenance')">
+        <a href="#" class="quick-action" data-view="maintenance">
           <div class="qa-icon">&#9881;</div>
           <div class="qa-label">Sign-offs</div>
         </a>
-        <a href="#" class="quick-action" onclick="return navigate('fuel')">
+        <a href="#" class="quick-action" data-view="fuel">
           <div class="qa-icon">&#9981;</div>
           <div class="qa-label">Fuel</div>
         </a>
-        <a href="#" class="quick-action" onclick="return navigate('inventory')">
+        <a href="#" class="quick-action" data-view="inventory">
           <div class="qa-icon">&#128230;</div>
           <div class="qa-label">Parts</div>
         </a>
@@ -533,6 +533,14 @@ async function dashboardView() {
   `;
 
   document.getElementById('dashboard-hero').addEventListener('click', () => showAircraftSheet());
+
+  // Quick-action navigation
+  document.querySelectorAll('.quick-action[data-view]').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      navigate(a.dataset.view);
+    });
+  });
 
   const crsBtn = document.getElementById('issue-daily-crs-btn');
   if (crsBtn) {
