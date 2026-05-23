@@ -16,7 +16,7 @@ const DEFAULT_AIRCRAFT = {
 };
 
 function getCurrentAircraftKey() {
-  return localStorage.getItem('aac_current_aircraft') || localStorage.getItem('aac_default_aircraft') || 'C-152-001';
+  return localStorage.getItem('aac_current_aircraft') || localStorage.getItem('aac_default_aircraft') || '';
 }
 
 function setCurrentAircraftKey(tailNumber) {
@@ -44,9 +44,6 @@ async function getAircraft() {
     if (all.length > 0) {
       ac = all[0];
       setCurrentAircraftKey(ac.tailNumber);
-    } else {
-      ac = { ...DEFAULT_AIRCRAFT };
-      await DB.put('aircraft', ac);
     }
   }
   return ac;
@@ -58,6 +55,7 @@ async function switchAircraft(tailNumber) {
 
 async function getFlights() {
   const ac = await getAircraft();
+  if (!ac) return [];
   return (await DB.getAll('flights'))
     .filter(f => f.aircraftId === ac.tailNumber)
     .sort((a, b) => b.flightDate.localeCompare(a.flightDate));
@@ -75,6 +73,11 @@ function fuelVal(id) { return parseFloat(document.getElementById(id)?.value) || 
 function flightOpsView() {
   const app = document.getElementById('app');
   getAircraft().then(ac => {
+    if (!ac) {
+      app.innerHTML = `<div class="page"><div class="page-header"><h2>Log Flights</h2></div><div class="card" style="text-align:center;padding:40px 20px"><p class="text-muted">Add an aircraft first in Fleet Manager.</p><button class="btn btn-primary btn-block" id="goto-fleet-from-flights" style="margin-top:16px">+ Add Aircraft</button></div></div>`;
+      document.getElementById('goto-fleet-from-flights').addEventListener('click', () => showAircraftSheet());
+      return;
+    }
     app.innerHTML = `
     <div class="page">
       <div class="page-header">

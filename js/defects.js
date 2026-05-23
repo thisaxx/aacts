@@ -1,5 +1,6 @@
 async function getDefects() {
   const ac = await getAircraft();
+  if (!ac) return [];
   return (await DB.getAll('defects'))
     .filter(d => d.aircraftId === ac.tailNumber)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));

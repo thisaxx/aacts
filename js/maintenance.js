@@ -1,5 +1,6 @@
 async function getMaintenanceTasks() {
   const ac = await getAircraft();
+  if (!ac) return [];
   return (await DB.getAll('maintenance_tasks'))
     .filter(t => t.aircraftId === ac.tailNumber)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));

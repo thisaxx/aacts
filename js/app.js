@@ -296,6 +296,22 @@ function initToggles() {
 async function dashboardView() {
   const app = document.getElementById('app');
   const ac = await getAircraft();
+  if (!ac) {
+    app.innerHTML = `
+      <div class="page">
+        <div class="page-header">
+          <h2>Dashboard</h2>
+          <div class="subtitle">No aircraft found</div>
+        </div>
+        <div class="card" style="text-align:center;padding:40px 20px">
+          <div style="font-size:48px;margin-bottom:16px">&#9992;</div>
+          <p class="text-muted">Add your first aircraft to get started.</p>
+          <button class="btn btn-primary btn-block" id="goto-fleet-btn" style="margin-top:16px">+ Add Aircraft</button>
+        </div>
+      </div>`;
+    document.getElementById('goto-fleet-btn').addEventListener('click', () => showAircraftSheet());
+    return;
+  }
   const flights = await getFlights();
   const tasks = await getMaintenanceTasks();
   const parts = await getParts();
@@ -359,6 +375,8 @@ async function dashboardView() {
   if (!crsIssuedToday && (userRole === 'engineer' || userRole === 'production_planner' || userRole === 'admin')) alerts.push('No daily CRS issued');
   if (afterFlightPending) alerts.push('After-flight inspection pending');
   if (lowFuels > 0 || mixLow) alerts.push(`Fuel low: ${lowFuels} stock${mixLow ? ', Mix below 50L' : ''}`);
+  const inspectionOverdue = minRemaining <= 0;
+  if (inspectionOverdue) alerts.push('Inspection overdue — perform sign-off to clear');
 
   app.innerHTML = `
     <div class="page">
@@ -402,28 +420,29 @@ async function dashboardView() {
         ${ac.groundedAfterInspection ? `<div class="dash-alert" style="border-color:var(--danger)">&#128308; Aircraft grounded — daily CRS required before next flight</div>` : ''}
         ${(!crsIssuedToday || ac.groundedAfterInspection) && (userRole === 'engineer' || userRole === 'production_planner' || userRole === 'admin') ? `
         <button class="btn btn-primary btn-block" id="issue-daily-crs-btn" style="margin-top:8px">${ac.groundedAfterInspection ? '&#9989; Issue Daily CRS to Clear Grounding' : 'Issue Daily CRS'}</button>` : ''}
+        ${inspectionOverdue ? `<button class="btn btn-primary btn-block" id="perform-inspection-btn" style="margin-top:8px">&#9881; Perform Inspection Sign-off</button>` : ''}
       </div>` : ''}
 
 
 
-      <div class="quick-actions
-        <a href="#" class="quick-action" onclick="navigate('flight-ops')">
+      <div class="quick-actions">
+        <a href="#" class="quick-action" onclick="return navigate('flight-ops')">
           <div class="qa-icon">&#9992;</div>
           <div class="qa-label">Log Flight</div>
         </a>
-        <a href="#" class="quick-action" onclick="navigate('defects')">
+        <a href="#" class="quick-action" onclick="return navigate('defects')">
           <div class="qa-icon">&#9888;</div>
           <div class="qa-label">Squawks</div>
         </a>
-        <a href="#" class="quick-action" onclick="navigate('maintenance')">
+        <a href="#" class="quick-action" onclick="return navigate('maintenance')">
           <div class="qa-icon">&#9881;</div>
           <div class="qa-label">Sign-offs</div>
         </a>
-        <a href="#" class="quick-action" onclick="navigate('fuel')">
+        <a href="#" class="quick-action" onclick="return navigate('fuel')">
           <div class="qa-icon">&#9981;</div>
           <div class="qa-label">Fuel</div>
         </a>
-        <a href="#" class="quick-action" onclick="navigate('inventory')">
+        <a href="#" class="quick-action" onclick="return navigate('inventory')">
           <div class="qa-icon">&#128230;</div>
           <div class="qa-label">Parts</div>
         </a>
@@ -517,7 +536,11 @@ async function dashboardView() {
 
   const crsBtn = document.getElementById('issue-daily-crs-btn');
   if (crsBtn) {
-    crsBtn.addEventListener('click', async () => {
+  const inspBtn = document.getElementById('perform-inspection-btn');
+  if (inspBtn) {
+    inspBtn.addEventListener('click', () => navigate('maintenance'));
+  }
+  crsBtn.addEventListener('click', async () => {
       const ac = await getAircraft();
       const hoursSinceOil = (ac.totalTachTime || 0) - (ac.lastOilChangeTach || 0);
       const oilDue = hoursSinceOil >= (ac.oilInterval || 50);
@@ -613,6 +636,8 @@ function navigate(view) {
     case 'notifications': notificationsView(); break;
     case 'activity': activityFeedView(); break;
   }
+  return false;
+}
   updateSidebarInspections();
 }
 
@@ -690,10 +715,10 @@ function updateSidebarUser() {
 async function updateSidebarInspections() {
   try {
     const ac = await getAircraft();
-    if (!ac) return;
-    const insp = getInspectionStatus(ac);
     const el = document.getElementById('sidebar-insp-list');
     if (!el) return;
+    if (!ac) { el.innerHTML = '<div class="sidebar-insp-item"><span class="text-muted small">No aircraft</span></div>'; return; }
+    const insp = getInspectionStatus(ac);
     el.innerHTML = `
       <div class="sidebar-insp-item"><span>50hr Inspection</span><span class="${insp.oilClass}">${insp.oilRemaining.toFixed(1)}h</span></div>
       <div class="sidebar-insp-item"><span>100hr Inspection</span><span class="${insp.structClass}">${insp.structRemaining.toFixed(1)}h</span></div>
@@ -795,7 +820,7 @@ function profileView() {
       localStorage.setItem('aac_user_photo', preview.dataset.photo);
     }
 
-    localStorage.setItem('aac_user', n);
+    localStorage.setItem('aac_user', escHtml(n));
     localStorage.setItem('aac_user_role', r);
     const uid = localStorage.getItem('aac_user_id');
     if (uid) {
@@ -889,6 +914,7 @@ function showAircraftSheet() {
     await DB.put('aircraft', ac);
     await queueSync('aircraft', 'create', ac);
     showToast(`Added ${tail}`);
+    setCurrentAircraftKey(tail);
     document.getElementById('new-ac-tail').value = '';
     document.getElementById('new-ac-type').value = '';
     renderACListSheet();
@@ -1174,6 +1200,68 @@ async function populateACSelector() {
   ).join('');
 }
 
+function showLoginGate() {
+  const app = document.getElementById('app');
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  if (sidebar) sidebar.style.display = 'none';
+  if (overlay) overlay.style.display = 'none';
+  document.getElementById('hamburger-btn').style.display = 'none';
+  const roles = [
+    { value: 'technician', label: 'Technician', desc: 'Can record sorties, report squawks, view data' },
+    { value: 'senior_technician', label: 'Senior Technician', desc: 'Above + can approve sign-ins' },
+    { value: 'production_planner', label: 'Production Planner', desc: 'Above + can end flying, issue CRS, manage fleet' },
+    { value: 'engineer', label: 'Engineer', desc: 'Above + can approve CRS (Release to Service)' },
+    { value: 'admin', label: 'Admin', desc: 'Full access to all features' }
+  ];
+  app.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:var(--bg)">
+      <div style="max-width:400px;width:100%">
+        <div style="text-align:center;margin-bottom:24px">
+          <div style="font-size:48px;margin-bottom:8px">&#9992;</div>
+          <h1 style="font-size:22px;margin:0">AAC Flight School</h1>
+          <p class="text-muted" style="margin-top:4px">Sign in to get started</p>
+        </div>
+        <div class="card" style="padding:20px">
+          <div class="form-group">
+            <label>Your Name</label>
+            <input type="text" id="login-name" class="form-input" placeholder="e.g. John Smith" autocomplete="name">
+          </div>
+          <div class="form-group">
+            <label>Your Role</label>
+            <select id="login-role" class="form-input">
+              <option value="">— Select role —</option>
+              ${roles.map(r => `<option value="${r.value}">${r.label}</option>`).join('')}
+            </select>
+            <div id="login-role-desc" class="text-muted small" style="margin-top:6px"></div>
+          </div>
+          <button class="btn btn-primary btn-block" id="login-btn">Sign In</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('login-role').addEventListener('change', function() {
+    const sel = roles.find(r => r.value === this.value);
+    const desc = document.getElementById('login-role-desc');
+    if (sel && desc) desc.textContent = sel.desc;
+  });
+  document.getElementById('login-btn').addEventListener('click', () => {
+    const n = document.getElementById('login-name').value.trim();
+    const r = document.getElementById('login-role').value;
+    if (!n) { showToast('Enter your name', 'error'); return; }
+    if (!r) { showToast('Select your role', 'error'); return; }
+    localStorage.setItem('aac_user', escHtml(n));
+    localStorage.setItem('aac_user_role', r);
+    if (sidebar) sidebar.style.display = '';
+    if (overlay) overlay.style.display = '';
+    document.getElementById('hamburger-btn').style.display = '';
+    updateSidebarUser();
+    navigate('dashboard');
+    checkInspectionNotifications();
+    scheduleEndOfDayCheck();
+  });
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   // Apply saved theme
   const savedTheme = localStorage.getItem('aac_theme');
@@ -1201,11 +1289,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('offline-banner')?.classList.remove('hidden');
   }
 
-  if (!localStorage.getItem('aac_user')) {
-    localStorage.setItem('aac_user', 'Crew');
-  }
-
   await populateACSelector();
+
+  // Login gate: require name & role before using the app
+  const needsLogin = !localStorage.getItem('aac_user') || !localStorage.getItem('aac_user_role');
 
   document.getElementById('ac-photo-input').addEventListener('change', async function() {
     const file = this.files[0];
@@ -1317,9 +1404,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (t) haptic();
   });
 
-  navigate('dashboard');
-  checkInspectionNotifications();
-  scheduleEndOfDayCheck();
+  if (needsLogin) {
+    showLoginGate();
+  } else {
+    navigate('dashboard');
+    checkInspectionNotifications();
+    scheduleEndOfDayCheck();
+  }
 });
 
 async function checkEndOfDayData() {
