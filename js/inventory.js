@@ -65,6 +65,10 @@ function inventoryView() {
         <div id="inventory-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line" style="width:40%"></div></div>
       </div>
       <div class="card">
+        <div class="card-header"><h3>Bulk Fuel Stock</h3></div>
+        <div id="fuel-stock-inv"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>
+      </div>
+      <div class="card">
         <div class="card-header"><h3>Low Inventory Alerts</h3></div>
         <div id="low-stock-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>
       </div>
@@ -276,12 +280,15 @@ function showFuelAddSheet(fuelId, fuelName) {
       <label>Liters to Add</label>
       ${stepperHTML('add-fuel-liters', 100, 0, 99999, 0.1)}
     </div>
+    <div class="form-group">
+      <label>Source</label>
+      <input type="text" id="add-fuel-source" class="form-input" placeholder="e.g. Manual add" value="Manual add">
+    </div>
     <button class="btn btn-primary btn-block" id="add-fuel-btn">Add Fuel Stock</button>
-  `;
+    <button class="btn btn-secondary btn-block" id="cancel-add-stock-btn" style="margin-top:8px">Cancel</button>
+  `);
 
   document.getElementById('add-fuel-btn').addEventListener('click', async () => {
-    const sel = document.getElementById('fuel-stock-select');
-    const type = sel.value;
     const liters = parseFloat(document.getElementById('add-fuel-liters').value) || 0;
     const source = document.getElementById('add-fuel-source').value.trim() || 'Manual add';
     if (liters <= 0) { showToast('Enter valid liters', 'error'); return; }
