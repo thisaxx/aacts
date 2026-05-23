@@ -1,4 +1,4 @@
-const CACHE = 'aac-v5';
+const CACHE = 'aac-v6';
 const PREFIX = '/aacts';
 const ASSETS = [
   PREFIX + '/',
