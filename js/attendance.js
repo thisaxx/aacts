@@ -44,6 +44,10 @@ function attendanceView() {
         <div class="card-header"><h3>Records</h3></div>
         <div id="attendance-today-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>
       </div>
+      <div class="card">
+        <div class="card-header"><h3>Crew Status Board</h3></div>
+        <div id="crew-status-board"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>
+      </div>
     </div>
   `;
 
@@ -250,15 +254,47 @@ async function renderAttendance(viewDate) {
         <button class="btn btn-sm btn-danger att-del-btn" data-id="${a.id}" style="margin-left:6px">&#10005;</button>
       </div>
     `).join('');
-    todayEl.querySelectorAll('.att-del-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const confirmed = await showConfirmDialog('Delete Record', 'Delete this crew record?');
-        if (!confirmed) return;
-        await DB.del('attendance', btn.dataset.id);
-        await queueSync('attendance', 'delete', { id: btn.dataset.id });
-        showToast('Record deleted');
-        renderAttendance(_attViewDate);
+      todayEl.querySelectorAll('.att-del-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const confirmed = await showConfirmDialog('Delete Record', 'Delete this crew record?');
+          if (!confirmed) return;
+          await DB.del('attendance', btn.dataset.id);
+          await queueSync('attendance', 'delete', { id: btn.dataset.id });
+          showToast('Record deleted');
+          renderAttendance(_attViewDate);
+        });
       });
-    });
   }
+  renderCrewStatusBoard();
+}
+
+async function renderCrewStatusBoard() {
+  const el = document.getElementById('crew-status-board');
+  if (!el) return;
+  const statuses = await getCrewStatusBoard();
+  if (statuses.length === 0) {
+    el.innerHTML = '<p class="text-muted small">No crew data</p>';
+    return;
+  }
+  el.innerHTML = statuses.map(s => {
+    const statusIcon = s.attendance
+      ? (s.attendance.status === 'approved' ? '&#10003;' : '&#9203;')
+      : '&#10007;';
+    const statusClass = s.attendance
+      ? (s.attendance.status === 'approved' ? 'crew-present' : 'crew-pending')
+      : 'crew-absent';
+    const taskCount = s.tasks.length;
+    return `
+      <div class="flight-row" style="border-left:3px solid ${s.attendance && s.attendance.status === 'approved' ? 'var(--success)' : s.attendance ? 'var(--gold)' : 'var(--danger)'};padding-left:10px;margin-bottom:4px">
+        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
+          <span class="${statusClass}" style="font-size:16px">${statusIcon}</span>
+          <div style="flex:1;min-width:0">
+            <strong>${escHtml(s.user.name)}</strong>
+            <div class="flight-date">${s.user.role ? s.user.role.replace(/_/g, ' ') : ''}${s.attendance ? ' &middot; In: ' + s.attendance.checkinTime : ''}</div>
+          </div>
+        </div>
+        ${taskCount > 0 ? `<span class="badge badge-open" style="font-size:10px">${taskCount} open</span>` : ''}
+      </div>
+    `;
+  }).join('');
 }

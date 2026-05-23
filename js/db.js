@@ -39,6 +39,9 @@ function openDB() {
       if (!db.objectStoreNames.contains('notifications')) {
         db.createObjectStore('notifications', { keyPath: 'id' });
       }
+      if (!db.objectStoreNames.contains('comments')) {
+        db.createObjectStore('comments', { keyPath: 'id' });
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);

@@ -59,6 +59,12 @@ function showDefectSheet() {
       </div>
     </div>
     <div class="form-group">
+      <label for="defect-assign">Assign To</label>
+      <select id="defect-assign" class="form-input">
+        <option value="">Unassigned</option>
+      </select>
+    </div>
+    <div class="form-group">
       <label>Photo (optional)</label>
       <input type="file" id="defect-photo-input" accept="image/*" style="display:none">
       <button class="btn btn-sm btn-secondary" id="defect-photo-btn" style="font-size:11px">+ Attach Photo</button>
@@ -70,6 +76,18 @@ function showDefectSheet() {
     <button class="btn btn-primary btn-block" id="save-defect-btn">Submit Squawk</button>
     <button class="btn btn-secondary btn-block" id="cancel-defect-btn" style="margin-top:8px">Cancel</button>
   `);
+
+  // Populate crew selector
+  DB.getAll('users').then(users => {
+    const sel = document.getElementById('defect-assign');
+    if (!sel) return;
+    users.forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u.name;
+      opt.textContent = u.name + (u.role ? ' (' + u.role.replace(/_/g, ' ') + ')' : '');
+      sel.appendChild(opt);
+    });
+  });
 
   let defectPhotoData = null;
   document.getElementById('defect-photo-btn').addEventListener('click', () => {
@@ -99,12 +117,15 @@ function showDefectSheet() {
     const urgency = urgencyEl ? urgencyEl.value : 'monitor';
     if (!desc) {     showToast('Please describe the squawk', 'error'); return; }
 
+    const assignedTo = document.getElementById('defect-assign')?.value || '';
+
     const defect = {
       id: 'def_' + Date.now(),
       aircraftId: getCurrentAircraftKey(),
       description: desc,
       urgency,
       status: 'open',
+      assignedTo,
       photoData: defectPhotoData,
       reportedBy: localStorage.getItem('aac_user') || 'Flight Ops',
       reportedAt: new Date().toISOString(),
@@ -138,9 +159,11 @@ function showDefectSheet() {
       await queueSync('defects', 'update', defect);
       showToast('Grounding squawk reported & work order created', 'warning');
       createNotification('squawk', 'Grounding Squawk Reported', `${user} reported a grounding squawk on ${defect.aircraftId}: ${desc}`, 'defects');
+      logActivity('defect_grounding', `${user} reported grounding squawk: ${desc} on ${defect.aircraftId}`, defect.id);
     } else {
       showToast('Monitor squawk reported');
       createNotification('squawk', 'Squawk Reported', `${user} reported a squawk on ${defect.aircraftId}: ${desc}`, 'defects');
+      logActivity('defect_reported', `${user} reported squawk: ${desc} on ${defect.aircraftId}`, defect.id);
     }
 
     window.__sheetClose(true);
@@ -176,6 +199,20 @@ async function renderDefects() {
 
   document.querySelectorAll('.resolve-defect-btn').forEach(btn => {
     btn.addEventListener('click', () => resolveDefect(btn.dataset.id));
+  });
+  document.querySelectorAll('.defect-comments-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      const container = document.getElementById('defect-comments-' + id);
+      if (!container) return;
+      const wasHidden = container.style.display === 'none';
+      container.style.display = wasHidden ? 'block' : 'none';
+      if (wasHidden) {
+        renderComments('defect', id, container);
+        container.innerHTML += commentInputHTML();
+        attachCommentHandler('defect', id, container);
+      }
+    });
   });
   document.querySelectorAll('.del-defect-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -218,10 +255,13 @@ function defectCard(defect) {
       <p class="task-desc">${escHtml(defect.description)}</p>
       ${defect.photoData ? `<img src="${defect.photoData}" style="width:100%;max-height:120px;object-fit:cover;border-radius:6px;margin:6px 0" onclick="window.open(this.src)">` : ''}
       <p class="task-meta">Reported by ${escHtml(defect.reportedBy)} &middot; ${new Date(defect.createdAt).toLocaleDateString()}</p>
+      ${defect.assignedTo ? `<p class="task-meta">&#128100; Assigned to <strong>${escHtml(defect.assignedTo)}</strong></p>` : ''}
       <div class="task-actions">
         ${defect.status === 'open' && canResolve ? `<button class="btn btn-sm btn-success resolve-defect-btn" data-id="${defect.id}">Resolve</button>` : ''}
+        ${defect.status === 'open' || defect.status === 'in-work' ? `<button class="btn btn-sm btn-ghost defect-comments-btn" data-id="${defect.id}" title="Comments" style="padding:4px 6px;font-size:11px">&#128172;</button>` : ''}
         ${canDelete ? `<button class="btn btn-sm btn-danger del-defect-btn" data-id="${defect.id}" style="padding:4px 8px;font-size:11px">&times;</button>` : ''}
       </div>
+      <div class="defect-comments-container" id="defect-comments-${defect.id}" style="display:none;margin-top:8px;border-top:1px solid var(--glass-border);padding-top:8px"></div>
     </div>
   `;
 }
@@ -242,5 +282,6 @@ async function resolveDefect(defectId) {
   showToast('Squawk resolved');
   const user = localStorage.getItem('aac_user') || 'Unknown';
   createNotification('squawk', 'Squawk Resolved', `${user} resolved squawk on ${defect.aircraftId}: ${defect.description}`, 'defects');
+  logActivity('defect_resolved', `${user} resolved squawk: ${defect.description}`, defect.id);
   renderDefects();
 }

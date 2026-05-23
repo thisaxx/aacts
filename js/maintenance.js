@@ -33,6 +33,12 @@ function maintenanceView() {
             <option value="critical">Critical</option>
           </select>
         </div>
+        <div class="form-group">
+          <label for="task-assign">Assign To</label>
+          <select id="task-assign" class="form-input">
+            <option value="">Unassigned</option>
+          </select>
+        </div>
         <button class="btn btn-primary" id="save-task-btn">Create Work Order</button>
         <button class="btn btn-secondary" id="cancel-task-btn">Cancel</button>
       </div>
@@ -57,6 +63,18 @@ function maintenanceView() {
   });
   document.getElementById('save-task-btn').addEventListener('click', onNewTask);
 
+  // Populate crew selector
+  DB.getAll('users').then(users => {
+    const sel = document.getElementById('task-assign');
+    if (!sel) return;
+    users.forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u.name;
+      opt.textContent = u.name + (u.role ? ' (' + u.role.replace(/_/g, ' ') + ')' : '');
+      sel.appendChild(opt);
+    });
+  });
+
   renderTasks();
 }
 
@@ -65,11 +83,14 @@ async function onNewTask() {
   const priority = document.getElementById('task-priority').value;
   if (!desc) { showToast('Please enter a description', 'error'); return; }
 
+  const assignedTo = document.getElementById('task-assign')?.value || '';
+
   const task = {
     id: 'mnt_' + Date.now(),
     aircraftId: getCurrentAircraftKey(),
     description: desc,
     priority,
+    assignedTo,
     status: 'open',
     technicianNotes: '',
     rectifiedBy: '',
@@ -131,6 +152,20 @@ async function renderTasks() {
   document.querySelectorAll('.edit-task-btn').forEach(btn => {
     btn.addEventListener('click', () => editTask(btn.dataset.id));
   });
+  document.querySelectorAll('.task-comments-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      const container = document.getElementById('task-comments-' + id);
+      if (!container) return;
+      const wasHidden = container.style.display === 'none';
+      container.style.display = wasHidden ? 'block' : 'none';
+      if (wasHidden) {
+        renderComments('task', id, container);
+        container.innerHTML += commentInputHTML();
+        attachCommentHandler('task', id, container);
+      }
+    });
+  });
 }
 
 async function editTask(taskId) {
@@ -177,22 +212,25 @@ function taskCard(task) {
   };
 
   return `
-    <div class="task-card">
+    <div class="task-card" data-task-id="${task.id}">
       <div class="task-header">
         <span class="task-priority" style="background:${priorityColors[task.priority] || '#666'}">${task.priority}</span>
         ${statusBadge[task.status]}
       </div>
       <p class="task-desc">${escHtml(task.description)}</p>
       <p class="task-meta">${new Date(task.createdAt).toLocaleDateString()}</p>
+      ${task.assignedTo ? `<p class="task-meta">&#128100; Assigned to <strong>${escHtml(task.assignedTo)}</strong></p>` : ''}
       ${task.technicianNotes ? `<p class="task-notes">${escHtml(task.technicianNotes)}</p>` : ''}
       ${task.rectifiedBy ? `<p class="task-meta">Rectified by ${escHtml(task.rectifiedBy)}</p>` : ''}
       <div class="task-actions">
         ${task.status === 'open' ? `<button class="btn btn-sm btn-primary task-detail-btn" data-id="${task.id}">Rectify</button>` : ''}
         ${task.status === 'open' ? `<button class="btn btn-sm btn-ghost edit-task-btn" data-id="${task.id}" title="Edit" style="padding:4px 6px;font-size:11px">&#9998;</button>` : ''}
         ${task.status === 'rectified' ? `<button class="btn btn-sm btn-success release-btn" data-id="${task.id}">Release to Service</button>` : ''}
+        ${task.status === 'open' || task.status === 'rectified' ? `<button class="btn btn-sm btn-ghost task-comments-btn" data-id="${task.id}" title="Comments" style="padding:4px 6px;font-size:11px">&#128172;</button>` : ''}
         <button class="btn btn-sm btn-danger del-task-btn" data-id="${task.id}" style="padding:4px 8px;font-size:11px;margin-left:auto">&times;</button>
       </div>
       ${task.releasedBy ? `<p class="task-meta">Released by ${escHtml(task.releasedBy)} &middot; ${new Date(task.releasedAt).toLocaleString()}</p>` : ''}
+      <div class="task-comments-container" id="task-comments-${task.id}" style="display:none;margin-top:8px;border-top:1px solid var(--glass-border);padding-top:8px"></div>
     </div>
   `;
 }
@@ -211,15 +249,18 @@ async function showTaskDetail(taskId) {
 
   task.technicianNotes = notes.trim();
   task.status = 'rectified';
-  task.rectifiedBy = localStorage.getItem('aac_user') || 'Technician';
+  const currentUser = localStorage.getItem('aac_user') || 'Technician';
+  task.rectifiedBy = currentUser;
   task.rectifiedAt = new Date().toISOString();
   task.rectifiedRole = localStorage.getItem('aac_user_role') || '';
+  if (!task.assignedTo) task.assignedTo = currentUser;
 
   await DB.put('maintenance_tasks', task);
   await queueSync('maintenance_tasks', 'update', task);
   showToast('Work order marked as rectified');
   const user = localStorage.getItem('aac_user') || 'Unknown';
   createNotification('task', 'Work Order Rectified', `${user} completed work on ${task.aircraftId}: ${task.description}`, 'maintenance');
+  logActivity('task_rectified', `${user} rectified work order: ${task.description}`, task.id);
   renderTasks();
 }
 
@@ -252,6 +293,19 @@ async function onRelease(taskId) {
   showToast('Work order released to service');
   const user = localStorage.getItem('aac_user') || 'Unknown';
   createNotification('crs', task.type === 'after-flight' ? 'After-Flight Inspection Signed' : 'CRS Issued', `${user} released ${task.description} to service on ${task.aircraftId}`, 'maintenance');
+  logActivity('task_released', `${user} released ${task.type === 'after-flight' ? 'after-flight inspection' : 'work order'}: ${task.description}`, task.id);
+
+  // If this is an after-flight inspection being released, ground the aircraft until next daily CRS
+  if (task.type === 'after-flight') {
+    const ac = await getAircraft();
+    ac.groundedAfterInspection = true;
+    ac.groundedAfterInspAt = new Date().toISOString();
+    await DB.put('aircraft', ac);
+    await queueSync('aircraft', 'update', ac);
+    showToast('Aircraft grounded — daily CRS required before next flight');
+    createNotification('system', 'Aircraft Grounded', `${ac.tailNumber} grounded after after-flight inspection. Daily CRS required.`, 'dashboard');
+  }
+
   renderTasks();
 }
 

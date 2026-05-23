@@ -10,6 +10,138 @@ function haptic() {
   if ('vibrate' in navigator) navigator.vibrate(8);
 }
 
+async function addComment(parentType, parentId, text) {
+  if (!text.trim()) return;
+  const user = localStorage.getItem('aac_user') || 'Unknown';
+  const comment = {
+    id: 'cmt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+    parentType,
+    parentId,
+    author: user,
+    authorRole: localStorage.getItem('aac_user_role') || '',
+    text: text.trim(),
+    createdAt: new Date().toISOString()
+  };
+  await DB.put('comments', comment);
+  await queueSync('comments', 'create', comment);
+  // Check for @mentions
+  const mentions = text.match(/@(\w[\w\s]*\w|\w)/g);
+  if (mentions) {
+    mentions.forEach(m => {
+      const mentionedName = m.slice(1).trim();
+      createNotification('mention', `You were mentioned by ${user}`, `In ${parentType}: ${text.slice(0, 100)}`, parentType === 'task' ? 'maintenance' : 'defects');
+    });
+  }
+  logActivity('comment', `${user} commented on ${parentType}`, parentId);
+  return comment;
+}
+
+async function getComments(parentType, parentId) {
+  const all = await DB.getAll('comments');
+  return all.filter(c => c.parentType === parentType && c.parentId === parentId)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+function renderComments(parentType, parentId, containerEl) {
+  getComments(parentType, parentId).then(comments => {
+    containerEl.innerHTML = comments.map(c => `
+      <div style="padding:8px 0;border-bottom:1px solid var(--glass-border)">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted)">
+          <strong>${escHtml(c.author)}</strong>
+          <span>${new Date(c.createdAt).toLocaleString()}</span>
+        </div>
+        <div style="font-size:13px;margin-top:2px">${escHtml(c.text)}</div>
+      </div>
+    `).join('') || '<div style="font-size:12px;color:var(--text-muted);padding:8px 0">No comments yet</div>';
+  });
+}
+
+function commentInputHTML() {
+  return `
+    <div style="display:flex;gap:6px;margin-top:8px">
+      <input type="text" class="comment-input form-input" placeholder="Add a comment... @mention a colleague" style="flex:1;font-size:13px">
+      <button class="btn btn-sm btn-primary comment-submit-btn" style="padding:4px 10px">Post</button>
+    </div>
+  `;
+}
+
+function attachCommentHandler(parentType, parentId, containerEl) {
+  const input = containerEl.querySelector('.comment-input');
+  const btn = containerEl.querySelector('.comment-submit-btn');
+  if (!input || !btn) return;
+  const post = async () => {
+    if (!input.value.trim()) return;
+    await addComment(parentType, parentId, input.value);
+    input.value = '';
+    renderComments(parentType, parentId, containerEl);
+  };
+  btn.addEventListener('click', post);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') post(); });
+}
+
+async function logActivity(type, description, relatedId) {
+  const entry = {
+    id: 'act_' + Date.now(),
+    type,
+    description,
+    relatedId: relatedId || '',
+    performedBy: localStorage.getItem('aac_user') || 'Unknown',
+    createdAt: new Date().toISOString()
+  };
+  await DB.put('flights', entry);
+}
+
+async function getActivityFeed(limit = 50) {
+  const all = await DB.getAll('flights');
+  return all.filter(e => e.id && e.id.startsWith('act_'))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, limit);
+}
+
+function activityFeedView() {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="page">
+      <div class="page-header">
+        <h2>Activity Feed</h2>
+        <div class="subtitle">Real-time crew activity</div>
+      </div>
+      <div id="activity-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>
+    </div>
+  `;
+  renderActivityFeed();
+}
+
+async function renderActivityFeed() {
+  const el = document.getElementById('activity-list');
+  const entries = await getActivityFeed();
+  if (entries.length === 0) {
+    el.innerHTML = emptyState('&#128197;', 'No activity recorded yet');
+    return;
+  }
+  el.innerHTML = entries.map(e => `
+    <div class="flight-row">
+      <div style="flex:1;min-width:0">
+        <div class="flight-pilot">${escHtml(e.description)}</div>
+        <div class="flight-date">${escHtml(e.performedBy)} &middot; ${new Date(e.createdAt).toLocaleString()}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function getCrewStatusBoard() {
+  const users = await DB.getAll('users');
+  const attendance = await DB.getAll('attendance');
+  const tasks = await DB.getAll('maintenance_tasks');
+  const today = new Date().toISOString().slice(0, 10);
+  const activeAttendance = attendance.filter(a => a.date === today && (a.status === 'approved' || a.status === 'pending'));
+  return users.map(u => {
+    const att = activeAttendance.find(a => a.userName === u.name);
+    const assignedTasks = tasks.filter(t => t.assignedTo === u.name && t.status === 'open');
+    return { user: u, attendance: att || null, tasks: assignedTasks };
+  });
+}
+
 function compressImage(dataUrl, maxW = 800, maxH = 600, quality = 0.7) {
   return new Promise(resolve => {
     const img = new Image();
@@ -209,6 +341,7 @@ async function dashboardView() {
   const reasons = [];
   if (groundingDefects > 0) { reasons.push(`${groundingDefects} grounding squawk(s)`); }
   if (minRemaining <= 0) { reasons.push('Inspection overdue'); }
+  if (ac.groundedAfterInspection) { reasons.push('After-flight inspection — CRS required'); }
   if (!crsIssuedToday) { reasons.push('No daily CRS issued'); }
 
   if (isAirborne) {
@@ -269,6 +402,8 @@ async function dashboardView() {
         ${!crsIssuedToday && (userRole === 'engineer' || userRole === 'admin') ? `
         <button class="btn btn-primary btn-block" id="issue-daily-crs-btn" style="margin-top:8px">Issue Daily CRS</button>` : ''}
       </div>` : ''}
+
+      <button class="btn btn-secondary btn-block" id="end-of-flying-btn" style="margin-bottom:14px">&#128200; End of Flying — Enter Tach &amp; Start Inspection</button>
 
       <div class="quick-actions">
         <a href="#" class="quick-action" onclick="navigate('flight-ops')">
@@ -379,6 +514,71 @@ async function dashboardView() {
 
   document.getElementById('dashboard-hero').addEventListener('click', () => showAircraftSheet());
 
+  document.getElementById('end-of-flying-btn').addEventListener('click', async () => {
+    const ac = await getAircraft();
+    const currentTach = ac.totalTachTime || 0;
+    showBottomSheet(`
+      <div class="card-header"><h3>&#128200; End of Flying — ${escHtml(ac.tailNumber)}</h3></div>
+      <p class="text-muted small" style="margin-bottom:12px">Enter current tach reading. Hours flown since last update will be deducted from inspection intervals.</p>
+      <div class="form-group">
+        <label>Current Tach Time (hours)</label>
+        ${stepperHTML('eof-tach', currentTach, 0, 99999, 0.1, true)}
+      </div>
+      <button class="btn btn-primary btn-block" id="eof-confirm-btn">Confirm End of Flying</button>
+      <button class="btn btn-secondary btn-block" id="eof-cancel-btn" style="margin-top:8px">Cancel</button>
+    `);
+    initSteppers();
+    document.getElementById('eof-confirm-btn').addEventListener('click', async () => {
+      const newTach = parseFloat(document.getElementById('eof-tach').value) || currentTach;
+      const ac2 = await getAircraft();
+      const duration = newTach - (ac2.totalTachTime || 0);
+
+      // Update tach and related counters
+      if (duration > 0) {
+        ac2.engineETSO = (ac2.engineETSO || 0) + duration;
+        ac2.propellerPTSO = (ac2.propellerPTSO || 0) + duration;
+        ac2.totalTachTime = newTach;
+      }
+
+      // Check 50/100 hr intervals
+      const hoursSinceOil = newTach - ac2.lastOilChangeTach;
+      const hoursSince100hr = newTach - ac2.last100hrTach;
+
+      // Create after-flight inspection
+      const today = new Date().toISOString().slice(0, 10);
+      const inspTask = {
+        id: 'insp_' + Date.now(),
+        type: 'after-flight',
+        aircraftId: ac2.tailNumber,
+        description: `After-flight inspection for end of flying day — ${today}${duration > 0 ? ` (${duration.toFixed(1)} tach hrs)` : ''}`,
+        priority: 'medium',
+        status: 'open',
+        notes: '',
+        rectifiedBy: '',
+        rectifiedAt: '',
+        rectifiedRole: '',
+        createdAt: new Date().toISOString()
+      };
+      await DB.put('maintenance_tasks', inspTask);
+      await queueSync('maintenance_tasks', 'create', inspTask);
+
+      // Ground the aircraft immediately
+      ac2.groundedAfterInspection = true;
+      ac2.groundedAfterInspAt = new Date().toISOString();
+      await DB.put('aircraft', ac2);
+      await queueSync('aircraft', 'update', ac2);
+
+      window.__sheetClose(true);
+      showToast('Aircraft grounded — after-flight inspection required');
+      createNotification('inspection', 'After-Flight Inspection Created', `End-of-day inspection due for ${ac2.tailNumber} — aircraft grounded`, 'maintenance');
+      logActivity('after_flight_created', `End-of-day after-flight inspection created for ${ac2.tailNumber} — grounded (tach: ${newTach.toFixed(1)})`, inspTask.id);
+      notifyDataChange();
+    });
+    document.getElementById('eof-cancel-btn').addEventListener('click', () => {
+      window.__sheetClose(null);
+    });
+  });
+
   const crsBtn = document.getElementById('issue-daily-crs-btn');
   if (crsBtn) {
     crsBtn.addEventListener('click', async () => {
@@ -387,6 +587,8 @@ async function dashboardView() {
       const ac = await getAircraft();
       ac.dailyCrsDate = new Date().toISOString().slice(0, 10);
       ac.dailyCrsBy = localStorage.getItem('aac_user') || 'Engineer';
+      ac.groundedAfterInspection = false;
+      ac.groundedAfterInspAt = '';
       await DB.put('aircraft', ac);
       await queueSync('aircraft', 'update', ac);
       showToast('Daily CRS issued — aircraft is flightworthy');
@@ -415,6 +617,7 @@ function navigate(view) {
     case 'attendance': attendanceView(); break;
     case 'profile': profileView(); break;
     case 'notifications': notificationsView(); break;
+    case 'activity': activityFeedView(); break;
   }
   updateSidebarInspections();
 }
@@ -704,20 +907,28 @@ async function renderACListSheet() {
     el.innerHTML = emptyState('&#128641;', 'No aircraft added yet');
     return;
   }
-  el.innerHTML = all.map(ac => `
+  const defaultKey = getDefaultAircraftKey();
+
+  el.innerHTML = all.map(ac => {
+    const isDefault = ac.tailNumber === defaultKey;
+    return `
     <div class="ac-list-item ${ac.tailNumber === current ? 'ac-current' : ''}"
          data-tail="${ac.tailNumber}">
       <div class="ac-list-info">
         ${ac.photoData ? `<img src="${ac.photoData}" alt="" class="ac-thumb">` : ''}
-        <strong>${escHtml(ac.tailNumber)}</strong>
+        <div style="display:flex;align-items:center;gap:6px">
+          <strong>${escHtml(ac.tailNumber)}</strong>
+          ${isDefault ? '<span class="badge badge-released" style="font-size:9px">Default</span>' : ''}
+        </div>
         <div class="text-muted small">${escHtml(ac.type || 'Aircraft')}</div>
         ${ac.tailNumber === current ? `      <div class="ac-list-tso">
           <span>Engine TSO: ${(ac.engineETSO || 0).toFixed(1)}h</span>
           <span>Prop TSO: ${(ac.propellerPTSO || 0).toFixed(1)}h</span>
         </div>` : ''}
-        ${canEdit ? `<div style="margin-top:6px;display:flex;gap:4px">
+        ${canEdit ? `<div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">
           <button class="btn btn-ghost edit-ac-btn" data-tail="${ac.tailNumber}" style="font-size:9px;padding:4px 8px">Edit</button>
           <button class="btn btn-ghost change-photo-btn" data-tail="${ac.tailNumber}" style="font-size:9px;padding:4px 8px">Photo</button>
+          ${!isDefault ? `<button class="btn btn-ghost set-default-ac-btn" data-tail="${ac.tailNumber}" style="font-size:9px;padding:4px 8px">&#9733; Set Default</button>` : ''}
         </div>` : ''}
       </div>
       <div class="ac-list-actions">
@@ -728,8 +939,8 @@ async function renderACListSheet() {
         `}
         ${canEdit ? `<button class="btn btn-sm btn-danger del-ac-btn" data-tail="${ac.tailNumber}" ${all.length <= 1 ? 'disabled' : ''}>&times;</button>` : ''}
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 
   el.querySelectorAll('.reset-etso-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -777,6 +988,14 @@ async function renderACListSheet() {
       populateACSelector();
       window.__sheetClose(true);
       navigate(document.querySelector('.nav-link.active')?.dataset?.view || 'dashboard');
+    });
+  });
+  el.querySelectorAll('.set-default-ac-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const tail = btn.dataset.tail;
+      setDefaultAircraftKey(tail);
+      showToast(`${tail} set as default aircraft`);
+      renderACListSheet();
     });
   });
   el.querySelectorAll('.del-ac-btn').forEach(btn => {

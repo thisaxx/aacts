@@ -16,10 +16,19 @@ const DEFAULT_AIRCRAFT = {
 };
 
 function getCurrentAircraftKey() {
-  return localStorage.getItem('aac_current_aircraft') || 'C-152-001';
+  return localStorage.getItem('aac_current_aircraft') || localStorage.getItem('aac_default_aircraft') || 'C-152-001';
 }
 
 function setCurrentAircraftKey(tailNumber) {
+  localStorage.setItem('aac_current_aircraft', tailNumber);
+}
+
+function getDefaultAircraftKey() {
+  return localStorage.getItem('aac_default_aircraft') || '';
+}
+
+function setDefaultAircraftKey(tailNumber) {
+  localStorage.setItem('aac_default_aircraft', tailNumber);
   localStorage.setItem('aac_current_aircraft', tailNumber);
 }
 
@@ -370,6 +379,7 @@ async function onDepartureSubmit(e) {
   showToast('Departure recorded — awaiting arrival');
 
   createNotification('sortie', 'Departure Recorded', `${pilot} departed in ${ac.tailNumber} at ${takeoffTime}`, 'flight-ops');
+  logActivity('departure', `${pilot} departed in ${ac.tailNumber} at ${takeoffTime}`, flight.id);
 
   renderDepartedList();
   renderRecentFlights();
@@ -454,33 +464,26 @@ async function onArrivalSubmit(e) {
     showToast('Sortie completed');
   }
 
-  // After-flight inspection
-  const flightDate = flight.flightDate;
-  const crsToday = ac.dailyCrsDate === flightDate;
-  const releasedTasksToday = (await DB.getAll('maintenance_tasks')).filter(t =>
-    t.aircraftId === ac.tailNumber && t.status === 'released' &&
-    t.releasedAt && t.releasedAt.slice(0, 10) === flightDate
-  );
-  if (crsToday || releasedTasksToday.length > 0) {
-    const inspTask = {
-      id: 'insp_' + Date.now(),
-      type: 'after-flight',
-      aircraftId: ac.tailNumber,
-      description: `After-flight inspection for ${flight.flightDate} sortie (${(duration * 60).toFixed(0)} min)`,
-      priority: 'medium',
-      status: 'open',
-      notes: '',
-      rectifiedBy: '',
-      rectifiedAt: '',
-      rectifiedRole: '',
-      createdAt: new Date().toISOString()
-    };
-    await DB.put('maintenance_tasks', inspTask);
-    await queueSync('maintenance_tasks', 'create', inspTask);
-    createNotification('inspection', 'After-Flight Inspection Created', `After-flight inspection due for ${ac.tailNumber} after ${flight.flightDate} sortie`, 'maintenance');
-  }
+  // After-flight inspection — created after every landing
+  const inspTask = {
+    id: 'insp_' + Date.now(),
+    type: 'after-flight',
+    aircraftId: ac.tailNumber,
+    description: `After-flight inspection for ${flight.flightDate} sortie (${(duration * 60).toFixed(0)} min)`,
+    priority: 'medium',
+    status: 'open',
+    notes: '',
+    rectifiedBy: '',
+    rectifiedAt: '',
+    rectifiedRole: '',
+    createdAt: new Date().toISOString()
+  };
+  await DB.put('maintenance_tasks', inspTask);
+  await queueSync('maintenance_tasks', 'create', inspTask);
+  createNotification('inspection', 'After-Flight Inspection Created', `After-flight inspection due for ${ac.tailNumber} after ${flight.flightDate} sortie`, 'maintenance');
 
   createNotification('sortie', 'Sortie Completed', `${flight.pilotName} completed sortie in ${ac.tailNumber} (${(duration*60).toFixed(0)} min)`, 'flight-ops');
+  logActivity('arrival', `${flight.pilotName} completed sortie in ${ac.tailNumber} (${(duration*60).toFixed(0)} min)`, flight.id);
 
   // Reset arrival form
   document.getElementById('arrival-card').classList.add('hidden');
