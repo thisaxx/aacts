@@ -35,10 +35,9 @@ function maintenanceView() {
           </select>
         </div>
         <div class="form-group">
-          <label for="task-assign">Assign To</label>
-          <select id="task-assign" class="form-input">
-            <option value="">Unassigned</option>
-          </select>
+          <label>Assign To</label>
+          <div id="task-assign-list" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px">
+          </div>
         </div>
         <button class="btn btn-primary" id="save-task-btn">Create Work Order</button>
         <button class="btn btn-secondary" id="cancel-task-btn">Cancel</button>
@@ -64,17 +63,24 @@ function maintenanceView() {
   });
   document.getElementById('save-task-btn').addEventListener('click', onNewTask);
 
-  // Populate crew selector
-  DB.getAll('users').then(users => {
-    const sel = document.getElementById('task-assign');
-    if (!sel) return;
+  // Populate crew checkboxes from aac_users
+  (function() {
+    const container = document.getElementById('task-assign-list');
+    if (!container) return;
+    let users = [];
+    try { users = JSON.parse(localStorage.getItem('aac_users')) || []; } catch(e) {}
     users.forEach(u => {
-      const opt = document.createElement('option');
-      opt.value = u.name;
-      opt.textContent = u.name + (u.role ? ' (' + u.role.replace(/_/g, ' ') + ')' : '');
-      sel.appendChild(opt);
+      const label = document.createElement('label');
+      label.style.cssText = 'display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;cursor:pointer';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = u.name;
+      cb.className = 'task-assign-cb';
+      label.appendChild(cb);
+      label.append(u.name);
+      container.appendChild(label);
     });
-  });
+  })();
 
   renderTasks();
 }
@@ -84,7 +90,8 @@ async function onNewTask() {
   const priority = document.getElementById('task-priority').value;
   if (!desc) { showToast('Please enter a description', 'error'); return; }
 
-  const assignedTo = document.getElementById('task-assign')?.value || '';
+  const assignedCbs = document.querySelectorAll('.task-assign-cb:checked');
+  const assignedTo = Array.from(assignedCbs).map(cb => cb.value);
 
   const task = {
     id: 'mnt_' + Date.now(),
@@ -220,7 +227,7 @@ function taskCard(task) {
       </div>
       <p class="task-desc">${escHtml(task.description)}</p>
       <p class="task-meta">${new Date(task.createdAt).toLocaleDateString()}</p>
-      ${task.assignedTo ? `<p class="task-meta">&#128100; Assigned to <strong>${escHtml(task.assignedTo)}</strong></p>` : ''}
+      ${task.assignedTo && task.assignedTo.length ? `<p class="task-meta">&#128100; Assigned to <strong>${escHtml(Array.isArray(task.assignedTo) ? task.assignedTo.join(', ') : task.assignedTo)}</strong></p>` : ''}
       ${task.technicianNotes ? `<p class="task-notes">${escHtml(task.technicianNotes)}</p>` : ''}
       ${task.rectifiedBy ? `<p class="task-meta">Rectified by ${escHtml(task.rectifiedBy)}</p>` : ''}
       <div class="task-actions">
@@ -254,7 +261,7 @@ async function showTaskDetail(taskId) {
   task.rectifiedBy = currentUser;
   task.rectifiedAt = new Date().toISOString();
   task.rectifiedRole = localStorage.getItem('aac_user_role') || '';
-  if (!task.assignedTo) task.assignedTo = currentUser;
+  if (!task.assignedTo || !task.assignedTo.length) task.assignedTo = [currentUser];
 
   await DB.put('maintenance_tasks', task);
   await queueSync('maintenance_tasks', 'update', task);

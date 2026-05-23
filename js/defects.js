@@ -60,10 +60,9 @@ function showDefectSheet() {
       </div>
     </div>
     <div class="form-group">
-      <label for="defect-assign">Assign To</label>
-      <select id="defect-assign" class="form-input">
-        <option value="">Unassigned</option>
-      </select>
+      <label>Assign To</label>
+      <div id="defect-assign-list" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px">
+      </div>
     </div>
     <div class="form-group">
       <label>Photo (optional)</label>
@@ -78,17 +77,24 @@ function showDefectSheet() {
     <button class="btn btn-secondary btn-block" id="cancel-defect-btn" style="margin-top:8px">Cancel</button>
   `);
 
-  // Populate crew selector
-  DB.getAll('users').then(users => {
-    const sel = document.getElementById('defect-assign');
-    if (!sel) return;
+  // Populate crew checkboxes from aac_users
+  (function() {
+    const container = document.getElementById('defect-assign-list');
+    if (!container) return;
+    let users = [];
+    try { users = JSON.parse(localStorage.getItem('aac_users')) || []; } catch(e) {}
     users.forEach(u => {
-      const opt = document.createElement('option');
-      opt.value = u.name;
-      opt.textContent = u.name + (u.role ? ' (' + u.role.replace(/_/g, ' ') + ')' : '');
-      sel.appendChild(opt);
+      const label = document.createElement('label');
+      label.style.cssText = 'display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;cursor:pointer';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = u.name;
+      cb.className = 'defect-assign-cb';
+      label.appendChild(cb);
+      label.append(u.name);
+      container.appendChild(label);
     });
-  });
+  })();
 
   let defectPhotoData = null;
   document.getElementById('defect-photo-btn').addEventListener('click', () => {
@@ -118,7 +124,8 @@ function showDefectSheet() {
     const urgency = urgencyEl ? urgencyEl.value : 'monitor';
     if (!desc) {     showToast('Please describe the squawk', 'error'); return; }
 
-    const assignedTo = document.getElementById('defect-assign')?.value || '';
+    const assignedCbs = document.querySelectorAll('.defect-assign-cb:checked');
+    const assignedTo = Array.from(assignedCbs).map(cb => cb.value);
 
     const defect = {
       id: 'def_' + Date.now(),
@@ -256,7 +263,7 @@ function defectCard(defect) {
       <p class="task-desc">${escHtml(defect.description)}</p>
       ${defect.photoData ? `<img src="${defect.photoData}" style="width:100%;max-height:120px;object-fit:cover;border-radius:6px;margin:6px 0" onclick="window.open(this.src)">` : ''}
       <p class="task-meta">Reported by ${escHtml(defect.reportedBy)} &middot; ${new Date(defect.createdAt).toLocaleDateString()}</p>
-      ${defect.assignedTo ? `<p class="task-meta">&#128100; Assigned to <strong>${escHtml(defect.assignedTo)}</strong></p>` : ''}
+      ${defect.assignedTo && defect.assignedTo.length ? `<p class="task-meta">&#128100; Assigned to <strong>${escHtml(Array.isArray(defect.assignedTo) ? defect.assignedTo.join(', ') : defect.assignedTo)}</strong></p>` : ''}
       <div class="task-actions">
         ${defect.status === 'open' && canResolve ? `<button class="btn btn-sm btn-success resolve-defect-btn" data-id="${defect.id}">Resolve</button>` : ''}
         ${defect.status === 'open' || defect.status === 'in-work' ? `<button class="btn btn-sm btn-ghost defect-comments-btn" data-id="${defect.id}" title="Comments" style="padding:4px 6px;font-size:11px">&#128172;</button>` : ''}

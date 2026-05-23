@@ -118,6 +118,7 @@ function getInspectionStatus(ac) {
 function checkInspectionNotifications() {
   getAircraft().then(ac => {
     if (!ac) return;
+    if (typeof checkAndCreateInspectionTasks === 'function') checkAndCreateInspectionTasks(ac);
     const insp = getInspectionStatus(ac);
     if (insp.oilRemaining <= 0) showToast('⚠ 50hr inspection overdue', 'error');
     if (insp.structRemaining <= 0) showToast('⚠ 100hr inspection overdue', 'error');

@@ -91,6 +91,63 @@ async function logActivity(type, description, relatedId) {
   await DB.put('flights', entry);
 }
 
+async function checkAndCreateInspectionTasks(ac) {
+  if (!ac) return;
+  const tach = ac.totalTachTime || 0;
+  const hoursSinceOil = tach - (ac.lastOilChangeTach || 0);
+  const hoursSince100hr = tach - (ac.last100hrTach || 0);
+  const tasks = await DB.getAll('maintenance_tasks');
+  const acTasks = tasks.filter(t => t.aircraftId === ac.tailNumber);
+
+  if (hoursSinceOil >= (ac.oilInterval || 50)) {
+    const hasOpen = acTasks.some(t => t.type === 'inspection_50hr' && t.status === 'open');
+    if (!hasOpen) {
+      const task = {
+        id: 'mnt_' + Date.now(),
+        aircraftId: ac.tailNumber,
+        description: '50-hour inspection due',
+        type: 'inspection_50hr',
+        priority: 'high',
+        assignedTo: [],
+        status: 'open',
+        technicianNotes: '',
+        rectifiedBy: '',
+        rectifiedAt: '',
+        releasedBy: '',
+        releasedAt: '',
+        createdAt: new Date().toISOString()
+      };
+      await DB.put('maintenance_tasks', task);
+      await queueSync('maintenance_tasks', 'create', task);
+      showToast('⚠️ 50hr inspection task auto-created');
+    }
+  }
+
+  if (hoursSince100hr >= (ac.structInterval || 100)) {
+    const hasOpen = acTasks.some(t => t.type === 'inspection_100hr' && t.status === 'open');
+    if (!hasOpen) {
+      const task = {
+        id: 'mnt_' + Date.now(),
+        aircraftId: ac.tailNumber,
+        description: '100-hour inspection due',
+        type: 'inspection_100hr',
+        priority: 'high',
+        assignedTo: [],
+        status: 'open',
+        technicianNotes: '',
+        rectifiedBy: '',
+        rectifiedAt: '',
+        releasedBy: '',
+        releasedAt: '',
+        createdAt: new Date().toISOString()
+      };
+      await DB.put('maintenance_tasks', task);
+      await queueSync('maintenance_tasks', 'create', task);
+      showToast('⚠️ 100hr inspection task auto-created');
+    }
+  }
+}
+
 async function getActivityFeed(limit = 50) {
   const all = await DB.getAll('flights');
   return all.filter(e => e.id && e.id.startsWith('act_'))
@@ -533,6 +590,8 @@ async function dashboardView() {
   `;
 
   document.getElementById('dashboard-hero').addEventListener('click', () => showAircraftSheet());
+
+  checkAndCreateInspectionTasks(ac);
 
   // Quick-action navigation
   document.querySelectorAll('.quick-action[data-view]').forEach(a => {

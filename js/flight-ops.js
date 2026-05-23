@@ -433,6 +433,7 @@ async function onArrivalSubmit(e) {
   ac.totalTachTime = (ac.totalTachTime || 0) + duration;
   await DB.put('aircraft', ac);
   await queueSync('aircraft', 'update', ac);
+  if (typeof checkAndCreateInspectionTasks === 'function') checkAndCreateInspectionTasks(ac);
 
   const hoursSinceOil = ac.totalTachTime - ac.lastOilChangeTach;
   const hoursSince100hr = ac.totalTachTime - ac.last100hrTach;
@@ -508,6 +509,7 @@ async function onUpdateMeters() {
   ac.totalTachTime = newTach;
   await DB.put('aircraft', ac);
   await queueSync('aircraft', 'update', ac);
+  if (typeof checkAndCreateInspectionTasks === 'function') checkAndCreateInspectionTasks(ac);
 
   const hoursSinceOil = newTach - ac.lastOilChangeTach;
   const hoursSince100hr = newTach - ac.last100hrTach;
@@ -590,6 +592,7 @@ async function showEndOfFlyingSheet() {
       ac2.propellerPTSO = (ac2.propellerPTSO || 0) + duration;
       ac2.totalTachTime = newTach;
     }
+    if (typeof checkAndCreateInspectionTasks === 'function') checkAndCreateInspectionTasks(ac2);
     const hoursSinceOil = newTach - ac2.lastOilChangeTach;
     const hoursSince100hr = newTach - ac2.last100hrTach;
     const today = new Date().toISOString().slice(0, 10);
