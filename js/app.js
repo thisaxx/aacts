@@ -410,6 +410,7 @@ function navigate(view) {
 let _refreshTimer = null;
 let _currentView = null;
 function onRemoteUpdate() {
+  updateNotifBadge();
   if (_refreshTimer) return;
   _refreshTimer = setTimeout(() => {
     _refreshTimer = null;
