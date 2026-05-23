@@ -396,11 +396,12 @@ async function dashboardView() {
         </div>
       </div>
 
-      ${alerts.length > 0 ? `
+      ${alerts.length > 0 || ac.groundedAfterInspection ? `
       <div class="dash-alerts">
         ${alerts.map(a => `<div class="dash-alert">&#9888; ${a}</div>`).join('')}
-        ${!crsIssuedToday && (userRole === 'engineer' || userRole === 'production_planner' || userRole === 'admin') ? `
-        <button class="btn btn-primary btn-block" id="issue-daily-crs-btn" style="margin-top:8px">Issue Daily CRS</button>` : ''}
+        ${ac.groundedAfterInspection ? `<div class="dash-alert" style="border-color:var(--danger)">&#128308; Aircraft grounded — daily CRS required before next flight</div>` : ''}
+        ${(!crsIssuedToday || ac.groundedAfterInspection) && (userRole === 'engineer' || userRole === 'production_planner' || userRole === 'admin') ? `
+        <button class="btn btn-primary btn-block" id="issue-daily-crs-btn" style="margin-top:8px">${ac.groundedAfterInspection ? '&#9989; Issue Daily CRS to Clear Grounding' : 'Issue Daily CRS'}</button>` : ''}
       </div>` : ''}
 
 
