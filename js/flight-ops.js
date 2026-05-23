@@ -24,13 +24,7 @@ function setCurrentAircraftKey(tailNumber) {
 }
 
 async function getAllAircraft() {
-  let all = await DB.getAll('aircraft');
-  if (all.length === 0) {
-    const ac = { ...DEFAULT_AIRCRAFT };
-    await DB.put('aircraft', ac);
-    all = [ac];
-  }
-  return all;
+  return await DB.getAll('aircraft');
 }
 
 async function getAircraft() {
