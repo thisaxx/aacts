@@ -476,7 +476,7 @@ async function dashboardView() {
         ${alerts.map(a => `<div class="dash-alert">&#9888; ${a}</div>`).join('')}
         ${ac.groundedAfterInspection ? `<div class="dash-alert" style="border-color:var(--danger)">&#128308; Aircraft grounded — daily CRS required before next flight</div>` : ''}
         ${(!crsIssuedToday || ac.groundedAfterInspection) && (userRole === 'engineer' || userRole === 'production_planner' || userRole === 'admin') ? `
-        <button class="btn btn-primary btn-block" id="issue-daily-crs-btn" style="margin-top:8px">${ac.groundedAfterInspection ? '&#9989; Issue Daily CRS to Clear Grounding' : 'Issue Daily CRS'}</button>` : ''}
+        <button class="btn btn-primary btn-block" id="issue-daily-crs-btn" style="margin-top:8px">${ac.groundedAfterInspection ? '&#9989; Issue Daily CRS for Airworthiness' : 'Issue Daily CRS'}</button>` : ''}
         ${inspectionOverdue ? `<button class="btn btn-primary btn-block" id="perform-inspection-btn" style="margin-top:8px">&#9881; Perform Inspection Sign-off</button>` : ''}
       </div>` : ''}
 
@@ -1015,6 +1015,11 @@ async function renderACListSheet() {
   }
   const defaultKey = getDefaultAircraftKey();
 
+  all.sort((a, b) => {
+    if (a.tailNumber === '4R-ACV') return -1;
+    if (b.tailNumber === '4R-ACV') return 1;
+    return a.tailNumber.localeCompare(b.tailNumber);
+  });
   el.innerHTML = all.map(ac => {
     const isDefault = ac.tailNumber === defaultKey;
     return `
