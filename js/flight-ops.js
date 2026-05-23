@@ -720,6 +720,7 @@ async function renderRecentFlights() {
       </div>
       <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
         ${!isDeparted ? `<div class="flight-hours">${(f.flownHours * 60).toFixed(0)}m</div>` : '<div class="flight-hours" style="opacity:0.4">—</div>'}
+        <button class="btn btn-sm btn-ghost edit-flight-btn" data-id="${f.id}" title="Edit" style="padding:4px 6px;font-size:11px">&#9998;</button>
         <button class="btn btn-sm btn-danger del-flight-btn" data-id="${f.id}" style="padding:4px 8px;font-size:11px">&times;</button>
       </div>
     </div>
@@ -728,4 +729,116 @@ async function renderRecentFlights() {
   el.querySelectorAll('.del-flight-btn').forEach(btn => {
     btn.addEventListener('click', () => deleteFlight(btn.dataset.id));
   });
+  el.querySelectorAll('.edit-flight-btn').forEach(btn => {
+    btn.addEventListener('click', () => editFlight(btn.dataset.id));
+  });
+}
+
+async function editFlight(flightId) {
+  const flight = await DB.get('flights', flightId);
+  if (!flight) { showToast('Flight not found', 'error'); return; }
+  showBottomSheet(`
+    <div class="card-header"><h3>Edit Sortie</h3></div>
+    <div class="form-group">
+      <label>Flight Date</label>
+      <input type="date" id="edit-flight-date" class="form-input" value="${flight.flightDate}">
+    </div>
+    <div class="form-group">
+      <label>Pilot Name</label>
+      <input type="text" id="edit-flight-pilot" class="form-input" value="${escHtml(flight.pilotName)}">
+    </div>
+    <div class="row">
+      <div class="form-group">
+        <label>Takeoff Time</label>
+        <input type="time" id="edit-flight-takeoff" class="form-input" value="${flight.takeoffTime || ''}">
+      </div>
+      <div class="form-group">
+        <label>Landing Time</label>
+        <input type="time" id="edit-flight-landing" class="form-input" value="${flight.landingTime || ''}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Flown Hours</label>
+      ${stepperHTML('edit-flight-hours', flight.flownHours || 0, 0, 99, 0.1)}
+    </div>
+    <div class="row">
+      <div class="form-group">
+        <label>Fuel Before (L)</label>
+        ${stepperHTML('edit-fuel-before-left', flight.fuelBeforeLeft || 0, 0, 999, 0.1)}
+      </div>
+      <div class="form-group">
+        <label>Fuel Before (R)</label>
+        ${stepperHTML('edit-fuel-before-right', flight.fuelBeforeRight || 0, 0, 999, 0.1)}
+      </div>
+    </div>
+    <div class="row">
+      <div class="form-group">
+        <label>Fuel After (L)</label>
+        ${stepperHTML('edit-fuel-after-left', flight.fuelAfterLeft || 0, 0, 999, 0.1)}
+      </div>
+      <div class="form-group">
+        <label>Fuel After (R)</label>
+        ${stepperHTML('edit-fuel-after-right', flight.fuelAfterRight || 0, 0, 999, 0.1)}
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Fuel Consumed (gal)</label>
+      ${stepperHTML('edit-fuel-consumed', flight.fuelConsumed || 0, 0, 999, 0.1)}
+    </div>
+    <div class="form-group">
+      ${toggleSwitchHTML('edit-refueled-check', 'Aircraft was refueled', flight.refueled || false)}
+    </div>
+    <div id="edit-refuel-fields" class="${flight.refueled ? '' : 'hidden'}">
+      <div class="form-group">
+        <label>Refuel Amount (gal)</label>
+        ${stepperHTML('edit-refuel-amount', flight.refuelAmount || 0, 0, 9999, 0.1)}
+      </div>
+      <div class="row">
+        <div class="form-group">
+          <label>Source</label>
+          <input type="text" id="edit-refuel-source" class="form-input" value="${escHtml(flight.refuelSource || '')}">
+        </div>
+        <div class="form-group">
+          <label>Fuel Type</label>
+          <input type="text" id="edit-fuel-type" class="form-input" value="${escHtml(flight.fuelType || '')}">
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-primary btn-block" id="save-edit-flight-btn">Save Changes</button>
+    <button class="btn btn-secondary btn-block" id="cancel-edit-flight-btn" style="margin-top:8px">Cancel</button>
+  `);
+  initSteppers();
+  initToggles();
+  document.querySelector('[data-toggle-id="edit-refueled-check"]')?.addEventListener('change', function(e) {
+    document.getElementById('edit-refuel-fields').classList.toggle('hidden', !e.checked);
+  });
+  document.getElementById('save-edit-flight-btn').addEventListener('click', async () => {
+    const date = document.getElementById('edit-flight-date').value;
+    const pilot = document.getElementById('edit-flight-pilot').value.trim();
+    if (!date || !pilot) { showToast('Date and pilot required', 'error'); return; }
+    flight.flightDate = date;
+    flight.pilotName = pilot;
+    flight.takeoffTime = document.getElementById('edit-flight-takeoff').value || '';
+    flight.landingTime = document.getElementById('edit-flight-landing').value || '';
+    flight.flownHours = parseFloat(document.getElementById('edit-flight-hours').value) || 0;
+    flight.fuelBeforeLeft = parseFloat(document.getElementById('edit-fuel-before-left').value) || 0;
+    flight.fuelBeforeRight = parseFloat(document.getElementById('edit-fuel-before-right').value) || 0;
+    flight.fuelAfterLeft = parseFloat(document.getElementById('edit-fuel-after-left').value) || 0;
+    flight.fuelAfterRight = parseFloat(document.getElementById('edit-fuel-after-right').value) || 0;
+    flight.fuelConsumed = parseFloat(document.getElementById('edit-fuel-consumed').value) || 0;
+    const refuelToggle = document.querySelector('[data-toggle-id="edit-refueled-check"]');
+    flight.refueled = refuelToggle?.querySelector('.toggle-track')?.classList.contains('on') || false;
+    flight.refuelAmount = flight.refueled ? parseFloat(document.getElementById('edit-refuel-amount').value) || 0 : 0;
+    flight.refuelSource = flight.refueled ? document.getElementById('edit-refuel-source').value : '';
+    flight.fuelType = flight.refueled ? document.getElementById('edit-fuel-type').value : '';
+    if (flight.status === 'departed' && flight.landingTime) flight.status = 'completed';
+    else if (flight.status === 'completed' && !flight.landingTime) flight.status = 'departed';
+    await DB.put('flights', flight);
+    await queueSync('flights', 'update', flight);
+    showToast('Sortie updated');
+    window.__sheetClose(true);
+    renderRecentFlights();
+    renderDepartedList();
+  });
+  document.getElementById('cancel-edit-flight-btn').addEventListener('click', () => window.__sheetClose(null));
 }

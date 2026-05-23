@@ -213,11 +213,25 @@ async function renderFuelStock() {
 async function updateFuelStockQty(id, qty) {
   const stock = await DB.get('fuel_stock', id);
   if (!stock) return;
+  const diff = qty - stock.quantityLiters;
   stock.quantityLiters = qty;
   stock.lastUpdated = new Date().toISOString();
   await DB.put('fuel_stock', stock);
   await queueSync('fuel_stock', 'update', stock);
-  // re-render both fuel page and inventory if visible
+  // Log the adjustment
+  if (diff !== 0) {
+    const reason = await showPromptDialog('Stock Adjustment', `Reason for ${diff > 0 ? 'adding' : 'removing'} ${Math.abs(diff).toFixed(1)}L ${stock.name}?`);
+    if (reason) {
+      await DB.put('fuel_logs', {
+        id: 'fuellog_' + Date.now(),
+        fuelType: stock.id,
+        type: 'adjustment',
+        liters: diff,
+        source: reason.trim(),
+        createdAt: new Date().toISOString()
+      });
+    }
+  }
   renderFuelStock();
   const invEl = document.getElementById('fuel-stock-inv');
   if (invEl && typeof renderInventory === 'function') renderInventory();

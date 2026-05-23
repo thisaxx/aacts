@@ -105,17 +105,20 @@ async function queueSync(collection, action, data) {
   updateSyncBadge();
 }
 
-function updateSyncBadge() {
+async function updateSyncBadge() {
   const badge = document.getElementById('sync-badge');
   if (!badge) return;
+  // Count pending sync queue items
+  let pendingCount = 0;
+  try { pendingCount = (await DB.getAll('sync_queue')).length; } catch(e) {}
   if (db_firestore && firebase.auth().currentUser && navigator.onLine) {
-    badge.textContent = '✓';
-    badge.style.background = 'rgba(16,185,129,0.25)';
-    badge.style.color = '#10b981';
+    badge.textContent = pendingCount > 0 ? `↻${pendingCount}` : '✓';
+    badge.style.background = pendingCount > 0 ? 'rgba(245,158,11,0.25)' : 'rgba(16,185,129,0.25)';
+    badge.style.color = pendingCount > 0 ? '#f59e0b' : '#10b981';
     badge.style.display = 'flex';
   } else {
-    badge.textContent = '✕';
-    badge.style.background = 'rgba(239,68,68,0.25)';
+    badge.textContent = pendingCount > 0 ? `✕${pendingCount}` : '✕';
+    badge.style.background = pendingCount > 0 ? 'rgba(239,68,68,0.35)' : 'rgba(239,68,68,0.25)';
     badge.style.color = '#ef4444';
     badge.style.display = 'flex';
   }

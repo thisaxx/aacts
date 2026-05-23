@@ -128,6 +128,44 @@ async function renderTasks() {
       renderTasks();
     });
   });
+  document.querySelectorAll('.edit-task-btn').forEach(btn => {
+    btn.addEventListener('click', () => editTask(btn.dataset.id));
+  });
+}
+
+async function editTask(taskId) {
+  const task = await DB.get('maintenance_tasks', taskId);
+  if (!task) { showToast('Work order not found', 'error'); return; }
+  showBottomSheet(`
+    <div class="card-header"><h3>Edit Work Order</h3></div>
+    <div class="form-group">
+      <label>Description</label>
+      <textarea id="edit-task-desc" rows="3" class="form-input">${escHtml(task.description)}</textarea>
+    </div>
+    <div class="form-group">
+      <label>Priority</label>
+      <select id="edit-task-priority" class="form-input">
+        <option value="low" ${task.priority === 'low' ? 'selected' : ''}>Low</option>
+        <option value="medium" ${task.priority === 'medium' ? 'selected' : ''}>Medium</option>
+        <option value="high" ${task.priority === 'high' ? 'selected' : ''}>High</option>
+        <option value="critical" ${task.priority === 'critical' ? 'selected' : ''}>Critical</option>
+      </select>
+    </div>
+    <button class="btn btn-primary btn-block" id="save-edit-task-btn">Save Changes</button>
+    <button class="btn btn-secondary btn-block" id="cancel-edit-task-btn" style="margin-top:8px">Cancel</button>
+  `);
+  document.getElementById('save-edit-task-btn').addEventListener('click', async () => {
+    const desc = document.getElementById('edit-task-desc').value.trim();
+    if (!desc) { showToast('Enter a description', 'error'); return; }
+    task.description = desc;
+    task.priority = document.getElementById('edit-task-priority').value;
+    await DB.put('maintenance_tasks', task);
+    await queueSync('maintenance_tasks', 'update', task);
+    showToast('Work order updated');
+    window.__sheetClose(true);
+    renderTasks();
+  });
+  document.getElementById('cancel-edit-task-btn').addEventListener('click', () => window.__sheetClose(null));
 }
 
 function taskCard(task) {
@@ -150,6 +188,7 @@ function taskCard(task) {
       ${task.rectifiedBy ? `<p class="task-meta">Rectified by ${escHtml(task.rectifiedBy)}</p>` : ''}
       <div class="task-actions">
         ${task.status === 'open' ? `<button class="btn btn-sm btn-primary task-detail-btn" data-id="${task.id}">Rectify</button>` : ''}
+        ${task.status === 'open' ? `<button class="btn btn-sm btn-ghost edit-task-btn" data-id="${task.id}" title="Edit" style="padding:4px 6px;font-size:11px">&#9998;</button>` : ''}
         ${task.status === 'rectified' ? `<button class="btn btn-sm btn-success release-btn" data-id="${task.id}">Release to Service</button>` : ''}
         <button class="btn btn-sm btn-danger del-task-btn" data-id="${task.id}" style="padding:4px 8px;font-size:11px;margin-left:auto">&times;</button>
       </div>

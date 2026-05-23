@@ -58,9 +58,40 @@ function showDefectSheet() {
         </label>
       </div>
     </div>
+    <div class="form-group">
+      <label>Photo (optional)</label>
+      <input type="file" id="defect-photo-input" accept="image/*" style="display:none">
+      <button class="btn btn-sm btn-secondary" id="defect-photo-btn" style="font-size:11px">+ Attach Photo</button>
+      <div id="defect-photo-preview" style="margin-top:6px;max-width:100%;border-radius:8px;overflow:hidden;display:none">
+        <img id="defect-photo-img" style="width:100%;max-height:150px;object-fit:cover">
+        <button class="btn btn-sm btn-ghost" id="defect-photo-remove" style="font-size:10px">Remove</button>
+      </div>
+    </div>
     <button class="btn btn-primary btn-block" id="save-defect-btn">Submit Squawk</button>
     <button class="btn btn-secondary btn-block" id="cancel-defect-btn" style="margin-top:8px">Cancel</button>
   `);
+
+  let defectPhotoData = null;
+  document.getElementById('defect-photo-btn').addEventListener('click', () => {
+    document.getElementById('defect-photo-input').click();
+  });
+  document.getElementById('defect-photo-input').addEventListener('change', async function() {
+    const file = this.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async e => {
+      defectPhotoData = await compressImage(e.target.result, 800, 600, 0.6);
+      const preview = document.getElementById('defect-photo-preview');
+      document.getElementById('defect-photo-img').src = defectPhotoData;
+      preview.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+    this.value = '';
+  });
+  document.getElementById('defect-photo-remove').addEventListener('click', () => {
+    defectPhotoData = null;
+    document.getElementById('defect-photo-preview').style.display = 'none';
+  });
 
   document.getElementById('save-defect-btn').addEventListener('click', async () => {
     const desc = document.getElementById('defect-desc').value.trim();
@@ -74,6 +105,7 @@ function showDefectSheet() {
       description: desc,
       urgency,
       status: 'open',
+      photoData: defectPhotoData,
       reportedBy: localStorage.getItem('aac_user') || 'Flight Ops',
       reportedAt: new Date().toISOString(),
       workOrderId: null,
@@ -184,6 +216,7 @@ function defectCard(defect) {
         ${statusLabel[defect.status]}
       </div>
       <p class="task-desc">${escHtml(defect.description)}</p>
+      ${defect.photoData ? `<img src="${defect.photoData}" style="width:100%;max-height:120px;object-fit:cover;border-radius:6px;margin:6px 0" onclick="window.open(this.src)">` : ''}
       <p class="task-meta">Reported by ${escHtml(defect.reportedBy)} &middot; ${new Date(defect.createdAt).toLocaleDateString()}</p>
       <div class="task-actions">
         ${defect.status === 'open' && canResolve ? `<button class="btn btn-sm btn-success resolve-defect-btn" data-id="${defect.id}">Resolve</button>` : ''}

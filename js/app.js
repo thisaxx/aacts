@@ -10,6 +10,23 @@ function haptic() {
   if ('vibrate' in navigator) navigator.vibrate(8);
 }
 
+function compressImage(dataUrl, maxW = 800, maxH = 600, quality = 0.7) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if (w > maxW) { h *= maxW / w; w = maxW; }
+      if (h > maxH) { w *= maxH / h; h = maxH; }
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(c.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
 function escHtml(str) {
   const d = document.createElement('div');
   d.textContent = str;
@@ -212,7 +229,7 @@ async function dashboardView() {
 
   app.innerHTML = `
     <div class="page">
-      <div class="dashboard-hero">
+      <div class="dashboard-hero" id="dashboard-hero" style="cursor:pointer">
         <div class="hero-image-wrap">
           <img src="${ac.photoData || 'img/aircraft.jpg'}" alt="${escHtml(ac.tailNumber)}" class="aircraft-image">
           <div class="hero-overlay"></div>
@@ -360,6 +377,8 @@ async function dashboardView() {
     </div>
   `;
 
+  document.getElementById('dashboard-hero').addEventListener('click', () => showAircraftSheet());
+
   const crsBtn = document.getElementById('issue-daily-crs-btn');
   if (crsBtn) {
     crsBtn.addEventListener('click', async () => {
@@ -440,6 +459,14 @@ function closeSidebar() {
   document.getElementById('sidebar-overlay')?.classList.remove('open');
 }
 
+function applyRoleVisibility() {
+  const role = localStorage.getItem('aac_user_role') || '';
+  document.querySelectorAll('[data-role]').forEach(el => {
+    const allowed = el.dataset.role.split(',').map(r => r.trim());
+    el.style.display = allowed.includes(role) ? '' : 'none';
+  });
+}
+
 function updateSidebarUser() {
   const name = localStorage.getItem('aac_user');
   const role = localStorage.getItem('aac_user_role');
@@ -459,6 +486,7 @@ function updateSidebarUser() {
   document.querySelectorAll('#sidebar-pincode, #sidebar-reset').forEach(el => {
     el.style.display = isPrivileged ? '' : 'none';
   });
+  applyRoleVisibility();
 }
 
 async function updateSidebarInspections() {
@@ -523,12 +551,10 @@ function profileView() {
       const file = input.files[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = e => {
-        const dataUrl = e.target.result;
-        // Preview
+      reader.onload = async e => {
+        const dataUrl = await compressImage(e.target.result, 400, 400, 0.6);
         const preview = document.getElementById('profile-photo-preview');
         preview.innerHTML = `<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover">`;
-        // Store temporarily
         preview.dataset.photo = dataUrl;
       };
       reader.readAsDataURL(file);
@@ -966,7 +992,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     reader.onload = async function(e) {
       const ac = await DB.get('aircraft', tail);
       if (!ac) return;
-      ac.photoData = e.target.result;
+      ac.photoData = await compressImage(e.target.result, 800, 600, 0.7);
       await DB.put('aircraft', ac);
       await queueSync('aircraft', 'update', ac);
       showToast('Photo updated');
@@ -1135,6 +1161,12 @@ async function showExportSheet() {
   showBottomSheet(`
     <div class="card-header"><h3>Export Records</h3></div>
     <div style="margin-bottom:14px">
+      <div class="form-group">
+        <label>Aircraft</label>
+        <select id="export-aircraft" class="form-input">
+          <option value="">All Aircraft</option>
+        </select>
+      </div>
       <div class="row">
         <div class="form-group">
           <label>From Date</label>
@@ -1158,9 +1190,22 @@ async function showExportSheet() {
     <button class="btn btn-secondary btn-block" id="close-export-btn" style="margin-top:8px">Close</button>
   `);
 
+  getAllAircraft().then(all => {
+    const sel = document.getElementById('export-aircraft');
+    if (sel) {
+      all.forEach(ac => {
+        const opt = document.createElement('option');
+        opt.value = ac.tailNumber;
+        opt.textContent = ac.tailNumber;
+        sel.appendChild(opt);
+      });
+    }
+  });
+
   document.getElementById('export-all-btn').addEventListener('click', async () => {
     const fromVal = document.getElementById('export-from').value;
     const toVal = document.getElementById('export-to').value;
+    const acFilter = document.getElementById('export-aircraft').value;
     if (!fromVal || !toVal) { showToast('Select from and to dates', 'error'); return; }
     const from = new Date(fromVal);
     const to = new Date(toVal + 'T23:59:59');
@@ -1186,6 +1231,10 @@ async function showExportSheet() {
           const d = new Date(raw.slice(0, 10));
           return d >= from && d <= to;
         });
+      }
+      // Filter by aircraft
+      if (acFilter && data[name].length > 0) {
+        data[name] = data[name].filter(item => item.aircraftId === acFilter || item.tailNumber === acFilter);
       }
     }
 
