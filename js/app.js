@@ -185,13 +185,18 @@ async function dashboardView() {
   const today = new Date().toISOString().slice(0, 10);
   const crsIssuedToday = ac.dailyCrsDate === today;
 
+  // Check if aircraft is airborne (departed but no arrival)
+  const isAirborne = flights.some(f => f.aircraftId === ac.tailNumber && f.status === 'departed');
+
   let statusClass, statusLabel;
   const reasons = [];
   if (groundingDefects > 0) { reasons.push(`${groundingDefects} grounding squawk(s)`); }
   if (minRemaining <= 0) { reasons.push('Inspection overdue'); }
   if (!crsIssuedToday) { reasons.push('No daily CRS issued'); }
 
-  if (reasons.length > 0) {
+  if (isAirborne) {
+    statusClass = 'blue'; statusLabel = 'Airborne';
+  } else if (reasons.length > 0) {
     statusClass = 'red'; statusLabel = 'Grounded';
   } else if (minRemaining <= 5) {
     statusClass = 'orange'; statusLabel = 'Caution';
