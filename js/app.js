@@ -196,7 +196,7 @@ async function dashboardView() {
   } else if (minRemaining <= 5) {
     statusClass = 'orange'; statusLabel = 'Caution';
   } else {
-    statusClass = 'green'; statusLabel = 'Flightworthy';
+    statusClass = 'green'; statusLabel = 'Airworthy';
   }
 
   // Build alerts list
