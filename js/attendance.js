@@ -87,7 +87,7 @@ async function renderAttendance(viewDate) {
   if (!user) {
     selfEl.innerHTML = `<p class="text-muted small">Set up your profile first (sidebar &rarr; My Profile)</p>`;
   } else {
-    const existing = (await DB.getAll('attendance')).filter(a => a.userId === user.id && a.date === today);
+    const existing = (await DB.getAll('attendance')).filter(a => a.date === today && user.id && a.userId === user.id);
     const active = existing.find(a => a.status === 'pending' || a.status === 'approved');
     if (active) {
       selfEl.innerHTML = `
@@ -169,7 +169,8 @@ async function renderAttendance(viewDate) {
     const delBtn = selfEl.querySelector('.att-del-btn');
     if (delBtn) {
       delBtn.addEventListener('click', async () => {
-        if (!confirm('Delete this crew record?')) return;
+        const confirmed = await showConfirmDialog('Delete Record', 'Delete this crew record?');
+        if (!confirmed) return;
         await DB.del('attendance', active.id);
         await queueSync('attendance', 'delete', { id: active.id });
         showToast('Record deleted');
@@ -251,7 +252,8 @@ async function renderAttendance(viewDate) {
     `).join('');
     todayEl.querySelectorAll('.att-del-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
-        if (!confirm('Delete this crew record?')) return;
+        const confirmed = await showConfirmDialog('Delete Record', 'Delete this crew record?');
+        if (!confirmed) return;
         await DB.del('attendance', btn.dataset.id);
         await queueSync('attendance', 'delete', { id: btn.dataset.id });
         showToast('Record deleted');

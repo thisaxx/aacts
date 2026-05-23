@@ -17,8 +17,8 @@ messaging.onBackgroundMessage(payload => {
   if (payload.notification) {
     self.registration.showNotification(payload.notification.title, {
       body: payload.notification.body,
-      icon: '/aacts/img/icon-192.png',
-      badge: '/aacts/img/icon-192.png'
+      icon: 'img/icon-192.png',
+      badge: 'img/icon-192.png'
     });
   }
 });

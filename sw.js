@@ -1,24 +1,25 @@
-const CACHE = 'aac-v5';
-const PREFIX = '/aacts';
+const CACHE = 'aac-v6';
+const BASE = self.location.pathname.replace(/\/[^/]*$/, '') || '/aacts';
 const ASSETS = [
-  PREFIX + '/',
-  PREFIX + '/index.html',
-  PREFIX + '/css/style.css',
-  PREFIX + '/js/app.js',
-  PREFIX + '/js/db.js',
-  PREFIX + '/js/sync.js',
-  PREFIX + '/js/flight-ops.js',
-  PREFIX + '/js/defects.js',
-  PREFIX + '/js/fuel.js',
-  PREFIX + '/js/maintenance.js',
-  PREFIX + '/js/inventory.js',
-  PREFIX + '/js/history.js',
-  PREFIX + '/js/attendance.js',
-  PREFIX + '/manifest.json',
-  PREFIX + '/img/aircraft.jpg',
-  PREFIX + '/img/icon-192.png',
-  PREFIX + '/img/icon-512.png',
-  PREFIX + '/firebase-messaging-sw.js'
+  BASE + '/',
+  BASE + '/index.html',
+  BASE + '/css/style.css',
+  BASE + '/js/app.js',
+  BASE + '/js/db.js',
+  BASE + '/js/sync.js',
+  BASE + '/js/flight-ops.js',
+  BASE + '/js/defects.js',
+  BASE + '/js/fuel.js',
+  BASE + '/js/maintenance.js',
+  BASE + '/js/inventory.js',
+  BASE + '/js/history.js',
+  BASE + '/js/attendance.js',
+  BASE + '/js/notifications.js',
+  BASE + '/manifest.json',
+  BASE + '/img/aircraft.jpg',
+  BASE + '/img/icon-192.png',
+  BASE + '/img/icon-512.png',
+  BASE + '/firebase-messaging-sw.js'
 ];
 
 self.addEventListener('install', e => {
@@ -39,7 +40,7 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  if (e.request.url.includes('firebase') || e.request.url.includes('googleapis') || e.request.url.includes('gstatic.com')) return;
+  if (e.request.url.includes('firebase') || e.request.url.includes('googleapis') || e.request.url.includes('gstatic.com') || e.request.url.startsWith('file://')) return;
   e.respondWith(
     caches.match(e.request).then(cached =>
       cached || fetch(e.request).then(res => {

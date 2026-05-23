@@ -350,7 +350,7 @@ async function dashboardView() {
                   <div class="flight-date">${f.flightDate}${f.takeoffTime ? ` &middot; ${f.takeoffTime}${f.landingTime ? '-' + f.landingTime : '...'}` : ''}</div>
                 </div>
                 <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
-                  ${f.status !== 'departed' ? `<div class="flight-hours">${(f.flownHours * 60).toFixed(0)}m</div>` : '<div class="flight-hours" style="opacity:0.4">ΓÇö</div>'}
+                  ${f.status !== 'departed' ? `<div class="flight-hours">${(f.flownHours * 60).toFixed(0)}m</div>` : '<div class="flight-hours" style="opacity:0.4">—</div>'}
                 </div>
               </div>
             `).join('')
@@ -370,7 +370,7 @@ async function dashboardView() {
       ac.dailyCrsBy = localStorage.getItem('aac_user') || 'Engineer';
       await DB.put('aircraft', ac);
       await queueSync('aircraft', 'update', ac);
-      showToast('Daily CRS issued ΓÇö aircraft is flightworthy');
+      showToast('Daily CRS issued — aircraft is flightworthy');
       const user = localStorage.getItem('aac_user') || 'Unknown';
       createNotification('crs', 'Daily CRS Issued', `${user} issued daily CRS for ${ac.tailNumber}`, 'dashboard');
       notifyDataChange();
@@ -430,7 +430,7 @@ function notifyDataChange() {
   }, 50);
 }
 
-/* ΓöÇΓöÇ Sidebar ΓöÇΓöÇ */
+/* ── Sidebar ── */
 function openSidebar() {
   document.getElementById('sidebar').classList.add('open');
   document.getElementById('sidebar-overlay').classList.add('open');
@@ -445,7 +445,7 @@ function updateSidebarUser() {
   const role = localStorage.getItem('aac_user_role');
   const photo = localStorage.getItem('aac_user_photo');
   document.getElementById('sidebar-name').textContent = name || 'No User';
-  document.getElementById('sidebar-role').textContent = role ? role.replace(/_/g, ' ') : 'ΓÇö';
+  document.getElementById('sidebar-role').textContent = role ? role.replace(/_/g, ' ') : '—';
   const avatar = document.getElementById('sidebar-avatar');
   if (photo) {
     avatar.innerHTML = `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
@@ -475,7 +475,7 @@ async function updateSidebarInspections() {
   } catch (e) {}
 }
 
-/* ΓöÇΓöÇ Profile View ΓöÇΓöÇ */
+/* ── Profile View ── */
 function profileView() {
   const app = document.getElementById('app');
   const name = localStorage.getItem('aac_user') || '';
@@ -910,7 +910,7 @@ async function clearAllData() {
       } catch (e) { /* ignore */ }
     }
   }
-  showToast('All data cleared ΓÇö reloading');
+  showToast('All data cleared — reloading');
   setTimeout(() => location.reload(), 800);
 }
 window.clearAllData = clearAllData;
@@ -951,10 +951,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('offline-banner')?.classList.remove('hidden');
   }
 
-  const user = localStorage.getItem('aac_user');
-  if (!user) {
-    const name = prompt('Enter your name:');
-    if (name) localStorage.setItem('aac_user', name.trim());
+  if (!localStorage.getItem('aac_user')) {
+    localStorage.setItem('aac_user', 'Crew');
   }
 
   await populateACSelector();
@@ -1107,10 +1105,11 @@ function scheduleEndOfDayCheck() {
     if (missing.length > 0) {
       const body = missing.join('\n');
       if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('AAC ΓÇö End of Day Reminder', { body, icon: '/aacts/img/icon-192.png' });
+        const notifIcon = window.location.origin + (window.location.pathname.includes('/aacts/') ? '/aacts/img/icon-192.png' : '/img/icon-192.png');
+        new Notification('AAC — End of Day Reminder', { body, icon: notifIcon });
       }
-      showNotification('End of Day Reminder', missing.join(' ┬╖ '));
-      createNotification('system', 'End of Day Reminder', missing.join(' ┬╖ '), 'dashboard');
+      showNotification('End of Day Reminder', missing.join(' · '));
+      createNotification('system', 'End of Day Reminder', missing.join(' · '), 'dashboard');
     }
     scheduleEndOfDayCheck();
   }, ms);
@@ -1191,7 +1190,7 @@ async function showExportSheet() {
     }
 
     doc.setFontSize(18);
-    doc.text('AAC ΓÇö Data Export', 14, 20);
+    doc.text('AAC — Data Export', 14, 20);
     doc.setFontSize(10);
     doc.text(`Period: ${fromVal} to ${toVal}`, 14, 28);
     doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 34);

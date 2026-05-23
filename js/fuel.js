@@ -166,7 +166,7 @@ async function deleteFuelStock(fuelId, fuelName) {
   renderFuelStock();
   renderFuelLogs();
   const invFuel = document.getElementById('fuel-stock-inv');
-  if (invFuel) renderInventory();
+  if (invFuel && typeof renderInventory === 'function') renderInventory();
 }
 
 async function renderFuelStock() {

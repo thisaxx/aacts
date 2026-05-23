@@ -2,7 +2,7 @@
   "name": "AAC - Flight School Management",
   "short_name": "AAC",
   "description": "Aircraft maintenance, flight logging, and inventory for Cessna 152 fleet",
-  "start_url": "/aacts/",
+  "start_url": ".",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",

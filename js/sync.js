@@ -31,7 +31,8 @@ async function initFirebase() {
 async function initFCM() {
   try {
     if ('Notification' in window && navigator.serviceWorker) {
-      const reg = await navigator.serviceWorker.register('/aacts/firebase-messaging-sw.js');
+      const swUrl = window.location.pathname.includes('/aacts/') ? '/aacts/firebase-messaging-sw.js' : 'firebase-messaging-sw.js';
+      const reg = await navigator.serviceWorker.register(swUrl);
       _messaging = firebase.messaging();
       const permission = await Notification.requestPermission();
       if (permission === 'granted') {
@@ -66,7 +67,7 @@ function subscribeToAll() {
           continue;
         }
         const data = change.doc.data();
-        if (data._deviceId === _deviceId) continue;
+        if (data._deviceId && data._deviceId === _deviceId) continue;
         const local = await DB.get(name, change.doc.id);
         if (!local || (data._updatedAt && (!local._updatedAt || data._updatedAt >= local._updatedAt))) {
           await DB.put(name, data);
