@@ -933,6 +933,15 @@ async function populateACSelector() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Apply saved theme
+  const savedTheme = localStorage.getItem('aac_theme');
+  if (savedTheme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  }
+  // Set sidebar theme label
+  const themeLabel = document.getElementById('sidebar-theme-label');
+  if (themeLabel) themeLabel.textContent = savedTheme === 'light' ? 'Light Mode' : 'Dark Mode';
+
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js');
   }
@@ -1002,6 +1011,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (role !== 'admin') { showToast('Only Admin can reset all data', 'error'); return; }
     const confirmed = await showConfirmDialog('Factory Reset', 'This will delete ALL data including aircraft, sorties, defects, parts, and fuel. Are you sure?');
     if (confirmed) await clearAllData();
+  });
+  document.getElementById('sidebar-theme').addEventListener('click', e => {
+    e.preventDefault();
+    closeSidebar();
+    const html = document.documentElement;
+    const isLight = html.getAttribute('data-theme') === 'light';
+    if (isLight) {
+      html.removeAttribute('data-theme');
+      localStorage.setItem('aac_theme', 'dark');
+      document.getElementById('sidebar-theme-label').textContent = 'Dark Mode';
+    } else {
+      html.setAttribute('data-theme', 'light');
+      localStorage.setItem('aac_theme', 'light');
+      document.getElementById('sidebar-theme-label').textContent = 'Light Mode';
+    }
   });
   document.getElementById('sidebar-pincode').addEventListener('click', async e => {
     e.preventDefault();

@@ -19,6 +19,21 @@
   --body: -apple-system, 'Helvetica Neue', sans-serif;
   --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --smooth: cubic-bezier(0.16, 1, 0.3, 1);
+  --dot-color: rgba(255,255,255,0.03);
+  --gold: #b8860b;
+}
+[data-theme="light"] {
+  --bg: #f5f5f5;
+  --glass: rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(0, 0, 0, 0.06);
+  --surface: #ffffff;
+  --surface-hover: #f0f0f0;
+  --text: #111111;
+  --text-secondary: rgba(0,0,0,0.7);
+  --text-muted: rgba(0,0,0,0.3);
+  --border: rgba(0,0,0,0.08);
+  --dot-color: rgba(0,0,0,0.04);
+  --gold: #b8860b;
 }
 html { font-size: 16px; -webkit-tap-highlight-color: transparent; }
 body {
@@ -33,7 +48,7 @@ body {
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
   background-image:
-    radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);
+    radial-gradient(var(--dot-color) 1px, transparent 1px);
   background-size: 20px 20px;
 }
 
