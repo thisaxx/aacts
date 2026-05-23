@@ -1242,7 +1242,7 @@ function showLoginGate() {
             <label>Select User</label>
             <select id="login-user" class="form-input">
               <option value="">— Select user —</option>
-              ${users.map(u => `<option value="${escHtml(u.name)}" data-role="${u.role}">${escHtml(u.name)} (${u.role.replace(/_/g, ' ')})</option>`).join('')}
+              ${users.map(u => `<option value="${escHtml(u.name)}" data-role="${u.role}">${escHtml(u.name)}</option>`).join('')}
             </select>
           </div>
           <div class="form-group" id="login-pin-group" style="display:none">
