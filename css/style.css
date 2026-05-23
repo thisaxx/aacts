@@ -21,6 +21,7 @@
   --smooth: cubic-bezier(0.16, 1, 0.3, 1);
   --dot-color: rgba(255,255,255,0.03);
   --gold: #b8860b;
+  --highlight: rgba(255,255,255,0.04);
 }
 [data-theme="light"] {
   --bg: #f5f5f5;
@@ -34,6 +35,7 @@
   --border: rgba(0,0,0,0.08);
   --dot-color: rgba(0,0,0,0.04);
   --gold: #b8860b;
+  --highlight: rgba(0,0,0,0.04);
 }
 html { font-size: 16px; -webkit-tap-highlight-color: transparent; }
 body {
@@ -122,7 +124,7 @@ body {
   min-width: 80px;
   max-width: 110px;
 }
-.ac-selector option { background: #000; color: #fff; }
+.ac-selector option { background: var(--surface); color: var(--text); }
 .ac-selector-wrap::after {
   content: '';
   position: absolute;
@@ -221,7 +223,7 @@ body {
   left: 8%;
   right: 8%;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+  background: linear-gradient(90deg, transparent, var(--glass-border), transparent);
   pointer-events: none;
 }
 .card-header {
@@ -246,7 +248,7 @@ body {
   100% { opacity: 0.3; }
 }
 .skeleton {
-  background: rgba(255,255,255,0.04);
+  background: var(--highlight);
   border-radius: 4px;
   animation: skeleton 1.5s ease-in-out infinite;
   display: inline-block;
@@ -328,7 +330,7 @@ body {
   transition: all 0.2s var(--smooth);
   box-shadow: 0 4px 30px rgba(0,0,0,0.4);
 }
-.stat-card:active { transform: scale(0.96); background: rgba(255,255,255,0.04); }
+.stat-card:active { transform: scale(0.96); background: var(--highlight); }
 .stat-icon { font-family: var(--mono); font-size: 22px; margin-bottom: 6px; }
 .stat-value {
   font-family: var(--mono);
@@ -396,7 +398,7 @@ body {
   width: 100%;
   padding: 12px 14px;
   border: 1px solid var(--border);
-  background: #000;
+  background: var(--surface);
   color: var(--text);
   font-size: 14px;
   font-family: var(--mono);
@@ -422,7 +424,7 @@ body {
 /* ── Calc Display ── */
 .calc-display {
   padding: 14px;
-  background: #000;
+  background: var(--surface);
   border: 1px solid var(--border);
   font-family: var(--mono);
   font-size: 32px;
@@ -463,7 +465,7 @@ body {
   border-color: var(--text);
 }
 .btn-danger {
-  background: #000;
+  background: var(--surface);
   color: var(--red);
   border-color: var(--red);
 }
@@ -483,7 +485,7 @@ body {
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  background: #000;
+  background: var(--surface);
   border: 1px solid var(--border);
   cursor: pointer;
   user-select: none;
@@ -501,13 +503,13 @@ body {
 .toggle-thumb {
   width: 12px;
   height: 12px;
-  background: #000;
+  background: var(--bg);
   position: absolute;
   top: 5px;
   left: 5px;
   transition: all 0.25s;
 }
-.toggle-track.on .toggle-thumb { left: 21px; background: #000; }
+.toggle-track.on .toggle-thumb { left: 21px; background: var(--bg); }
 .toggle-label { font-family: var(--mono); font-size: 12px; font-weight: 400; color: var(--text); flex: 1; }
 
 /* ── Interval Bars ── */
@@ -598,7 +600,7 @@ body {
   font-size: 11px;
   color: var(--text-secondary);
   padding: 10px 12px;
-  background: #000;
+  background: var(--surface);
   border-left: 2px solid var(--border);
   margin: 8px 0;
   line-height: 1.4;
@@ -640,7 +642,7 @@ body {
 
 .low-stock-item {
   padding: 12px;
-  background: #000;
+  background: var(--surface);
   border: 1px solid var(--border);
   margin-bottom: 8px;
   font-family: var(--mono);
@@ -651,7 +653,7 @@ body {
 /* ── Fuel Stock ── */
 .fuel-stock-item {
   padding: 14px;
-  background: #000;
+  background: var(--surface);
   border: 1px solid var(--border);
   margin-bottom: 10px;
 }
@@ -681,7 +683,7 @@ body {
   font-size: 12px;
   font-weight: 700;
   transition: all 0.15s;
-  background: #000;
+  background: var(--surface);
 }
 .urgency-danger { color: var(--red); }
 .urgency-warning { color: var(--text); }
@@ -721,7 +723,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
 }
 .sheet.open { transform: translateY(0); pointer-events: auto; }
 .sheet-inner {
-  background: rgba(18, 18, 20, 0.92);
+  background: var(--glass);
   backdrop-filter: blur(40px) saturate(1.5);
   -webkit-backdrop-filter: blur(40px) saturate(1.5);
   border-top: 1px solid var(--glass-border);
@@ -734,7 +736,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
 .sheet-handle {
   width: 32px;
   height: 3px;
-  background: rgba(255,255,255,0.15);
+  background: var(--text-muted);
   margin: 0 auto 14px;
 }
 
@@ -754,7 +756,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
 }
 .dialog-overlay.open { opacity: 1; pointer-events: auto; }
 .dialog {
-  background: rgba(18, 18, 20, 0.95);
+  background: var(--glass);
   backdrop-filter: blur(40px) saturate(1.5);
   -webkit-backdrop-filter: blur(40px) saturate(1.5);
   border: 1px solid var(--glass-border);
@@ -874,7 +876,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
   justify-content: space-between;
   align-items: flex-start;
   padding: 12px 14px;
-  background: #000;
+  background: var(--surface);
   border: 1px solid var(--border);
   margin-bottom: 8px;
   gap: 8px;
@@ -920,7 +922,7 @@ select {
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 1px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); }
+::-webkit-scrollbar-thumb { background: var(--border); }
 
 @media (min-width: 480px) {
   body { border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
