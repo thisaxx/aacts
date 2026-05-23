@@ -1233,7 +1233,7 @@ function showLoginGate() {
     <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:var(--bg)">
       <div style="max-width:400px;width:100%">
         <div style="text-align:center;margin-bottom:24px">
-          <div style="font-size:48px;margin-bottom:8px">&#9992;</div>
+          <img src="img/aircraft.jpg" alt="Aircraft" style="width:100%;max-width:280px;border-radius:12px;margin-bottom:12px;box-shadow:0 4px 20px rgba(0,0,0,0.3)">
           <h1 style="font-size:22px;margin:0">AAC Technical Services</h1>
           <p class="text-muted" style="margin-top:4px">Select your name to sign in</p>
         </div>
@@ -1335,7 +1335,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       { name: 'Rehan', role: 'technician' },
       { name: 'Binada', role: 'technician' },
       { name: 'Bihandu', role: 'technician' },
-      { name: 'Ginod', role: 'technician' }
+      { name: 'Ginod', role: 'technician' },
+      { name: 'Kalum', role: 'technician' },
+      { name: 'Rajapaksha', role: 'technician' }
     ];
     localStorage.setItem('aac_users', JSON.stringify(defaultUsers));
   }
