@@ -189,7 +189,6 @@ async function dashboardView() {
   const reasons = [];
   if (groundingDefects > 0) { reasons.push(`${groundingDefects} grounding squawk(s)`); }
   if (minRemaining <= 0) { reasons.push('Inspection overdue'); }
-  if (afterFlightPending) { reasons.push('After-flight inspection pending'); }
   if (!crsIssuedToday) { reasons.push('No daily CRS issued'); }
 
   if (reasons.length > 0) {
@@ -769,6 +768,7 @@ async function renderACListSheet() {
       const confirmed = await showConfirmDialog('Delete Aircraft', `Delete ${tail}? This cannot be undone.`);
       if (!confirmed) return;
       await DB.del('aircraft', tail);
+      await queueSync('aircraft', 'delete', { id: tail });
       if (getCurrentAircraftKey() === tail) {
         const remaining = await getAllAircraft();
         if (remaining.length > 0) await switchAircraft(remaining[0].tailNumber);
@@ -1068,9 +1068,6 @@ async function checkEndOfDayData() {
 
   const openDefects = allDefects.filter(d => d.status === 'open');
   if (openDefects.length > 0) missing.push(`${openDefects.length} open squawk(s) unresolved`);
-
-  const pendingAfterFlight = allTasks.filter(t => t.type === 'after-flight' && t.status === 'open');
-  if (pendingAfterFlight.length > 0) missing.push(`${pendingAfterFlight.length} after-flight inspection(s) pending`);
 
   return missing;
 }
