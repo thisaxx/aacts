@@ -380,6 +380,7 @@ async function onDepartureSubmit(e) {
 
   renderDepartedList();
   renderRecentFlights();
+  showArrivalForm(flight.id);
 }
 
 async function onArrivalSubmit(e) {
