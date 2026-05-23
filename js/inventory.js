@@ -37,44 +37,14 @@ function inventoryView() {
         <div class="card-header">
           <h3>Fuel Stock</h3>
         </div>
-        <div id="fuel-stock-inv"><p class="text-muted small">Loading...</p></div>
-      </div>
-
+      <div id="fuel-stock-inv"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>
       <div class="card">
-        <div class="card-header">
-          <h3>Parts</h3>
-          <button class="btn btn-sm btn-primary" id="add-part-btn">+ Add Part</button>
-        </div>
-        <div id="add-part-form" class="hidden">
-          <div class="form-group">
-            <label for="part-number">Part Number</label>
-            <input type="text" id="part-number" placeholder="e.g. OIL-FILTER-C152">
-          </div>
-          <div class="form-group">
-            <label for="part-desc">Description</label>
-            <input type="text" id="part-desc" placeholder="Part description">
-          </div>
-          <div class="row">
-            <div class="form-group">
-              <label for="part-qty">Quantity on Hand</label>
-              <input type="number" id="part-qty" min="0">
-            </div>
-            <div class="form-group">
-              <label for="part-min">Min Safe Stock</label>
-              <input type="number" id="part-min" min="0">
-            </div>
-          </div>
-          <button class="btn btn-primary" id="save-part-btn">Save Part</button>
-          <button class="btn btn-secondary" id="cancel-part-btn">Cancel</button>
-        </div>
-        <div id="inventory-list"><p class="text-muted small">Loading...</p></div>
+        <div class="card-header"><h3>Parts Inventory</h3></div>
+        <div id="inventory-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line" style="width:40%"></div></div>
       </div>
-
       <div class="card">
-        <div class="card-header">
-          <h3>Low Stock &amp; Fuel Alerts</h3>
-        </div>
-        <div id="low-stock-list"><p class="text-muted small">Loading...</p></div>
+        <div class="card-header"><h3>Low Stock Alerts</h3></div>
+        <div id="low-stock-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>
       </div>
 
       <div class="card">

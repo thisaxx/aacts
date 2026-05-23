@@ -15,11 +15,11 @@ function attendanceView() {
       <div id="attendance-self" class="card"></div>
       <div id="attendance-pending" class="card">
         <div class="card-header"><h3>Pending Approvals</h3></div>
-        <div id="attendance-pending-list"><p class="text-muted small">Loading...</p></div>
+        <div id="attendance-pending-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line" style="width:40%"></div></div>
       </div>
       <div class="card">
         <div class="card-header"><h3>Today's Records</h3></div>
-        <div id="attendance-today-list"><p class="text-muted small">Loading...</p></div>
+        <div id="attendance-today-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>
       </div>
     </div>
   `;

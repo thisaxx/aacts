@@ -41,14 +41,10 @@ function maintenanceView() {
         <div class="card-header">
           <h3>Open Tasks</h3>
         </div>
-        <div id="tasks-list"><p class="text-muted small">Loading...</p></div>
-      </div>
-
+      <div id="tasks-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line" style="width:40%"></div></div>
       <div class="card">
-        <div class="card-header">
-          <h3>Rectified / Released</h3>
-        </div>
-        <div id="completed-tasks"><p class="text-muted small">Loading...</p></div>
+        <div class="card-header"><h3>Completed / Released</h3></div>
+        <div id="completed-tasks"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>
       </div>
     </div>
   `;

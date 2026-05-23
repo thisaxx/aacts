@@ -72,7 +72,7 @@ function flightOpsView() {
 
       <div class="status-card" id="aircraft-status">
         <div class="status-dot" id="status-dot"></div>
-        <div class="status-text" id="status-text">Loading...</div>
+        <div class="status-text" id="status-text"><span class="skeleton" style="display:inline-block;width:140px;height:14px;vertical-align:middle"></span></div>
       </div>
 
       <form id="flight-form" class="card">
@@ -189,26 +189,79 @@ function flightOpsView() {
         <div class="card-header">
           <h3>Recent Flights</h3>
         </div>
-        <div id="recent-flights"><p class="text-muted small">Loading...</p></div>
+        <div id="recent-flights"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line" style="width:40%"></div></div>
       </div>
     </div>
   `;
 
-    document.getElementById('flight-form').addEventListener('submit', onFlightSubmit);
-    document.getElementById('update-meters-btn').addEventListener('click', onUpdateMeters);
-    initSteppers();
-    initToggles();
-    document.querySelector('[data-toggle-id="refueled-check"]').addEventListener('change', function(e) {
-      document.getElementById('refuel-fields').classList.toggle('hidden', !e.checked);
+  document.getElementById('flight-form').addEventListener('submit', onFlightSubmit);
+  document.getElementById('update-meters-btn').addEventListener('click', onUpdateMeters);
+  initSteppers();
+  initToggles();
+  document.querySelector('[data-toggle-id="refueled-check"]').addEventListener('change', function(e) {
+    document.getElementById('refuel-fields').classList.toggle('hidden', !e.checked);
+  });
+  ['takeoff-time','landing-time'].forEach(id => {
+    document.getElementById(id).addEventListener('change', updateCalcDuration);
+  });
+  ['fuel-before-left','fuel-before-right','fuel-after-left','fuel-after-right'].forEach(id => {
+    document.getElementById(id).addEventListener('change', updateFuelCalc);
+  });
+
+  // Auto-save draft to localStorage
+  const draftKey = 'aac_flight_draft';
+  const formInputs = document.querySelectorAll('#flight-form input, #flight-form select');
+  const saveDraft = () => {
+    const draft = {};
+    formInputs.forEach(el => {
+      if (el.type === 'checkbox') draft[el.id] = el.checked;
+      else if (el.type === 'date' || el.type === 'time' || el.type === 'text' || el.type === 'number') draft[el.id] = el.value;
     });
-    ['takeoff-time','landing-time'].forEach(id => {
-      document.getElementById(id).addEventListener('change', updateCalcDuration);
-    });
-    ['fuel-before-left','fuel-before-right','fuel-after-left','fuel-after-right'].forEach(id => {
-      document.getElementById(id).addEventListener('change', updateFuelCalc);
-    });
-    document.getElementById('flight-date').valueAsDate = new Date();
-    updateFuelCalc();
+    // Save stepper values
+    document.querySelectorAll('.stepper-value').forEach(el => { draft[el.id] = el.textContent; });
+    // Save toggle state
+    const toggle = document.querySelector('[data-toggle-id="refueled-check"] .toggle-track');
+    if (toggle) draft['refueled-check'] = toggle.classList.contains('on');
+    localStorage.setItem(draftKey, JSON.stringify(draft));
+  };
+  formInputs.forEach(el => el.addEventListener('input', saveDraft));
+  document.querySelectorAll('.stepper-btn').forEach(el => el.addEventListener('click', () => setTimeout(saveDraft, 50)));
+
+  // Restore draft
+  try {
+    const saved = JSON.parse(localStorage.getItem(draftKey));
+    if (saved) {
+      Object.entries(saved).forEach(([id, val]) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (id === 'refueled-check') {
+          // handled below
+        } else if (el.classList.contains('stepper-value')) {
+          el.textContent = val;
+        } else if (el.type === 'checkbox') {
+          el.checked = val;
+        } else {
+          el.value = val;
+        }
+      });
+      if (saved['refueled-check']) {
+        const toggle = document.querySelector('[data-toggle-id="refueled-check"] .toggle-track');
+        if (toggle && saved['refueled-check']) {
+          toggle.classList.add('on');
+          document.getElementById('refuel-fields').classList.remove('hidden');
+        }
+      }
+    }
+  } catch(e) {}
+  // Clear draft on submit
+  const origSubmit = onFlightSubmit;
+  onFlightSubmit = async function(e) {
+    localStorage.removeItem(draftKey);
+    return origSubmit.call(this, e);
+  };
+
+  document.getElementById('flight-date').valueAsDate = new Date();
+  updateFuelCalc();
 
     renderAircraftStatus();
     renderIntervalBars();
@@ -576,7 +629,7 @@ async function renderRecentFlights() {
   const flights = await getFlights();
   const el = document.getElementById('recent-flights');
   if (flights.length === 0) {
-    el.innerHTML = '<p class="text-muted small">No flights logged yet</p>';
+    el.innerHTML = emptyState('&#9992;', 'No flights logged yet');
     return;
   }
   el.innerHTML = flights.slice(0, 20).map(f => `

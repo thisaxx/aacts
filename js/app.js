@@ -6,10 +6,21 @@ function showToast(msg, type = 'success') {
   setTimeout(() => el.classList.remove('show'), 3000);
 }
 
+function haptic() {
+  if ('vibrate' in navigator) navigator.vibrate(8);
+}
+
 function escHtml(str) {
   const d = document.createElement('div');
   d.textContent = str;
   return d.innerHTML;
+}
+
+function emptyState(icon, msg) {
+  return `<div style="text-align:center;padding:24px 12px;font-family:var(--mono)">
+    <div style="font-size:28px;margin-bottom:8px;opacity:0.4">${icon}</div>
+    <div style="font-size:12px;color:var(--text-muted);letter-spacing:0.3px">${msg}</div>
+  </div>`;
 }
 
 function showConfirmDialog(title, message) {
@@ -202,6 +213,13 @@ async function dashboardView() {
     if (mixStock) { mixQty = mixStock.quantityLiters; mixLow = mixQty < 50; }
   } catch(e) {}
 
+  // Month stats
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+  const monthFlights = flights.filter(f => f.flightDate >= monthStart);
+  const monthHours = monthFlights.reduce((s, f) => s + f.flownHours, 0);
+  const openDefects = defects.filter(d => d.status === 'open').length;
+
   // After-flight inspection pending
   const afterFlightPending = tasks.filter(t => t.type === 'after-flight' && t.status === 'open').length > 0;
   // Daily CRS check
@@ -266,7 +284,7 @@ async function dashboardView() {
         <div class="stat-card">
           <div class="stat-icon">&#9992;</div>
           <div class="stat-value">${flights.length}</div>
-          <div class="stat-label">Flights</div>
+          <div class="stat-label">Total Flights</div>
         </div>
         <div class="stat-card">
           <div class="stat-icon">&#9201;</div>
@@ -274,9 +292,24 @@ async function dashboardView() {
           <div class="stat-label">Total Hours</div>
         </div>
         <div class="stat-card">
+          <div class="stat-icon">&#128197;</div>
+          <div class="stat-value">${monthFlights.length}</div>
+          <div class="stat-label">Flights This Month</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">&#9200;</div>
+          <div class="stat-value">${monthHours.toFixed(1)}</div>
+          <div class="stat-label">Hours This Month</div>
+        </div>
+        <div class="stat-card">
           <div class="stat-icon">&#9881;</div>
-          <div class="stat-value ${openTasks > 0 ? 'text-orange' : 'text-green'}">${openTasks}</div>
+          <div class="stat-value ${openTasks > 0 ? 'text-red' : 'text-green'}">${openTasks}</div>
           <div class="stat-label">Open Tasks</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">&#9888;</div>
+          <div class="stat-value ${openDefects > 0 ? 'text-red' : 'text-green'}">${openDefects}</div>
+          <div class="stat-label">Open Defects</div>
         </div>
         <div class="stat-card">
           <div class="stat-icon">&#128230;</div>
@@ -382,7 +415,7 @@ async function dashboardView() {
           <h3>Recent Flights</h3>
         </div>
         <div id="dash-flights">
-          ${flights.length === 0 ? '<p class="text-muted small">No flights logged yet</p>' :
+          ${flights.length === 0 ? emptyState('&#9992;', 'No flights logged yet') :
             flights.slice(0, 5).map(f => `
               <div class="flight-row">
                 <div style="flex:1;min-width:0">
@@ -644,7 +677,7 @@ async function renderACListSheet() {
   const el = document.getElementById('ac-list-sheet');
   if (!el) return;
   if (all.length === 0) {
-    el.innerHTML = '<p class="text-muted small">No aircraft added yet</p>';
+    el.innerHTML = emptyState('&#128641;', 'No aircraft added yet');
     return;
   }
   el.innerHTML = all.map(ac => `
@@ -870,8 +903,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.querySelectorAll('.nav-link').forEach(a => {
     a.addEventListener('click', e => {
       e.preventDefault();
+      haptic();
       navigate(a.dataset.view);
     });
+  });
+
+  // Global haptic on actionable elements
+  document.addEventListener('click', e => {
+    const t = e.target.closest('.btn, .quick-action, .sidebar-link, .header-btn, .hamburger-btn, .stepper-btn');
+    if (t) haptic();
   });
 
   navigate('dashboard');

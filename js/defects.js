@@ -25,14 +25,10 @@ function defectsView() {
         <div class="card-header">
           <h3>Open Squawks</h3>
         </div>
-        <div id="open-defects"><p class="text-muted small">Loading...</p></div>
-      </div>
-
+      <div id="open-defects"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line" style="width:50%"></div></div>
       <div class="card">
-        <div class="card-header">
-          <h3>Resolved</h3>
-        </div>
-        <div id="resolved-defects"><p class="text-muted small">Loading...</p></div>
+        <div class="card-header"><h3>Resolved</h3></div>
+        <div id="resolved-defects"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>
       </div>
     </div>
   `;

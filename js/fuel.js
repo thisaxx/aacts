@@ -76,16 +76,10 @@ function fuelView() {
         <div class="card-header">
           <h3>Bulk Fuel Stock</h3>
         </div>
-        <div id="fuel-stock-list"><p class="text-muted small">Loading...</p></div>
-      </div>
-
-      <button class="btn btn-primary btn-block" id="topup-btn">Record Fuel Delivery</button>
-
+      <div id="fuel-stock-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line" style="width:60%"></div></div>
       <div class="card">
-        <div class="card-header">
-          <h3>Recent Refueling Log</h3>
-        </div>
-        <div id="fuel-log-list"><p class="text-muted small">Loading...</p></div>
+        <div class="card-header"><h3>Refueling Log</h3></div>
+        <div id="fuel-log-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>
       </div>
     </div>
   `;
@@ -269,7 +263,7 @@ async function renderFuelLogs() {
   const logs = await getFuelLogs();
   const el = document.getElementById('fuel-log-list');
   if (logs.length === 0) {
-    el.innerHTML = '<p class="text-muted small">No refueling records yet</p>';
+    el.innerHTML = emptyState('&#9981;', 'No refueling records yet');
     return;
   }
   el.innerHTML = logs.slice(0, 20).map(l => `
