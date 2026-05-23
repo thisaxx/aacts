@@ -235,7 +235,7 @@ async function renderDefects() {
 function defectCard(defect) {
   const role = localStorage.getItem('aac_user_role');
   const canResolve = role === 'engineer' || role === 'senior_technician' || role === 'production_planner' || role === 'admin';
-  const canDelete = role === 'engineer' || role === 'admin';
+  const canDelete = role === 'engineer' || role === 'production_planner' || role === 'admin';
   const urgencyLabel = defect.urgency === 'grounding'
     ? '<span class="badge badge-open" style="border-color:rgba(239,68,68,0.3)">GROUNDING</span>'
     : '<span class="badge badge-rectified">MONITOR</span>';

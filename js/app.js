@@ -356,7 +356,7 @@ async function dashboardView() {
 
   // Build alerts list
   const alerts = [];
-  if (!crsIssuedToday && (userRole === 'engineer' || userRole === 'admin')) alerts.push('No daily CRS issued');
+  if (!crsIssuedToday && (userRole === 'engineer' || userRole === 'production_planner' || userRole === 'admin')) alerts.push('No daily CRS issued');
   if (afterFlightPending) alerts.push('After-flight inspection pending');
   if (lowFuels > 0 || mixLow) alerts.push(`Fuel low: ${lowFuels} stock${mixLow ? ', Mix below 50L' : ''}`);
 
@@ -399,7 +399,7 @@ async function dashboardView() {
       ${alerts.length > 0 ? `
       <div class="dash-alerts">
         ${alerts.map(a => `<div class="dash-alert">&#9888; ${a}</div>`).join('')}
-        ${!crsIssuedToday && (userRole === 'engineer' || userRole === 'admin') ? `
+        ${!crsIssuedToday && (userRole === 'engineer' || userRole === 'production_planner' || userRole === 'admin') ? `
         <button class="btn btn-primary btn-block" id="issue-daily-crs-btn" style="margin-top:8px">Issue Daily CRS</button>` : ''}
       </div>` : ''}
 
@@ -649,7 +649,7 @@ async function dashboardView() {
   const crsBtn = document.getElementById('issue-daily-crs-btn');
   if (crsBtn) {
     crsBtn.addEventListener('click', async () => {
-      const confirmed = await showConfirmDialog('Issue Daily CRS', 'Confirm you are an authorized engineer and wish to issue the Certificate of Release to Service for today?');
+      const confirmed = await showConfirmDialog('Issue Daily CRS', 'Confirm you are authorized to issue the Certificate of Release to Service for today?');
       if (!confirmed) return;
       const ac = await getAircraft();
       ac.dailyCrsDate = new Date().toISOString().slice(0, 10);
@@ -783,7 +783,7 @@ function profileView() {
   const roles = [
     { value: 'technician', label: 'Technician', desc: 'Can record sorties, report squawks, view data' },
     { value: 'senior_technician', label: 'Senior Technician', desc: 'Above + can approve sign-ins' },
-    { value: 'production_planner', label: 'Production Planner', desc: 'Above + can end flying day, schedule maintenance' },
+    { value: 'production_planner', label: 'Production Planner', desc: 'Above + can end flying, issue CRS, manage fleet' },
     { value: 'engineer', label: 'Engineer', desc: 'Above + can approve CRS (Release to Service)' },
     { value: 'admin', label: 'Admin', desc: 'Full access to all features' }
   ];
@@ -895,31 +895,34 @@ function profileView() {
 
 function showAircraftSheet() {
   const role = localStorage.getItem('aac_user_role');
-  const canEdit = role === 'engineer' || role === 'admin';
+  const canEdit = role === 'engineer' || role === 'production_planner' || role === 'admin';
   showBottomSheet(`
     <div class="card-header"><h3>Fleet Manager</h3></div>
     <div id="ac-list-sheet"></div>
     ${canEdit ? `
     <hr>
-    <div class="form-group">
-      <label for="new-ac-tail">Tail Number</label>
-      <input type="text" id="new-ac-tail" placeholder="e.g. C-152-002">
-    </div>
-    <div class="form-group">
-      <label for="new-ac-type">Aircraft Type</label>
-      <input type="text" id="new-ac-type" placeholder="e.g. Cessna 152">
-    </div>
-    <div class="row">
+    <button class="btn btn-primary btn-block" id="toggle-add-ac-btn">+ Add New Aircraft</button>
+    <div id="add-ac-form" style="display:none;margin-top:12px">
       <div class="form-group">
-        <label>Engine TBO (hrs)</label>
-        ${stepperHTML('new-ac-etbo', 2000, 100, 99999, 100)}
+        <label for="new-ac-tail">Tail Number</label>
+        <input type="text" id="new-ac-tail" placeholder="e.g. C-152-002">
       </div>
       <div class="form-group">
-        <label>Prop TBO (hrs)</label>
-        ${stepperHTML('new-ac-ptbo', 2000, 100, 99999, 100)}
+        <label for="new-ac-type">Aircraft Type</label>
+        <input type="text" id="new-ac-type" placeholder="e.g. Cessna 152">
       </div>
+      <div class="row">
+        <div class="form-group">
+          <label>Engine TBO (hrs)</label>
+          ${stepperHTML('new-ac-etbo', 2000, 100, 99999, 100)}
+        </div>
+        <div class="form-group">
+          <label>Prop TBO (hrs)</label>
+          ${stepperHTML('new-ac-ptbo', 2000, 100, 99999, 100)}
+        </div>
+      </div>
+      <button class="btn btn-primary btn-block" id="add-ac-btn">Create Aircraft</button>
     </div>
-    <button class="btn btn-primary btn-block" id="add-ac-btn">+ Add Aircraft</button>
     <button class="btn btn-secondary btn-block" id="close-ac-btn" style="margin-top:8px">Close</button>
     ` : `<button class="btn btn-secondary btn-block" id="close-ac-btn" style="margin-top:8px">Close</button>`}
   `);
@@ -928,6 +931,11 @@ function showAircraftSheet() {
     initSteppers();
   }
   renderACListSheet();
+
+  document.getElementById('toggle-add-ac-btn')?.addEventListener('click', () => {
+    const form = document.getElementById('add-ac-form');
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+  });
 
   document.getElementById('add-ac-btn')?.addEventListener('click', async () => {
     const tail = document.getElementById('new-ac-tail').value.trim().toUpperCase();
@@ -969,7 +977,7 @@ async function renderACListSheet() {
   const all = await getAllAircraft();
   const current = getCurrentAircraftKey();
   const role = localStorage.getItem('aac_user_role');
-  const canEdit = role === 'engineer' || role === 'admin';
+  const canEdit = role === 'engineer' || role === 'production_planner' || role === 'admin';
   const el = document.getElementById('ac-list-sheet');
   if (!el) return;
   if (all.length === 0) {

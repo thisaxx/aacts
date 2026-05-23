@@ -235,7 +235,7 @@ async function renderAttendance(viewDate) {
       });
     }
   } else {
-    pendingEl.innerHTML = '<p class="text-muted small">Only engineers/senior technicians can approve sign-ins</p>';
+    pendingEl.innerHTML = '<p class="text-muted small">Only engineers/senior technicians/production planners can approve sign-ins</p>';
   }
 
   // Today's records

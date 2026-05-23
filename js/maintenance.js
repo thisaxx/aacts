@@ -270,10 +270,10 @@ async function onRelease(taskId) {
 
   const userRole = localStorage.getItem('aac_user_role');
   const isAfterFlight = task.type === 'after-flight';
-  const allowedRoles = isAfterFlight ? ['engineer', 'senior_technician', 'production_planner', 'admin'] : ['engineer', 'admin'];
+  const allowedRoles = isAfterFlight ? ['engineer', 'senior_technician', 'production_planner', 'admin'] : ['engineer', 'production_planner', 'admin'];
 
   if (!allowedRoles.includes(userRole)) {
-    showToast(`Only ${isAfterFlight ? 'Senior Technician or Engineer' : 'engineers'} can release to service (CRS)`, 'error');
+    showToast(`Only ${isAfterFlight ? 'Senior Technician or Engineer' : 'Engineer or Production Planner'} can release to service (CRS)`, 'error');
     return;
   }
 
