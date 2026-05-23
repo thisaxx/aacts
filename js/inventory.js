@@ -29,17 +29,39 @@ function inventoryView() {
   app.innerHTML = `
     <div class="page">
       <div class="page-header">
-        <h2>Stock &amp; Inventory</h2>
-        <div class="subtitle">Parts &amp; Bulk Fuel</div>
+        <h2>Parts &amp; Stock</h2>
+        <div class="subtitle">Parts inventory management</div>
       </div>
 
       <div class="card">
         <div class="card-header">
-          <h3>Fuel Stock</h3>
+          <h3>Parts Inventory</h3>
+          <button class="btn btn-sm btn-primary" id="add-part-btn">+ Add Part</button>
         </div>
-      <div id="fuel-stock-inv"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>
-      <div class="card">
-        <div class="card-header"><h3>Parts Inventory</h3></div>
+        <div id="add-part-form" class="hidden" style="margin-bottom:14px">
+          <div class="form-group">
+            <label>Part Number</label>
+            <input type="text" id="part-number" placeholder="e.g. OIL-FILTER-C152">
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <input type="text" id="part-desc" placeholder="e.g. Oil Filter">
+          </div>
+          <div class="row">
+            <div class="form-group">
+              <label>Quantity</label>
+              <input type="number" id="part-qty" value="1" min="0">
+            </div>
+            <div class="form-group">
+              <label>Min Safe Stock</label>
+              <input type="number" id="part-min" value="1" min="0">
+            </div>
+          </div>
+          <div class="row" style="gap:6px">
+            <button class="btn btn-sm btn-primary" id="save-part-btn">Save Part</button>
+            <button class="btn btn-sm btn-secondary" id="cancel-part-btn">Cancel</button>
+          </div>
+        </div>
         <div id="inventory-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line" style="width:40%"></div></div>
       </div>
       <div class="card">
@@ -82,7 +104,7 @@ function inventoryView() {
   document.getElementById('adj-add').addEventListener('click', () => adjustPart(1));
   document.getElementById('adj-remove').addEventListener('click', () => adjustPart(-1));
 
-  seedParts().then(() => seedFuelStock()).then(() => {
+  seedParts().then(() => {
     renderInventory();
     populateAdjustSelect();
   }).catch(e => {

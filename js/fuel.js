@@ -75,8 +75,10 @@ function fuelView() {
       <div class="card">
         <div class="card-header">
           <h3>Bulk Fuel Stock</h3>
+          <button class="btn btn-sm btn-primary" id="topup-btn">+ Record Delivery</button>
         </div>
-      <div id="fuel-stock-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line" style="width:60%"></div></div>
+        <div id="fuel-stock-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line" style="width:60%"></div></div>
+      </div>
       <div class="card">
         <div class="card-header"><h3>Refueling Log</h3></div>
         <div id="fuel-log-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>

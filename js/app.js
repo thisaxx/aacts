@@ -335,7 +335,7 @@ async function dashboardView() {
           <div class="qa-icon">&#128230;</div>
           <div class="qa-label">Stock</div>
         </a>
-        <a href="#" class="quick-action" onclick="navigate('inventory')">
+        <a href="#" class="quick-action" onclick="navigate('fuel')">
           <div class="qa-icon">&#9981;</div>
           <div class="qa-label">Fuel</div>
         </a>
@@ -470,6 +470,7 @@ function navigate(view) {
     case 'defects': defectsView(); break;
     case 'maintenance': maintenanceView(); break;
     case 'inventory': inventoryView(); break;
+    case 'fuel': fuelView(); break;
     case 'calendar': calendarView(); break;
     case 'attendance': attendanceView(); break;
     case 'profile': profileView(); break;
@@ -500,9 +501,17 @@ function closeSidebar() {
 function updateSidebarUser() {
   const name = localStorage.getItem('aac_user');
   const role = localStorage.getItem('aac_user_role');
+  const photo = localStorage.getItem('aac_user_photo');
   document.getElementById('sidebar-name').textContent = name || 'No User';
   document.getElementById('sidebar-role').textContent = role ? role.replace(/_/g, ' ') : '—';
-  document.getElementById('sidebar-avatar').textContent = name ? name[0].toUpperCase() : '?';
+  const avatar = document.getElementById('sidebar-avatar');
+  if (photo) {
+    avatar.innerHTML = `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    avatar.style.background = 'none';
+  } else {
+    avatar.textContent = name ? name[0].toUpperCase() : '?';
+    avatar.style.background = '';
+  }
 }
 
 async function updateSidebarInspections() {
@@ -524,6 +533,7 @@ function profileView() {
   const app = document.getElementById('app');
   const name = localStorage.getItem('aac_user') || '';
   const role = localStorage.getItem('aac_user_role') || '';
+  const photo = localStorage.getItem('aac_user_photo') || '';
   const roles = [
     { value: 'technician', label: 'Technician', desc: 'Can log flights, report defects, view data' },
     { value: 'senior_technician', label: 'Senior Technician', desc: 'Above + can approve attendance' },
@@ -534,6 +544,13 @@ function profileView() {
     <div class="page">
       <div class="page-header"><h2>My Profile</h2></div>
       <div class="card">
+        <div style="text-align:center;margin-bottom:16px">
+          <div id="profile-photo-preview" style="width:80px;height:80px;border-radius:50%;margin:0 auto 10px;overflow:hidden;border:1px solid var(--border);background:var(--glass);display:flex;align-items:center;justify-content:center;font-size:32px">
+            ${photo ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover">` : '?'}
+          </div>
+          <button class="btn btn-sm btn-secondary" id="profile-photo-btn">Change Photo</button>
+          ${photo ? `<button class="btn btn-sm btn-ghost" id="profile-photo-remove" style="margin-left:6px">Remove</button>` : ''}
+        </div>
         <div class="form-group">
           <label>Your Name</label>
           <input type="text" id="profile-name" value="${escHtml(name)}" placeholder="e.g. John Smith">
@@ -553,6 +570,39 @@ function profileView() {
       </div>
     </div>
   `;
+
+  // Photo upload
+  document.getElementById('profile-photo-btn').addEventListener('click', () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = () => {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const dataUrl = e.target.result;
+        // Preview
+        const preview = document.getElementById('profile-photo-preview');
+        preview.innerHTML = `<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover">`;
+        // Store temporarily
+        preview.dataset.photo = dataUrl;
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  });
+  const removeBtn = document.getElementById('profile-photo-remove');
+  if (removeBtn) {
+    removeBtn.addEventListener('click', () => {
+      const preview = document.getElementById('profile-photo-preview');
+      preview.innerHTML = '?';
+      delete preview.dataset.photo;
+      localStorage.removeItem('aac_user_photo');
+      updateSidebarUser();
+    });
+  }
+
   document.querySelectorAll('.profile-role-option').forEach(el => {
     el.addEventListener('click', () => {
       document.querySelectorAll('.profile-role-option').forEach(o => o.classList.remove('selected'));
@@ -573,6 +623,12 @@ function profileView() {
       if (entered.trim() !== pin) { showToast('Incorrect pincode', 'error'); return; }
     }
 
+    const preview = document.getElementById('profile-photo-preview');
+    const newPhoto = preview.dataset.photo || localStorage.getItem('aac_user_photo') || '';
+    if (preview.dataset.photo) {
+      localStorage.setItem('aac_user_photo', preview.dataset.photo);
+    }
+
     localStorage.setItem('aac_user', n);
     localStorage.setItem('aac_user_role', r);
     const uid = localStorage.getItem('aac_user_id');
@@ -581,13 +637,14 @@ function profileView() {
       if (existing) {
         existing.name = n;
         existing.role = r;
+        existing.photo = newPhoto;
         await DB.put('users', existing);
         await queueSync('users', 'update', existing);
       }
     } else {
       const id = 'user_' + Date.now();
       localStorage.setItem('aac_user_id', id);
-      const u = { id, name: n, role: r, createdAt: new Date().toISOString() };
+      const u = { id, name: n, role: r, photo: newPhoto, createdAt: new Date().toISOString() };
       await DB.put('users', u);
       await queueSync('users', 'create', u);
     }
