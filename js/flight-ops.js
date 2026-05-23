@@ -206,23 +206,18 @@ function flightOpsView() {
 
       <div class="card">
         <div class="card-header">
-          <h3>Engine &amp; Propeller</h3>
-        </div>
-        <div id="etso-ptso-bars"></div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
           <h3>Recent Sorties</h3>
         </div>
         <div id="recent-flights"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line" style="width:40%"></div></div>
       </div>
+      <button class="btn btn-secondary btn-block" id="flight-ops-eof-btn" style="margin-bottom:14px">&#128200; End of Flying — Enter Tach &amp; Start Inspection</button>
     </div>
   `;
 
   document.getElementById('depart-form').addEventListener('submit', onDepartureSubmit);
   document.getElementById('arrival-form').addEventListener('submit', onArrivalSubmit);
   document.getElementById('update-meters-btn').addEventListener('click', onUpdateMeters);
+  document.getElementById('flight-ops-eof-btn').addEventListener('click', showEndOfFlyingSheet);
   initSteppers();
   initToggles();
   document.querySelector('[data-toggle-id="refueled-check"]')?.addEventListener('change', function(e) {
@@ -237,7 +232,6 @@ function flightOpsView() {
 
   renderAircraftStatus();
   renderIntervalBars();
-  renderETSO_PTSO();
   renderRecentFlights();
   renderDepartedList();
   });
@@ -498,7 +492,6 @@ async function onArrivalSubmit(e) {
 
   renderAircraftStatus();
   renderIntervalBars();
-  renderETSO_PTSO();
   renderRecentFlights();
   renderDepartedList();
 }
@@ -524,7 +517,6 @@ async function onUpdateMeters() {
   renderAircraftStatus();
   renderIntervalBars();
   notifyDataChange();
-  renderETSO_PTSO();
 }
 
 async function showOilChangePrompt(currentTach) {
@@ -569,6 +561,62 @@ async function show100hrPrompt(currentTach) {
     showToast('100-hour inspection recorded');
     renderIntervalBars();
   }
+}
+
+async function showEndOfFlyingSheet() {
+  const ac = await getAircraft();
+  const currentTach = ac.totalTachTime || 0;
+  showBottomSheet(`
+    <div class="card-header"><h3>&#128200; End of Flying — ${escHtml(ac.tailNumber)}</h3></div>
+    <p class="text-muted small" style="margin-bottom:12px">Enter current tach reading. Hours flown since last update will be deducted from inspection intervals.</p>
+    <div class="form-group">
+      <label>Current Tach Time (hours)</label>
+      ${stepperHTML('eof-tach', currentTach, 0, 99999, 0.1, true)}
+    </div>
+    <button class="btn btn-primary btn-block" id="eof-confirm-btn">Confirm End of Flying</button>
+    <button class="btn btn-secondary btn-block" id="eof-cancel-btn" style="margin-top:8px">Cancel</button>
+  `);
+  initSteppers();
+  document.getElementById('eof-confirm-btn').addEventListener('click', async () => {
+    const newTach = parseFloat(document.getElementById('eof-tach').value) || currentTach;
+    const ac2 = await getAircraft();
+    const duration = newTach - (ac2.totalTachTime || 0);
+    if (duration > 0) {
+      ac2.engineETSO = (ac2.engineETSO || 0) + duration;
+      ac2.propellerPTSO = (ac2.propellerPTSO || 0) + duration;
+      ac2.totalTachTime = newTach;
+    }
+    const hoursSinceOil = newTach - ac2.lastOilChangeTach;
+    const hoursSince100hr = newTach - ac2.last100hrTach;
+    const today = new Date().toISOString().slice(0, 10);
+    const inspTask = {
+      id: 'insp_' + Date.now(),
+      type: 'after-flight',
+      aircraftId: ac2.tailNumber,
+      description: `After-flight inspection for end of flying day — ${today}${duration > 0 ? ` (${duration.toFixed(1)} tach hrs)` : ''}`,
+      priority: 'medium',
+      status: 'open',
+      notes: '',
+      rectifiedBy: '',
+      rectifiedAt: '',
+      rectifiedRole: '',
+      createdAt: new Date().toISOString()
+    };
+    await DB.put('maintenance_tasks', inspTask);
+    await queueSync('maintenance_tasks', 'create', inspTask);
+    ac2.groundedAfterInspection = true;
+    ac2.groundedAfterInspAt = new Date().toISOString();
+    await DB.put('aircraft', ac2);
+    await queueSync('aircraft', 'update', ac2);
+    window.__sheetClose(true);
+    showToast('Aircraft grounded — after-flight inspection required');
+    createNotification('inspection', 'After-Flight Inspection Created', `End-of-day inspection due for ${ac2.tailNumber} — aircraft grounded`, 'maintenance');
+    logActivity('after_flight_created', `End-of-day after-flight inspection created for ${ac2.tailNumber} — grounded (tach: ${newTach.toFixed(1)})`, inspTask.id);
+    notifyDataChange();
+  });
+  document.getElementById('eof-cancel-btn').addEventListener('click', () => {
+    window.__sheetClose(null);
+  });
 }
 
 async function renderAircraftStatus() {
@@ -636,58 +684,13 @@ async function renderIntervalBars() {
   `;
 }
 
-async function renderETSO_PTSO() {
-  const ac = await getAircraft();
-  const etso = ac.engineETSO || 0;
-  const ptso = ac.propellerPTSO || 0;
-  const eTBO = ac.engineTBO || 2000;
-  const pTBO = ac.propellerTBO || 2000;
-  const ePct = Math.min(100, (etso / eTBO) * 100);
-  const pPct = Math.min(100, (ptso / pTBO) * 100);
-
-  const el = document.getElementById('etso-ptso-bars');
-  if (!el) return;
-  el.innerHTML = `
-    <div class="interval-item">
-      <div class="interval-label">
-        <span class="label">Engine TSO</span>
-        <span class="interval-value ${etso >= eTBO ? 'text-red' : etso >= eTBO - 50 ? 'text-orange' : 'text-green'}">
-          ${etso.toFixed(1)}h / ${eTBO}h
-        </span>
-      </div>
-      <div class="progress-bar">
-        <div class="progress-fill ${etso >= eTBO ? 'fill-red' : etso >= eTBO - 50 ? 'fill-orange' : 'fill-green'}"
-             style="width:${ePct}%"></div>
-      </div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
-        ${etso >= eTBO ? '<span class="text-red">Overhaul Due</span>' : `${(eTBO - etso).toFixed(1)}h until TBO`}
-      </div>
-    </div>
-    <div class="interval-item">
-      <div class="interval-label">
-        <span class="label">Propeller TSO</span>
-        <span class="interval-value ${ptso >= pTBO ? 'text-red' : ptso >= pTBO - 50 ? 'text-orange' : 'text-green'}">
-          ${ptso.toFixed(1)}h / ${pTBO}h
-        </span>
-      </div>
-      <div class="progress-bar">
-        <div class="progress-fill ${ptso >= pTBO ? 'fill-red' : ptso >= pTBO - 50 ? 'fill-orange' : 'fill-green'}"
-             style="width:${pPct}%"></div>
-      </div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
-        ${ptso >= pTBO ? '<span class="text-red">Overhaul Due</span>' : `${(pTBO - ptso).toFixed(1)}h until TBO`}
-      </div>
-    </div>
-  `;
-}
-
 async function deleteFlight(flightId) {
   const flight = await DB.get('flights', flightId);
   if (!flight) return;
   const h = flight.flownHours || 0;
   const isDeparted = flight.status === 'departed';
   const confirmed = await showConfirmDialog(isDeparted ? 'Delete Departure' : 'Delete Sortie',
-    isDeparted ? 'Delete this departure record?' : `Delete this ${(h * 60).toFixed(0)} min sortie and reverse ETSO/PTSO?`);
+    isDeparted ? 'Delete this departure record?' : `Delete this ${(h * 60).toFixed(0)} min sortie?`);
   if (!confirmed) return;
   if (!isDeparted && h > 0) {
     const ac = await getAircraft();
@@ -698,12 +701,11 @@ async function deleteFlight(flightId) {
   }
   await DB.del('flights', flightId);
   await queueSync('flights', 'delete', { id: flightId });
-  showToast(isDeparted ? 'Departure deleted' : 'Sortie deleted & ETSO/PTSO reversed');
+  showToast(isDeparted ? 'Departure deleted' : 'Sortie deleted');
   renderRecentFlights();
   renderDepartedList();
   renderAircraftStatus();
   renderIntervalBars();
-  renderETSO_PTSO();
 }
 
 async function renderRecentFlights() {

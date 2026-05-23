@@ -403,8 +403,7 @@ async function dashboardView() {
         <button class="btn btn-primary btn-block" id="issue-daily-crs-btn" style="margin-top:8px">Issue Daily CRS</button>` : ''}
       </div>` : ''}
 
-      ${userRole === 'engineer' || userRole === 'production_planner' || userRole === 'admin' ? `
-      <button class="btn btn-secondary btn-block" id="end-of-flying-btn" style="margin-bottom:14px">&#128200; End of Flying — Enter Tach &amp; Start Inspection</button>` : ''}
+
 
       <div class="quick-actions
         <a href="#" class="quick-action" onclick="navigate('flight-ops')">
@@ -514,76 +513,6 @@ async function dashboardView() {
   `;
 
   document.getElementById('dashboard-hero').addEventListener('click', () => showAircraftSheet());
-
-  document.getElementById('end-of-flying-btn')?.addEventListener('click', async () => {
-    const userRole2 = localStorage.getItem('aac_user_role');
-    if (userRole2 !== 'engineer' && userRole2 !== 'production_planner' && userRole2 !== 'admin') {
-      showToast('Only Engineer or Production Planner can end flying', 'error');
-      return;
-    }
-    const ac = await getAircraft();
-    const currentTach = ac.totalTachTime || 0;
-    showBottomSheet(`
-      <div class="card-header"><h3>&#128200; End of Flying — ${escHtml(ac.tailNumber)}</h3></div>
-      <p class="text-muted small" style="margin-bottom:12px">Enter current tach reading. Hours flown since last update will be deducted from inspection intervals.</p>
-      <div class="form-group">
-        <label>Current Tach Time (hours)</label>
-        ${stepperHTML('eof-tach', currentTach, 0, 99999, 0.1, true)}
-      </div>
-      <button class="btn btn-primary btn-block" id="eof-confirm-btn">Confirm End of Flying</button>
-      <button class="btn btn-secondary btn-block" id="eof-cancel-btn" style="margin-top:8px">Cancel</button>
-    `);
-    initSteppers();
-    document.getElementById('eof-confirm-btn').addEventListener('click', async () => {
-      const newTach = parseFloat(document.getElementById('eof-tach').value) || currentTach;
-      const ac2 = await getAircraft();
-      const duration = newTach - (ac2.totalTachTime || 0);
-
-      // Update tach and related counters
-      if (duration > 0) {
-        ac2.engineETSO = (ac2.engineETSO || 0) + duration;
-        ac2.propellerPTSO = (ac2.propellerPTSO || 0) + duration;
-        ac2.totalTachTime = newTach;
-      }
-
-      // Check 50/100 hr intervals
-      const hoursSinceOil = newTach - ac2.lastOilChangeTach;
-      const hoursSince100hr = newTach - ac2.last100hrTach;
-
-      // Create after-flight inspection
-      const today = new Date().toISOString().slice(0, 10);
-      const inspTask = {
-        id: 'insp_' + Date.now(),
-        type: 'after-flight',
-        aircraftId: ac2.tailNumber,
-        description: `After-flight inspection for end of flying day — ${today}${duration > 0 ? ` (${duration.toFixed(1)} tach hrs)` : ''}`,
-        priority: 'medium',
-        status: 'open',
-        notes: '',
-        rectifiedBy: '',
-        rectifiedAt: '',
-        rectifiedRole: '',
-        createdAt: new Date().toISOString()
-      };
-      await DB.put('maintenance_tasks', inspTask);
-      await queueSync('maintenance_tasks', 'create', inspTask);
-
-      // Ground the aircraft immediately
-      ac2.groundedAfterInspection = true;
-      ac2.groundedAfterInspAt = new Date().toISOString();
-      await DB.put('aircraft', ac2);
-      await queueSync('aircraft', 'update', ac2);
-
-      window.__sheetClose(true);
-      showToast('Aircraft grounded — after-flight inspection required');
-      createNotification('inspection', 'After-Flight Inspection Created', `End-of-day inspection due for ${ac2.tailNumber} — aircraft grounded`, 'maintenance');
-      logActivity('after_flight_created', `End-of-day after-flight inspection created for ${ac2.tailNumber} — grounded (tach: ${newTach.toFixed(1)})`, inspTask.id);
-      notifyDataChange();
-    });
-    document.getElementById('eof-cancel-btn').addEventListener('click', () => {
-      window.__sheetClose(null);
-    });
-  });
 
   const crsBtn = document.getElementById('issue-daily-crs-btn');
   if (crsBtn) {
