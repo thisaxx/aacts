@@ -322,8 +322,18 @@ async function onFlightSubmit(e) {
 
   ac.engineETSO = (ac.engineETSO || 0) + duration;
   ac.propellerPTSO = (ac.propellerPTSO || 0) + duration;
+  ac.totalTachTime = (ac.totalTachTime || 0) + duration;
   await DB.put('aircraft', ac);
   await queueSync('aircraft', 'update', ac);
+
+  const hoursSinceOil = ac.totalTachTime - ac.lastOilChangeTach;
+  const hoursSince100hr = ac.totalTachTime - ac.last100hrTach;
+  if (hoursSinceOil >= 50) {
+    await showOilChangePrompt(ac.totalTachTime);
+  }
+  if (hoursSince100hr >= 100) {
+    await show100hrPrompt(ac.totalTachTime);
+  }
 
   if (refueled && refuelAmt > 0 && fuelType) {
     const refuelLiters = refuelAmt * GAL_TO_L;
