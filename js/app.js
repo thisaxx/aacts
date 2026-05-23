@@ -768,7 +768,7 @@ async function renderACListSheet() {
       const confirmed = await showConfirmDialog('Delete Aircraft', `Delete ${tail}? This cannot be undone.`);
       if (!confirmed) return;
       await DB.del('aircraft', tail);
-      await queueSync('aircraft', 'delete', { id: tail });
+      await queueSync('aircraft', 'delete', { tailNumber: tail });
       if (getCurrentAircraftKey() === tail) {
         const remaining = await getAllAircraft();
         if (remaining.length > 0) await switchAircraft(remaining[0].tailNumber);
@@ -864,7 +864,7 @@ function showEditAircraftForm(ac) {
         const existing = await DB.get('aircraft', tail);
         if (existing) { showToast('Tail number already exists', 'error'); return; }
         await DB.del('aircraft', ac.tailNumber);
-        await queueSync('aircraft', 'delete', { id: ac.tailNumber });
+        await queueSync('aircraft', 'delete', { tailNumber: ac.tailNumber });
         // Update all flights/defects/tasks referencing old tail
         for (const store of ['flights', 'defects', 'maintenance_tasks', 'fuel_logs']) {
           const items = await DB.getAll(store);
@@ -1009,7 +1009,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const current = localStorage.getItem('aac_pin') || '1234';
     const old = await showPromptDialog('Change PIN', 'Enter current PIN:');
     if (old === null) return;
-    if (old.trim() !== pin) { showToast('Incorrect PIN', 'error'); return; }
+    if (old.trim() !== current) { showToast('Incorrect PIN', 'error'); return; }
     const newPin = await showPromptDialog('Change PIN', 'Enter new PIN:');
     if (newPin === null) return;
     if (!newPin.trim()) { showToast('PIN cannot be empty', 'error'); return; }

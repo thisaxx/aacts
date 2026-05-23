@@ -1,8 +1,6 @@
 async function createNotification(type, title, message, link) {
-  const user = localStorage.getItem('aac_user') || 'unknown';
   const notif = {
     id: 'notif_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
-    userId: user,
     type,
     title,
     message,
@@ -17,16 +15,13 @@ async function createNotification(type, title, message, link) {
 }
 
 async function getNotifications() {
-  const user = localStorage.getItem('aac_user') || 'unknown';
   return (await DB.getAll('notifications'))
-    .filter(n => n.userId === user)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 async function getUnreadCount() {
-  const user = localStorage.getItem('aac_user') || 'unknown';
   const all = await DB.getAll('notifications');
-  return all.filter(n => n.userId === user && !n.read).length;
+  return all.filter(n => !n.read).length;
 }
 
 async function markNotifRead(notifId) {
@@ -39,10 +34,9 @@ async function markNotifRead(notifId) {
 }
 
 async function markAllNotifsRead() {
-  const user = localStorage.getItem('aac_user') || 'unknown';
   const all = await DB.getAll('notifications');
   for (const n of all) {
-    if (n.userId === user && !n.read) {
+    if (!n.read) {
       n.read = true;
       await DB.put('notifications', n);
       await queueSync('notifications', 'update', n);

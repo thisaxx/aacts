@@ -317,7 +317,7 @@ function updateArrivalCalc() {
     const takeoffParts = (flight.takeoffTime || '').split(':').map(Number);
     const t = takeoffParts[0]*60 + takeoffParts[1];
     const durationEl = document.getElementById('calc-duration');
-    if (!t || !l || l <= t) { durationEl.textContent = '—'; return; }
+    if (!t || isNaN(t) || !l || l <= t) { durationEl.textContent = '—'; return; }
     durationEl.textContent = (l - t) + ' min';
 
     const beforeLeft = flight.fuelBeforeLeft || 0;
@@ -396,7 +396,11 @@ async function onArrivalSubmit(e) {
   const takeoffParts = (flight.takeoffTime || '').split(':').map(Number);
   const landingParts = landingTime.split(':').map(Number);
   const durationMin = (landingParts[0]*60 + landingParts[1]) - (takeoffParts[0]*60 + takeoffParts[1]);
-  const duration = durationMin > 0 ? durationMin / 60 : 0;
+  if (durationMin <= 0) {
+    showToast('Arrival time must be after departure time', 'error');
+    return;
+  }
+  const duration = durationMin / 60;
 
   const fuelAfterLeft = fuelVal('fuel-after-left');
   const fuelAfterRight = fuelVal('fuel-after-right');
@@ -479,6 +483,7 @@ async function onArrivalSubmit(e) {
     };
     await DB.put('maintenance_tasks', inspTask);
     await queueSync('maintenance_tasks', 'create', inspTask);
+    createNotification('inspection', 'After-Flight Inspection Created', `After-flight inspection due for ${ac.tailNumber} after ${flight.flightDate} sortie`, 'maintenance');
   }
 
   const user = localStorage.getItem('aac_user') || 'Unknown';
