@@ -1233,7 +1233,7 @@ function showLoginGate() {
     <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:var(--bg)">
       <div style="max-width:400px;width:100%">
         <div style="text-align:center;margin-bottom:24px">
-          <img src="img/aircraft.jpg" alt="Aircraft" style="width:100%;max-width:280px;border-radius:12px;margin-bottom:12px;box-shadow:0 4px 20px rgba(0,0,0,0.3)">
+          <img src="img/cessna152-badge.svg" alt="Cessna 152" style="width:80px;height:80px;margin-bottom:8px">
           <h1 style="font-size:22px;margin:0">AAC Technical Services</h1>
           <p class="text-muted" style="margin-top:4px">Select your name to sign in</p>
         </div>
@@ -1251,6 +1251,7 @@ function showLoginGate() {
           </div>
           <div id="login-error" class="text-red small" style="display:none;margin-bottom:8px"></div>
           <button class="btn btn-primary btn-block" id="login-btn">Sign In</button>
+          <div class="text-muted" style="font-size:9px;margin-top:12px;text-align:center">Cessna 152 icon by FlyingPete (CC BY-SA 4.0)</div>
         </div>
       </div>
     </div>
