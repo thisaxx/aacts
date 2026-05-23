@@ -768,6 +768,7 @@ function profileView() {
           <div id="profile-role-desc" class="text-muted small" style="margin-top:6px">${roles.find(r => r.value === role)?.desc || roles[0].desc}</div>
         </div>
         <button class="btn btn-primary btn-block" id="profile-save-btn">Save Profile</button>
+        <button class="btn btn-secondary btn-block" id="profile-logout-btn" style="margin-top:8px;border-color:var(--danger);color:var(--danger)">Sign Out</button>
       </div>
     </div>
   `;
@@ -848,6 +849,16 @@ function profileView() {
     updateSidebarUser();
     showToast('Profile saved');
     navigate('dashboard');
+  });
+  document.getElementById('profile-logout-btn').addEventListener('click', () => {
+    localStorage.removeItem('aac_user');
+    localStorage.removeItem('aac_user_role');
+    localStorage.removeItem('aac_user_photo');
+    localStorage.removeItem('aac_user_id');
+    document.getElementById('sidebar').style.display = 'none';
+    document.getElementById('sidebar-overlay').style.display = 'none';
+    document.getElementById('hamburger-btn').style.display = 'none';
+    showLoginGate();
   });
 }
 
@@ -1213,51 +1224,66 @@ function showLoginGate() {
   if (sidebar) sidebar.style.display = 'none';
   if (overlay) overlay.style.display = 'none';
   document.getElementById('hamburger-btn').style.display = 'none';
-  const roles = [
-    { value: 'technician', label: 'Technician', desc: 'Can record sorties, report squawks, view data' },
-    { value: 'senior_technician', label: 'Senior Technician', desc: 'Above + can approve sign-ins' },
-    { value: 'production_planner', label: 'Production Planner', desc: 'Above + can end flying, issue CRS, manage fleet' },
-    { value: 'engineer', label: 'Engineer', desc: 'Above + can approve CRS (Release to Service)' },
-    { value: 'admin', label: 'Admin', desc: 'Full access to all features' }
-  ];
+
+  let users = [];
+  try { users = JSON.parse(localStorage.getItem('aac_users')) || []; } catch(e) {}
+  const privilegedRoles = ['admin', 'engineer', 'production_planner', 'senior_technician'];
+
   app.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:var(--bg)">
       <div style="max-width:400px;width:100%">
         <div style="text-align:center;margin-bottom:24px">
           <div style="font-size:48px;margin-bottom:8px">&#9992;</div>
           <h1 style="font-size:22px;margin:0">AAC Flight School</h1>
-          <p class="text-muted" style="margin-top:4px">Sign in to get started</p>
+          <p class="text-muted" style="margin-top:4px">Select your name to sign in</p>
         </div>
         <div class="card" style="padding:20px">
           <div class="form-group">
-            <label>Your Name</label>
-            <input type="text" id="login-name" class="form-input" placeholder="e.g. John Smith" autocomplete="name">
-          </div>
-          <div class="form-group">
-            <label>Your Role</label>
-            <select id="login-role" class="form-input">
-              <option value="">— Select role —</option>
-              ${roles.map(r => `<option value="${r.value}">${r.label}</option>`).join('')}
+            <label>Select User</label>
+            <select id="login-user" class="form-input">
+              <option value="">— Select user —</option>
+              ${users.map(u => `<option value="${escHtml(u.name)}" data-role="${u.role}">${escHtml(u.name)} (${u.role.replace(/_/g, ' ')})</option>`).join('')}
             </select>
-            <div id="login-role-desc" class="text-muted small" style="margin-top:6px"></div>
           </div>
+          <div class="form-group" id="login-pin-group" style="display:none">
+            <label>PIN</label>
+            <input type="password" id="login-pin" class="form-input" placeholder="Enter PIN" inputmode="numeric" maxlength="10">
+          </div>
+          <div id="login-error" class="text-red small" style="display:none;margin-bottom:8px"></div>
           <button class="btn btn-primary btn-block" id="login-btn">Sign In</button>
         </div>
       </div>
     </div>
   `;
-  document.getElementById('login-role').addEventListener('change', function() {
-    const sel = roles.find(r => r.value === this.value);
-    const desc = document.getElementById('login-role-desc');
-    if (sel && desc) desc.textContent = sel.desc;
+
+  document.getElementById('login-user').addEventListener('change', function() {
+    const opt = this.options[this.selectedIndex];
+    const role = opt?.dataset?.role || '';
+    const pinGroup = document.getElementById('login-pin-group');
+    const error = document.getElementById('login-error');
+    error.style.display = 'none';
+    if (privilegedRoles.includes(role)) {
+      pinGroup.style.display = '';
+    } else {
+      pinGroup.style.display = 'none';
+    }
   });
+
   document.getElementById('login-btn').addEventListener('click', () => {
-    const n = document.getElementById('login-name').value.trim();
-    const r = document.getElementById('login-role').value;
-    if (!n) { showToast('Enter your name', 'error'); return; }
-    if (!r) { showToast('Select your role', 'error'); return; }
-    localStorage.setItem('aac_user', escHtml(n));
-    localStorage.setItem('aac_user_role', r);
+    const sel = document.getElementById('login-user');
+    const name = sel.value;
+    const role = sel.options[sel.selectedIndex]?.dataset?.role || '';
+    const error = document.getElementById('login-error');
+    error.style.display = 'none';
+    if (!name) { showToast('Select a user', 'error'); return; }
+    if (privilegedRoles.includes(role)) {
+      const pin = document.getElementById('login-pin').value.trim();
+      const storedPin = localStorage.getItem('aac_pin') || '1234';
+      if (!pin) { error.textContent = 'PIN required for this role'; error.style.display = ''; return; }
+      if (pin !== storedPin) { error.textContent = 'Incorrect PIN'; error.style.display = ''; return; }
+    }
+    localStorage.setItem('aac_user', escHtml(name));
+    localStorage.setItem('aac_user_role', role);
     if (sidebar) sidebar.style.display = '';
     if (overlay) overlay.style.display = '';
     document.getElementById('hamburger-btn').style.display = '';
@@ -1296,6 +1322,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   await populateACSelector();
+
+  // Seed user database if not yet set
+  if (!localStorage.getItem('aac_users')) {
+    const defaultUsers = [
+      { name: 'pasan anishka', role: 'admin' },
+      { name: 'buddika chandrarathna', role: 'engineer' },
+      { name: 'thisanga', role: 'production_planner' },
+      { name: 'chandrakeerthi', role: 'senior_technician' },
+      { name: 'deshan', role: 'technician' },
+      { name: 'shalana', role: 'technician' },
+      { name: 'rehan', role: 'technician' },
+      { name: 'binada', role: 'technician' },
+      { name: 'bihandu', role: 'technician' },
+      { name: 'ginod', role: 'technician' }
+    ];
+    localStorage.setItem('aac_users', JSON.stringify(defaultUsers));
+  }
 
   // Login gate: require name & role before using the app
   const needsLogin = !localStorage.getItem('aac_user') || !localStorage.getItem('aac_user_role');
