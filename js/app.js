@@ -504,14 +504,10 @@ function profileView() {
         </div>
         <div class="form-group">
           <label>Your Role</label>
-          <div class="profile-role-select">
-            ${roles.map(r => `
-              <label class="profile-role-option ${role === r.value ? 'selected' : ''}">
-                <input type="radio" name="profile-role" value="${r.value}" ${role === r.value ? 'checked' : ''}>
-                <div><div class="profile-role-label">${r.label}</div><div class="profile-role-desc">${r.desc}</div></div>
-              </label>
-            `).join('')}
-          </div>
+          <select id="profile-role" class="form-input">
+            ${roles.map(r => `<option value="${r.value}" ${role === r.value ? 'selected' : ''}>${r.label}</option>`).join('')}
+          </select>
+          <div id="profile-role-desc" class="text-muted small" style="margin-top:6px">${roles.find(r => r.value === role)?.desc || roles[0].desc}</div>
         </div>
         <button class="btn btn-primary btn-block" id="profile-save-btn">Save Profile</button>
       </div>
@@ -550,16 +546,14 @@ function profileView() {
     });
   }
 
-  document.querySelectorAll('.profile-role-option').forEach(el => {
-    el.addEventListener('click', () => {
-      document.querySelectorAll('.profile-role-option').forEach(o => o.classList.remove('selected'));
-      el.classList.add('selected');
-      el.querySelector('input').checked = true;
-    });
+  document.getElementById('profile-role').addEventListener('change', function() {
+    const sel = roles.find(r => r.value === this.value);
+    const desc = document.getElementById('profile-role-desc');
+    if (sel && desc) desc.textContent = sel.desc;
   });
   document.getElementById('profile-save-btn').addEventListener('click', async () => {
     const n = document.getElementById('profile-name').value.trim();
-    const r = document.querySelector('input[name="profile-role"]:checked')?.value;
+    const r = document.getElementById('profile-role').value;
     if (!n) { showToast('Enter your name', 'error'); return; }
     if (!r) { showToast('Select your role', 'error'); return; }
 
