@@ -453,12 +453,13 @@ async function dashboardView() {
       await DB.put('aircraft', ac);
       await queueSync('aircraft', 'update', ac);
       showToast('Daily CRS issued — aircraft is flightworthy');
-      dashboardView();
+      notifyDataChange();
     });
   }
 }
 
 function navigate(view) {
+  _currentView = view;
   document.querySelectorAll('.nav-link').forEach(a => a.classList.remove('active'));
   const link = document.querySelector(`.nav-link[data-view="${view}"]`);
   if (link) link.classList.add('active');
@@ -479,13 +480,32 @@ function navigate(view) {
 }
 
 let _refreshTimer = null;
+let _currentView = null;
 function onRemoteUpdate() {
   if (_refreshTimer) return;
   _refreshTimer = setTimeout(() => {
     _refreshTimer = null;
-    const active = document.querySelector('.nav-link.active')?.dataset?.view;
-    if (active) navigate(active);
-  }, 1000);
+    if (_currentView) refreshView(_currentView);
+  }, 300);
+}
+
+// Lightweight view refresh without full page rebuild
+const _viewRefreshers = {};
+function registerRefresh(view, fn) { _viewRefreshers[view] = fn; }
+function refreshView(view) {
+  const fn = _viewRefreshers[view];
+  if (fn) { fn(); return; }
+  navigate(view);
+}
+
+// Call after any local write to trigger instant refresh (debounced)
+let _notifyTimer = null;
+function notifyDataChange() {
+  if (_notifyTimer) return;
+  _notifyTimer = setTimeout(() => {
+    _notifyTimer = null;
+    if (_currentView) refreshView(_currentView);
+  }, 50);
 }
 
 /* ── Sidebar ── */

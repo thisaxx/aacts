@@ -253,12 +253,6 @@ function flightOpsView() {
       }
     }
   } catch(e) {}
-  // Clear draft on submit
-  const origSubmit = onFlightSubmit;
-  onFlightSubmit = async function(e) {
-    localStorage.removeItem(draftKey);
-    return origSubmit.call(this, e);
-  };
 
   document.getElementById('flight-date').valueAsDate = new Date();
   updateFuelCalc();
@@ -327,6 +321,7 @@ async function onUpdateMeters() {
 
 async function onFlightSubmit(e) {
   e.preventDefault();
+  localStorage.removeItem('aac_flight_draft');
   const pilot = document.getElementById('pilot-name').value.trim() || 'Unknown';
   const takeoffTime = document.getElementById('takeoff-time').value;
   const landingTime = document.getElementById('landing-time').value;
