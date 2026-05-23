@@ -542,12 +542,12 @@ async function dashboardView() {
     });
   });
 
-  const crsBtn = document.getElementById('issue-daily-crs-btn');
-  if (crsBtn) {
   const inspBtn = document.getElementById('perform-inspection-btn');
   if (inspBtn) {
     inspBtn.addEventListener('click', () => navigate('maintenance'));
   }
+  const crsBtn = document.getElementById('issue-daily-crs-btn');
+  if (crsBtn) {
   crsBtn.addEventListener('click', async () => {
       const ac = await getAircraft();
       const hoursSinceOil = (ac.totalTachTime || 0) - (ac.lastOilChangeTach || 0);
@@ -645,8 +645,6 @@ function navigate(view) {
     case 'activity': activityFeedView(); break;
   }
   return false;
-}
-  updateSidebarInspections();
 }
 
 let _refreshTimer = null;
@@ -1362,10 +1360,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     showToast(isLight ? 'Dark mode' : 'Light mode');
   }
-  document.getElementById('sidebar-theme')?.addEventListener('click', e => {
-    e.preventDefault();
-    toggleTheme();
-  });
   document.getElementById('sidebar-theme-toggle').addEventListener('click', e => {
     toggleTheme();
   });
@@ -1424,6 +1418,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function checkEndOfDayData() {
   const today = new Date().toISOString().slice(0, 10);
   const ac = await getAircraft();
+  if (!ac) return;
   const flights = await getFlights();
   const allAttendance = await DB.getAll('attendance');
   const allTasks = await DB.getAll('maintenance_tasks');
