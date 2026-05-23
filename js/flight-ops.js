@@ -375,8 +375,7 @@ async function onDepartureSubmit(e) {
 
   showToast('Departure recorded — awaiting arrival');
 
-  const user = localStorage.getItem('aac_user') || 'Unknown';
-  createNotification('sortie', 'Departure Recorded', `${user} departed in ${ac.tailNumber} at ${takeoffTime}`, 'flight-ops');
+  createNotification('sortie', 'Departure Recorded', `${pilot} departed in ${ac.tailNumber} at ${takeoffTime}`, 'flight-ops');
 
   renderDepartedList();
   renderRecentFlights();
@@ -487,8 +486,7 @@ async function onArrivalSubmit(e) {
     createNotification('inspection', 'After-Flight Inspection Created', `After-flight inspection due for ${ac.tailNumber} after ${flight.flightDate} sortie`, 'maintenance');
   }
 
-  const user = localStorage.getItem('aac_user') || 'Unknown';
-  createNotification('sortie', 'Sortie Completed', `${user} completed sortie in ${ac.tailNumber} (${(duration*60).toFixed(0)} min)`, 'flight-ops');
+  createNotification('sortie', 'Sortie Completed', `${flight.pilotName} completed sortie in ${ac.tailNumber} (${(duration*60).toFixed(0)} min)`, 'flight-ops');
 
   // Reset arrival form
   document.getElementById('arrival-card').classList.add('hidden');
