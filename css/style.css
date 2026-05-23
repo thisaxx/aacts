@@ -326,6 +326,23 @@ body {
 .hero-status.orange .hero-status-dot { background: #f59e0b; }
 .hero-status.red .hero-status-dot { background: #ef4444; animation: pulseDot 1.5s infinite; }
 
+/* ── Dashboard Alerts ── */
+.dash-alerts {
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dash-alert {
+  background: rgba(245,158,11,0.1);
+  border: 1px solid rgba(245,158,11,0.25);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+}
+
 /* ── Status Card ── */
 .status-card {
   background: var(--glass);
@@ -383,7 +400,6 @@ body {
   gap: 4px;
 }
 .stat-card:active { transform: scale(0.96); background: var(--highlight); }
-.stat-icon { font-family: var(--mono); font-size: 20px; opacity: 0.6; margin-bottom: 2px; }
 .stat-value {
   font-family: var(--mono);
   font-size: 28px;

@@ -199,6 +199,12 @@ async function dashboardView() {
     statusClass = 'green'; statusLabel = 'Flightworthy';
   }
 
+  // Build alerts list
+  const alerts = [];
+  if (!crsIssuedToday && (userRole === 'engineer' || userRole === 'admin')) alerts.push('No daily CRS issued');
+  if (afterFlightPending) alerts.push('After-flight inspection pending');
+  if (lowFuels > 0 || mixLow) alerts.push(`Fuel low: ${lowFuels} stock${mixLow ? ', Mix below 50L' : ''}`);
+
   app.innerHTML = `
     <div class="page">
       <div class="dashboard-hero">
@@ -216,44 +222,31 @@ async function dashboardView() {
         </div>
       </div>
 
-      ${!crsIssuedToday && (userRole === 'engineer' || userRole === 'admin') ? `
-      <div class="card" style="border-color:rgba(10,132,255,0.2);text-align:center">
-        <button class="btn btn-primary btn-block" id="issue-daily-crs-btn">Issue Daily CRS</button>
-        <p class="text-muted small" style="margin-top:6px">Aircraft grounded until daily CRS issued</p>
-      </div>` : ''}
-      ${afterFlightPending ? `
-      <div class="status-card" style="border-color:rgba(255,159,10,0.3)">
-        <div class="status-dot orange"></div>
-        <div class="status-text">&#9888; After-flight inspection pending</div>
-      </div>` : ''}
-      ${lowFuels > 0 || mixLow ? `
-      <div class="status-card" style="border-color:rgba(245,158,11,0.3)">
-        <div class="status-dot orange"></div>
-        <div class="status-text">Fuel alert: ${lowFuels} low stock${mixLow ? ', Mix below 50L' : ''}</div>
-      </div>` : ''}
-
       <div class="dashboard-grid">
         <div class="stat-card">
-          <div class="stat-icon">&#9992;</div>
           <div class="stat-value">${flights.length}</div>
-          <div class="stat-label">Total Flights</div>
+          <div class="stat-label">Flights</div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon">&#9201;</div>
           <div class="stat-value">${totalHours.toFixed(1)}</div>
           <div class="stat-label">Total Hours</div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon">&#128197;</div>
           <div class="stat-value">${monthFlights.length}</div>
           <div class="stat-label">This Month</div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon">&#9888;</div>
           <div class="stat-value ${openDefects > 0 ? 'text-red' : 'text-green'}">${openDefects}</div>
           <div class="stat-label">Open Squawks</div>
         </div>
       </div>
+
+      ${alerts.length > 0 ? `
+      <div class="dash-alerts">
+        ${alerts.map(a => `<div class="dash-alert">&#9888; ${a}</div>`).join('')}
+        ${!crsIssuedToday && (userRole === 'engineer' || userRole === 'admin') ? `
+        <button class="btn btn-primary btn-block" id="issue-daily-crs-btn" style="margin-top:8px">Issue Daily CRS</button>` : ''}
+      </div>` : ''}
 
       <div class="quick-actions">
         <a href="#" class="quick-action" onclick="navigate('flight-ops')">
@@ -268,19 +261,19 @@ async function dashboardView() {
           <div class="qa-icon">&#9881;</div>
           <div class="qa-label">Sign-offs</div>
         </a>
-        <a href="#" class="quick-action" onclick="navigate('inventory')">
-          <div class="qa-icon">&#128230;</div>
-          <div class="qa-label">Parts</div>
-        </a>
         <a href="#" class="quick-action" onclick="navigate('fuel')">
           <div class="qa-icon">&#9981;</div>
           <div class="qa-label">Fuel</div>
+        </a>
+        <a href="#" class="quick-action" onclick="navigate('inventory')">
+          <div class="qa-icon">&#128230;</div>
+          <div class="qa-label">Parts</div>
         </a>
       </div>
 
       <div class="card">
         <div class="card-header">
-          <h3>Maintenance Status</h3>
+          <h3>Maintenance</h3>
         </div>
         <div id="dash-intervals">
           <div class="interval-item">
@@ -297,7 +290,7 @@ async function dashboardView() {
           </div>
           <div class="interval-item">
             <div class="interval-label">
-              <span class="label">Structural Insp. (100 hrs)</span>
+              <span class="label">Structural (100 hrs)</span>
               <span class="interval-value ${hoursSince100hr >= ac.structInterval ? 'text-red' : hoursSince100hr >= ac.structInterval - 5 ? 'text-orange' : 'text-green'}">
                 ${structRemaining.toFixed(1)}h left
               </span>
@@ -361,13 +354,6 @@ async function dashboardView() {
       </div>
     </div>
   `;
-
-  document.querySelectorAll('.dash-del-flight-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      await deleteFlight(btn.dataset.id);
-      dashboardView();
-    });
-  });
 
   const crsBtn = document.getElementById('issue-daily-crs-btn');
   if (crsBtn) {
@@ -463,6 +449,11 @@ function updateSidebarUser() {
     avatar.textContent = name ? name[0].toUpperCase() : '?';
     avatar.style.background = '';
   }
+  // Role-based sidebar visibility
+  const isPrivileged = role === 'engineer' || role === 'admin';
+  document.querySelectorAll('#sidebar-pincode, #sidebar-reset').forEach(el => {
+    el.style.display = isPrivileged ? '' : 'none';
+  });
 }
 
 async function updateSidebarInspections() {
