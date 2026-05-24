@@ -49,6 +49,31 @@ async function getAircraft() {
   return ac;
 }
 
+async function isAircraftGrounded() {
+  try {
+    const ac = await getAircraft();
+    if (!ac) return { grounded: false, reasons: [] };
+    const tach = ac.totalTachTime || 0;
+    const hoursSinceOil = tach - (ac.lastOilChangeTach || 0);
+    const hoursSince100hr = tach - (ac.last100hrTach || 0);
+    const oilRemaining = Math.max(0, (ac.oilInterval || 50) - hoursSinceOil);
+    const structRemaining = Math.max(0, (ac.structInterval || 100) - hoursSince100hr);
+    const minRemaining = Math.min(oilRemaining, structRemaining);
+    const defects = await getDefects();
+    const groundingDefects = defects.filter(d => d.urgency === 'grounding' && d.status === 'open').length > 0;
+    const today = new Date().toISOString().slice(0, 10);
+    const crsIssued = ac.dailyCrsDate === today;
+    const reasons = [];
+    if (groundingDefects) reasons.push('Grounding squawk(s) exist');
+    if (minRemaining <= 0) reasons.push('Inspection overdue');
+    if (ac.groundedAfterInspection) reasons.push('After-flight inspection — CRS required');
+    if (!crsIssued) reasons.push('No daily CRS issued');
+    return { grounded: reasons.length > 0 || !!ac.groundedAfterInspection, reasons };
+  } catch (e) {
+    return { grounded: false, reasons: [] };
+  }
+}
+
 async function switchAircraft(tailNumber) {
   setCurrentAircraftKey(tailNumber);
 }
@@ -78,6 +103,15 @@ function flightOpsView() {
       document.getElementById('goto-fleet-from-flights').addEventListener('click', () => showAircraftSheet());
       return;
     }
+    isAircraftGrounded().then(status => {
+    const groundedBlock = status.grounded ? `
+      <div class="card" style="border-color:var(--danger);margin-bottom:14px">
+        <div class="card-header"><h3 style="color:var(--danger)">&#128308; Aircraft Grounded</h3></div>
+        <div style="padding:10px 14px">
+          ${status.reasons.map(r => `<div class="dash-alert" style="margin-bottom:4px">&#9888; ${r}</div>`).join('')}
+          <p class="text-muted small" style="margin-top:8px">Resolve all issues before flying.</p>
+        </div>
+      </div>` : '';
     app.innerHTML = `
     <div class="page">
       <div class="page-header">
@@ -90,7 +124,9 @@ function flightOpsView() {
         <div class="status-text" id="status-text"><span class="skeleton" style="display:inline-block;width:140px;height:14px;vertical-align:middle"></span></div>
       </div>
 
-      <form id="depart-form" class="card">
+      ${groundedBlock}
+
+      <form id="depart-form" class="card"${status.grounded ? ' style="opacity:0.5;pointer-events:none"' : ''}>
         <div class="card-header">
           <h3>Departure</h3>
         </div>
@@ -222,26 +258,27 @@ function flightOpsView() {
     </div>
   `;
 
-  document.getElementById('depart-form').addEventListener('submit', onDepartureSubmit);
-  document.getElementById('arrival-form').addEventListener('submit', onArrivalSubmit);
-  document.getElementById('update-meters-btn').addEventListener('click', onUpdateMeters);
-  document.getElementById('flight-ops-eof-btn').addEventListener('click', showEndOfFlyingSheet);
-  initSteppers();
-  initToggles();
-  document.querySelector('[data-toggle-id="refueled-check"]')?.addEventListener('change', function(e) {
-    document.getElementById('refuel-fields').classList.toggle('hidden', !e.checked);
-  });
-  document.getElementById('landing-time')?.addEventListener('change', updateArrivalCalc);
-  ['fuel-after-left','fuel-after-right'].forEach(id => {
-    document.getElementById(id)?.addEventListener('change', updateArrivalCalc);
-  });
+    document.getElementById('depart-form').addEventListener('submit', onDepartureSubmit);
+    document.getElementById('arrival-form').addEventListener('submit', onArrivalSubmit);
+    document.getElementById('update-meters-btn').addEventListener('click', onUpdateMeters);
+    document.getElementById('flight-ops-eof-btn').addEventListener('click', showEndOfFlyingSheet);
+    initSteppers();
+    initToggles();
+    document.querySelector('[data-toggle-id="refueled-check"]')?.addEventListener('change', function(e) {
+      document.getElementById('refuel-fields').classList.toggle('hidden', !e.checked);
+    });
+    document.getElementById('landing-time')?.addEventListener('change', updateArrivalCalc);
+    ['fuel-after-left','fuel-after-right'].forEach(id => {
+      document.getElementById(id)?.addEventListener('change', updateArrivalCalc);
+    });
 
-  document.getElementById('flight-date').valueAsDate = new Date();
+    document.getElementById('flight-date').valueAsDate = new Date();
 
-  renderAircraftStatus();
-  renderIntervalBars();
-  renderRecentFlights();
-  renderDepartedList();
+    renderAircraftStatus();
+    renderIntervalBars();
+    renderRecentFlights();
+    renderDepartedList();
+    });
   });
 }
 
@@ -759,6 +796,7 @@ async function deleteFlight(flightId) {
     const ac = await getAircraft();
     ac.engineETSO = Math.max(0, (ac.engineETSO || 0) - h);
     ac.propellerPTSO = Math.max(0, (ac.propellerPTSO || 0) - h);
+    ac.totalTachTime = Math.max(0, (ac.totalTachTime || 0) - h);
     await DB.put('aircraft', ac);
     await queueSync('aircraft', 'update', ac);
   }
