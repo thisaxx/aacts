@@ -2745,18 +2745,34 @@ async function showExportSheet() {
       doc.text(name.replace(/_/g, ' ').toUpperCase(), 14, y);
       y += 6;
 
+      // Per-collection field whitelists for clean export
+      const exportFields = {
+        aircraft: ['tailNumber', 'type', 'totalTachTime', 'currentHobbs', 'engineETSO', 'propellerPTSO', 'engineTBO', 'propellerTBO', 'oilInterval', 'structInterval', 'lastOilChangeTach', 'last100hrTach', 'dailyCrsDate', 'dailyCrsBy'],
+        flights: ['flightDate', 'pilotName', 'takeoffTime', 'landingTime', 'flownHours', 'tachStart', 'tachEnd', 'route', 'remarks', 'fuelBeforeLeft', 'fuelBeforeRight', 'fuelAfterLeft', 'fuelAfterRight', 'fuelConsumed', 'status', 'aircraftId'],
+        defects: ['description', 'urgency', 'status', 'createdAt', 'resolvedAt', 'resolvedBy', 'resolution', 'aircraftId'],
+        maintenance_tasks: ['description', 'type', 'priority', 'status', 'assignedTo', 'technicianNotes', 'rectifiedBy', 'rectifiedAt', 'releasedBy', 'releasedAt', 'createdAt', 'aircraftId'],
+        fuel_stock: ['name', 'quantityLiters', 'capacity', 'minSafeLevel', 'fuelType'],
+        fuel_logs: ['date', 'fuelType', 'quantityLiters', 'supplier', 'cost', 'notes', 'aircraftId'],
+        parts: ['partNumber', 'name', 'quantityOnHand', 'minSafeStock', 'location'],
+        users: ['name', 'role', 'photo'],
+        attendance: ['userName', 'role', 'date', 'checkinTime', 'checkoutTime', 'status'],
+        components: ['name', 'serialNumber', 'partNumber', 'installDate', 'installTach', 'lifeLimit', 'aircraftId']
+      };
+
       const sorted = [...items].sort((a, b) => {
-        const ka = a.tailNumber || a.partNumber || a.id || a.name || '';
-        const kb = b.tailNumber || b.partNumber || b.id || b.name || '';
-        return ka.toString().localeCompare(kb.toString());
+        const ka = a.flightDate || a.date || a.tailNumber || a.partNumber || a.name || '';
+        const kb = b.flightDate || b.date || b.tailNumber || b.partNumber || b.name || '';
+        return kb.toString().localeCompare(ka.toString()) || a.id?.localeCompare(b.id);
       });
 
-      const keys = Object.keys(sorted[0]).filter(k => !k.startsWith('_'));
+      let keys = exportFields[name] || Object.keys(sorted[0]).filter(k => !k.startsWith('_') && k !== 'photoData' && k !== 'id' && k !== 'createdAt');
+      keys = keys.filter(k => sorted[0].hasOwnProperty(k));
       const headers = keys.map(k => k.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()));
       const rows = sorted.map(item => keys.map(k => {
         const v = item[k];
         if (v === null || v === undefined) return '';
-        if (typeof v === 'object') return JSON.stringify(v);
+        if (Array.isArray(v)) return v.join(', ');
+        if (typeof v === 'object') return '';
         return String(v);
       }));
 
