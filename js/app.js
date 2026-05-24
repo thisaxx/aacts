@@ -543,7 +543,50 @@ async function dashboardView() {
         ${inspectionOverdue ? `<button class="btn btn-primary btn-block" id="perform-inspection-btn" style="margin-top:8px">&#9881; Perform Inspection Sign-off</button>` : ''}
       </div>` : ''}
 
-
+      <div class="dashboard-widgets">
+        <div class="dash-widget">
+          <div class="dw-icon">&#128197;</div>
+          <div class="dw-info">
+            <div class="dw-value ${inspectionOverdue ? 'text-red' : oilRemaining <= 5 ? 'text-orange' : 'text-green'}">${oilRemaining.toFixed(1)}h</div>
+            <div class="dw-label">50hr Inspection Left</div>
+          </div>
+        </div>
+        <div class="dash-widget">
+          <div class="dw-icon">&#128197;</div>
+          <div class="dw-info">
+            <div class="dw-value ${structRemaining <= 0 ? 'text-red' : structRemaining <= 5 ? 'text-orange' : 'text-green'}">${structRemaining.toFixed(1)}h</div>
+            <div class="dw-label">100hr Inspection Left</div>
+          </div>
+        </div>
+        <div class="dash-widget" style="cursor:pointer" onclick="navigate('maintenance')">
+          <div class="dw-icon">&#9881;</div>
+          <div class="dw-info">
+            <div class="dw-value ${openTasks > 0 ? 'text-orange' : 'text-green'}">${openTasks}</div>
+            <div class="dw-label">Open Tasks</div>
+          </div>
+        </div>
+        <div class="dash-widget" style="cursor:pointer" onclick="navigate('inventory')">
+          <div class="dw-icon">&#128230;</div>
+          <div class="dw-info">
+            <div class="dw-value ${lowParts > 0 ? 'text-red' : 'text-green'}">${lowParts}</div>
+            <div class="dw-label">Low Stock Parts</div>
+          </div>
+        </div>
+        <div class="dash-widget">
+          <div class="dw-icon">&#9981;</div>
+          <div class="dw-info">
+            <div class="dw-value ${mixLow || lowFuels > 0 ? 'text-red' : 'text-green'}">${lowFuels > 0 || mixLow ? 'Low' : 'OK'}</div>
+            <div class="dw-label">Fuel Status</div>
+          </div>
+        </div>
+        <div class="dash-widget">
+          <div class="dw-icon">&#9888;</div>
+          <div class="dw-info">
+            <div class="dw-value ${groundingDefects > 0 ? 'text-red' : openDefects > 0 ? 'text-orange' : 'text-green'}">${openDefects}</div>
+            <div class="dw-label">Open Squawks</div>
+          </div>
+        </div>
+      </div>
 
       <div class="quick-actions">
         <a href="#" class="quick-action" data-view="flight-ops">

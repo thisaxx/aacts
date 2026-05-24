@@ -10,7 +10,6 @@ const firebaseConfig = {
 
 let db_firestore;
 let _deviceId;
-let _messaging;
 
 async function initFirebase() {
   try {
@@ -31,16 +30,15 @@ async function initFirebase() {
 async function initFCM() {
   try {
     if ('Notification' in window && navigator.serviceWorker) {
-      const swUrl = window.location.pathname.includes('/aacts/') ? '/aacts/firebase-messaging-sw.js' : 'firebase-messaging-sw.js';
-      const reg = await navigator.serviceWorker.register(swUrl);
-      _messaging = firebase.messaging();
+      const reg = await navigator.serviceWorker.ready;
+      const messaging = firebase.messaging();
       const permission = await Notification.requestPermission();
       if (permission === 'granted') {
-        const token = await _messaging.getToken({ vapidKey: 'BPDOB1rrNFE1rDZF1kssXN6m3stPy6e69cpC7nFhkXrVq6vFw8kQRh3amP6nfw43X4T9qN4N-s6NoFzQrUYYN1o', serviceWorkerRegistration: reg });
+        const token = await messaging.getToken({ vapidKey: 'BPDOB1rrNFE1rDZF1kssXN6m3stPy6e69cpC7nFhkXrVq6vFw8kQRh3amP6nfw43X4T9qN4N-s6NoFzQrUYYN1o', serviceWorkerRegistration: reg });
         if (token) {
           await db_firestore.collection('fcm_tokens').doc(_deviceId).set({ token, _deviceId, _updatedAt: Date.now() }, { merge: true });
         }
-        _messaging.onMessage(payload => {
+        messaging.onMessage(payload => {
           if (payload.notification) {
             showNotification(payload.notification.title, payload.notification.body);
           }
