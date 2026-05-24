@@ -21,6 +21,7 @@ async function initFirebase() {
     subscribeToAll();
     initFCM();
     processSyncQueue();
+    scheduleCleanup();
   } catch (e) {
     console.warn('Firebase init failed — offline-only mode', e);
   }
@@ -51,7 +52,7 @@ async function initFCM() {
 }
 
 const FIRESTORE_COLLECTIONS = [
-  'aircraft', 'flights', 'defects', 'fuel_logs', 'fuel_stock', 'maintenance_tasks', 'parts', 'users', 'attendance', 'notifications', 'components', 'calibration_tools', 'certificates', 'activity_log'
+  'aircraft', 'flights', 'defects', 'fuel_logs', 'fuel_stock', 'maintenance_tasks', 'parts', 'users', 'attendance', 'components'
 ];
 
 function subscribeToAll() {
@@ -68,6 +69,7 @@ function subscribeToAll() {
         if (data._deviceId && data._deviceId === _deviceId) continue;
         const local = await DB.get(name, change.doc.id);
         if (!local || (data._updatedAt && (!local._updatedAt || data._updatedAt >= local._updatedAt))) {
+          if (local && !data.photoData && local.photoData) data.photoData = local.photoData;
           await DB.put(name, data);
           hadRemote = true;
         }
@@ -86,16 +88,20 @@ function getDocId(collection, data) {
 
 async function queueSync(collection, action, data) {
   if (!db_firestore) { updateSyncBadge(); return; }
+  if (!FIRESTORE_COLLECTIONS.includes(collection)) { updateSyncBadge(); return; }
   data._deviceId = _deviceId;
   data._updatedAt = Date.now();
+  // Strip heavy photo data before cloud sync
+  const toSync = JSON.parse(JSON.stringify(data));
+  if (toSync.photoData) delete toSync.photoData;
   try {
     if (action === 'delete') {
       await db_firestore.collection(collection).doc(getDocId(collection, data)).delete();
     } else {
-      await db_firestore.collection(collection).doc(getDocId(collection, data)).set(data, { merge: true });
+      await db_firestore.collection(collection).doc(getDocId(collection, data)).set(toSync, { merge: true });
     }
   } catch (e) {
-    // Offline — save to retry queue
+    // Offline — save to retry queue (original data for offline retry)
     try {
       await DB.put('sync_queue', { collection, action, data: JSON.parse(JSON.stringify(data)), createdAt: Date.now() });
     } catch (qe) { /* queue full */ }
@@ -128,10 +134,12 @@ async function processSyncQueue() {
   for (const entry of entries) {
     try {
       const { collection, action, data } = entry;
+      const toSync = JSON.parse(JSON.stringify(data));
+      if (toSync.photoData) delete toSync.photoData;
       if (action === 'delete') {
         await db_firestore.collection(collection).doc(getDocId(collection, data)).delete();
       } else {
-        await db_firestore.collection(collection).doc(getDocId(collection, data)).set(data, { merge: true });
+        await db_firestore.collection(collection).doc(getDocId(collection, data)).set(toSync, { merge: true });
       }
       await DB.del('sync_queue', entry.id);
     } catch (e) { break; } // still offline, stop processing
@@ -165,6 +173,56 @@ function showSyncToast(msg, type) {
   t.textContent = msg;
   document.body.appendChild(t);
   setTimeout(() => { t.className = 'sync-toast'; }, 3000);
+}
+
+/* ── Idle-time Firestore cleanup ── */
+const CLEANUP_COLLECTIONS = {
+  flights: 365, attendance: 90, fuel_logs: 365, activity_log: 90
+};
+
+async function firestoreCleanup() {
+  if (!db_firestore || !navigator.onLine) return;
+  for (const [col, days] of Object.entries(CLEANUP_COLLECTIONS)) {
+    if (!FIRESTORE_COLLECTIONS.includes(col)) continue;
+    try {
+      const cutoff = Date.now() - days * 86400000;
+      const snap = await db_firestore.collection(col).where('_updatedAt', '<', cutoff).limit(50).get();
+      if (snap.empty) continue;
+      const batch = db_firestore.batch();
+      snap.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+    } catch (e) { /* skip collection on error */ }
+  }
+}
+
+async function firestoreDropLegacyCollections() {
+  const legacy = ['certificates', 'calibration_tools', 'activity_log', 'notifications'];
+  if (!db_firestore || !navigator.onLine) return;
+  for (const col of legacy) {
+    try {
+      const snap = await db_firestore.collection(col).limit(100).get();
+      if (snap.empty) continue;
+      const batch = db_firestore.batch();
+      snap.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+    } catch (e) { /* skip */ }
+  }
+}
+
+function scheduleCleanup() {
+  const idle = window.requestIdleCallback || (fn => setTimeout(fn, 5000));
+  idle(() => {
+    firestoreCleanup();
+    firestoreDropLegacyCollections();
+  });
+  // Repeat daily
+  setInterval(() => {
+    const idle2 = window.requestIdleCallback || (fn => setTimeout(fn, 5000));
+    idle2(() => {
+      firestoreCleanup();
+      firestoreDropLegacyCollections();
+    });
+  }, 86400000);
 }
 
 try { updateSyncBadge(); } catch (e) { /* firebase not yet inited */ }

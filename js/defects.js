@@ -105,7 +105,7 @@ function showDefectSheet() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async e => {
-      defectPhotoData = await compressImage(e.target.result, 800, 600, 0.6);
+      defectPhotoData = await compressImage(e.target.result, 320, 240, 0.5);
       const preview = document.getElementById('defect-photo-preview');
       document.getElementById('defect-photo-img').src = defectPhotoData;
       preview.style.display = 'block';

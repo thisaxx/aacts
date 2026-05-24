@@ -281,7 +281,7 @@ async function getCrewStatusBoard() {
   });
 }
 
-function compressImage(dataUrl, maxW = 800, maxH = 600, quality = 0.7) {
+function compressImage(dataUrl, maxW = 320, maxH = 240, quality = 0.5) {
   return new Promise(resolve => {
     const img = new Image();
     img.onload = () => {
@@ -1244,7 +1244,7 @@ function profileView() {
       if (!file) return;
       const reader = new FileReader();
       reader.onload = async e => {
-        const dataUrl = await compressImage(e.target.result, 400, 400, 0.6);
+        const dataUrl = await compressImage(e.target.result, 240, 240, 0.5);
         const preview = document.getElementById('profile-photo-preview');
         preview.innerHTML = `<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover">`;
         preview.dataset.photo = dataUrl;
@@ -2364,7 +2364,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     reader.onload = async function(e) {
       const ac = await DB.get('aircraft', tail);
       if (!ac) return;
-      ac.photoData = await compressImage(e.target.result, 800, 600, 0.7);
+      ac.photoData = await compressImage(e.target.result, 320, 240, 0.5);
       await DB.put('aircraft', ac);
       await queueSync('aircraft', 'update', ac);
       showToast('Photo updated');
