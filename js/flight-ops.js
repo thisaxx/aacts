@@ -794,11 +794,19 @@ async function deleteFlight(flightId) {
   if (!confirmed) return;
   if (!isDeparted && h > 0) {
     const ac = await getAircraft();
+    const oldTach = ac.totalTachTime || 0;
     ac.engineETSO = Math.max(0, (ac.engineETSO || 0) - h);
     ac.propellerPTSO = Math.max(0, (ac.propellerPTSO || 0) - h);
-    ac.totalTachTime = Math.max(0, (ac.totalTachTime || 0) - h);
+    ac.totalTachTime = Math.max(0, oldTach - h);
+    if ((ac.lastOilChangeTach || 0) > ac.totalTachTime) {
+      ac.lastOilChangeTach = Math.max(0, (ac.lastOilChangeTach || 0) - h);
+    }
+    if ((ac.last100hrTach || 0) > ac.totalTachTime) {
+      ac.last100hrTach = Math.max(0, (ac.last100hrTach || 0) - h);
+    }
     await DB.put('aircraft', ac);
     await queueSync('aircraft', 'update', ac);
+    if (typeof checkAndCreateInspectionTasks === 'function') checkAndCreateInspectionTasks(ac);
   }
   await DB.del('flights', flightId);
   await queueSync('flights', 'delete', { id: flightId });
