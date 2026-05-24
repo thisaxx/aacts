@@ -1622,86 +1622,97 @@ function settingsView() {
   const name = localStorage.getItem('aac_user');
   const roleLabel = role ? role.replace(/_/g, ' ') : '—';
 
-  const guides = {
-    admin: {
-      title: 'Full System Access',
-      permissions: [
-        'Full CRS authority — issue daily CRS and task releases',
-        'Manage aircraft — add, edit, delete fleet',
-        'Delete any flight or defect record',
-        'Manage parts inventory and fuel stock',
-        'Approve crew attendance',
-        'Factory reset — wipe all data',
-        'Access all views and features'
-      ]
-    },
-    engineer: {
-      title: 'Technical Authority',
-      permissions: [
-        'Issue CRS — daily CRS and task releases to service',
-        'Manage aircraft — add, edit, delete fleet',
-        'Resolve defects and grounding squawks',
-        'Rectify and release maintenance tasks',
-        'Approve crew attendance',
-        'Manage parts inventory and fuel stock',
-        'Log flights and report defects'
-      ]
-    },
-    production_planner: {
-      title: 'Planning & Coordination',
-      permissions: [
-        'Manage aircraft — add, edit, delete fleet',
-        'Create and manage work orders',
-        'Rectify maintenance tasks',
-        'Manage parts inventory and fuel stock',
-        'Delete flights',
-        'Approve crew attendance',
-        'CANNOT issue CRS (Engineer or Admin only)'
-      ]
-    },
-    senior_technician: {
-      title: 'Senior Technical',
-      permissions: [
-        'Sign off after-flight inspections',
-        'Rectify maintenance tasks',
-        'Resolve defects',
-        'Approve crew attendance',
-        'Log flights and report defects',
-        'View and manage inventory'
-      ]
-    },
-    technician: {
-      title: 'Technical Staff',
-      permissions: [
-        'Log flights with tach times and fuel',
-        'Report defects (squawks)',
-        'View maintenance tasks',
-        'Manage parts inventory',
-        'View fleet data and dashboard'
-      ]
-    },
-    pilot: {
-      title: 'Flight Operations',
-      permissions: [
-        'Log flights and record fuel usage',
-        'Report defects',
-        'View dashboard, fleet status, and history',
-        'View maintenance and inventory read-only'
-      ]
-    },
-    guest: {
-      title: 'Read-Only Access',
-      permissions: [
-        'View dashboard — aircraft status and stats',
-        'View flights, defects, and maintenance records',
-        'View parts inventory and fuel stock',
-        'View crew attendance',
-        'CANNOT create, edit, or delete any data'
-      ]
+  const common = (r, label, items) => {
+    const out = [`<div class="card"><div class="card-header"><h3>${label} — User Guide</h3></div><div style="padding:4px 16px 16px"><div class="text-muted small" style="margin-bottom:10px">How to use AACTS for your role:</div>`];
+    items.forEach(item => {
+      out.push(`<div style="margin-bottom:10px"><strong style="font-size:13px">${item.h}</strong>`);
+      if (item.t) out.push(`<div style="font-size:12px;color:var(--text-muted);margin-top:2px;line-height:1.6">${item.t}</div>`);
+      if (item.l) {
+        out.push(`<ul style="margin:4px 0 0;padding-left:16px;font-size:12px;color:var(--text-muted);line-height:1.7">`);
+        item.l.forEach(li => out.push(`<li>${li}</li>`));
+        out.push(`</ul>`);
+      }
+      out.push(`</div>`);
+    });
+    if (r === 'engineer' || r === 'admin' || r === 'production_planner') {
+      out.push(`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--text-muted);line-height:1.6"><strong>Note:</strong> Aircraft selector in the top-right header lets you switch between aircraft. The dashboard and all views update to show data for the selected aircraft.</div>`);
     }
+    if (r === 'production_planner') {
+      out.push(`<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);font-size:12px;color:var(--danger);line-height:1.6"><strong>Important:</strong> Production Planner CANNOT issue CRS. Only Engineer and Admin can release tasks to service.</div>`);
+    }
+    out.push(`</div></div>`);
+    return out.join('');
   };
 
-  const guide = guides[role] || guides.guest;
+  const guideHTML = {
+    admin: common('admin', 'Admin', [
+      { h: 'Dashboard', t: 'Your home screen. View aircraft status (Airworthy/Grounded), inspection countdowns, open tasks, low stock alerts, and fuel status. Tap the Issue Daily CRS button to make the aircraft airworthy for the day.' },
+      { h: 'Fleet Manager', t: 'Sidebar → Fleet Manager. Add new aircraft (tail number, type, TBO limits), edit existing ones, upload photos, set a default aircraft, or delete aircraft.' },
+      { h: 'Log Flights', t: 'Bottom nav → Log Flights or sidebar. Tap + New Flight to record a sortie. Enter pilot name, tach start/end, route, remarks, and fuel gauges. Flight time auto-calculates. ETSO/PTSO increment automatically. After-flight inspection auto-created. Delete a flight by tapping × — ETSO/PTSO are rolled back.' },
+      { h: 'Defects (Squawks)', t: 'Bottom nav → Mx/Defects → Defects tab. Tap + Report Squawk to log a defect. Set urgency: Grounding (grounds aircraft) or Normal. Resolve defects by tapping Resolve. Delete any defect with ×.' },
+      { h: 'Mx / Sign-offs', t: 'Bottom nav → Mx/Defects → Work tab. View all maintenance tasks. Sign off 50hr/100hr inspections, after-flight inspections, and work orders. Issue CRS to release tasks to service. Overhaul engine or propeller to reset TSO counters.' },
+      { h: 'Parts', t: 'Bottom nav → Parts or sidebar. Add new parts, adjust quantities with +/- buttons, tap number to type directly, delete parts. Red text = below minimum stock.' },
+      { h: 'Fuel Ops', t: 'Sidebar or bottom nav → Fuel. Record fuel deliveries, view fuel stock levels (Avgas 100LL, Mogas, Mix). Fuel auto-deducted by flight logging.' },
+      { h: 'Crew', t: 'Sidebar → Crew. View all users with today\'s attendance status. Approve or reject pending sign-ins.' },
+      { h: 'Live Feed', t: 'Sidebar → Live Feed. Real-time view of airborne flights (pulsing dot with ETA), on-duty crew with avatars, and today\'s activity timeline. Auto-refreshes every 15 seconds.' },
+      { h: 'Logbook', t: 'Sidebar → Logbook. Browse all records by date: flights, defects, maintenance, fuel, attendance in a single timeline.' },
+      { h: 'Export / Tech Log', t: 'Sidebar → Export / Tech Log. Select date range, aircraft, and data types to include. Generate a PDF report or a Daily Tech Log Summary PDF.' },
+      { h: 'Settings', t: 'Sidebar → Settings. Change your PIN, toggle dark/light theme, view this guide, or factory reset (Admin only — deletes ALL data).' }
+    ]),
+    engineer: common('engineer', 'Engineer', [
+      { h: 'Dashboard', t: 'Your home screen. Check aircraft status and inspection countdowns. Tap Issue Daily CRS each day to make the aircraft airworthy. View open tasks, low stock, and fuel status.' },
+      { h: 'Fleet Manager', t: 'Sidebar → Fleet Manager. Add new aircraft (tail number, type, TBO limits). Edit existing aircraft, upload photos, set default aircraft, or delete aircraft.' },
+      { h: 'Defects (Squawks)', t: 'Bottom nav → Mx/Defects → Defects tab. Report squawks with Grounding or Normal urgency. Resolve defects by entering resolution notes. Delete defects with ×.' },
+      { h: 'Mx / Sign-offs', t: 'Bottom nav → Mx/Defects → Work tab. Sign off maintenance tasks (50hr, 100hr, after-flight inspections). Issue CRS to release tasks to service. Overhaul engine/propeller to reset TSO. Rectify work orders with repair notes.' },
+      { h: 'Log Flights', t: 'Bottom nav → Log Flights. Record flights with pilot, tach times, route, and fuel data. Delete flights when needed.' },
+      { h: 'Parts', t: 'Bottom nav → Parts. Add parts, adjust stock levels, set minimum quantities.' },
+      { h: 'Fuel Ops', t: 'Sidebar → Fuel Ops. Record fuel deliveries, monitor stock levels.' },
+      { h: 'Crew', t: 'Sidebar → Crew. Approve or reject crew attendance requests.' },
+      { h: 'Export / Tech Log', t: 'Sidebar → Export / Tech Log. Generate PDF reports and Daily Tech Log summaries for record-keeping.' }
+    ]),
+    production_planner: common('production_planner', 'Production Planner', [
+      { h: 'Fleet Manager', t: 'Sidebar → Fleet Manager. Add, edit, and delete aircraft. Manage fleet records and set default aircraft.' },
+      { h: 'Log Flights', t: 'Bottom nav → Log Flights. Record flights and delete them when needed.' },
+      { h: 'Mx / Sign-offs', t: 'Bottom nav → Mx/Defects → Work tab. Create work orders and sign off tasks. Note: you CANNOT issue CRS — only Engineer and Admin can release tasks to service.' },
+      { h: 'Defects', t: 'Report defects and track open squawks.' },
+      { h: 'Parts', t: 'Manage parts inventory and stock levels.' },
+      { h: 'Fuel Ops', t: 'Record deliveries and monitor fuel stock.' },
+      { h: 'Crew', t: 'Approve or reject attendance requests.' },
+      { h: 'Export', t: 'Generate PDF reports and tech logs.' }
+    ]),
+    senior_technician: common('senior_technician', 'Senior Technician', [
+      { h: 'Log Flights', t: 'Bottom nav → Log Flights. Record flights with pilot, tach times, route, and fuel data.' },
+      { h: 'Defects', t: 'Bottom nav → Mx/Defects → Defects tab. Report and resolve squawks.' },
+      { h: 'Mx / Sign-offs', t: 'Bottom nav → Mx/Defects → Work tab. Sign off after-flight inspections and rectification tasks.' },
+      { h: 'Parts', t: 'Bottom nav → Parts. View and manage inventory, adjust stock levels.' },
+      { h: 'Crew', t: 'Sidebar → Crew. Approve or reject attendance requests.' },
+      { h: 'Dashboard', t: 'View fleet status, inspection intervals, and alerts.' }
+    ]),
+    technician: common('technician', 'Technician', [
+      { h: 'Log Flights', t: 'Bottom nav → Log Flights. Record flights: enter pilot name, tach start/end times, route, remarks, and wing fuel readings. Flight time and fuel consumption auto-calculate.' },
+      { h: 'Defects', t: 'Bottom nav → Mx/Defects → Defects tab. Tap + Report Squawk to log a defect with description and urgency.' },
+      { h: 'Parts', t: 'Bottom nav → Parts. View and manage inventory. Add parts, adjust stock with +/- buttons, or tap the number to type directly.' },
+      { h: 'Dashboard', t: 'View the aircraft status, inspection countdowns, open tasks, and alerts.' },
+      { h: 'Mx / Sign-offs', t: 'Bottom nav → Mx/Defects → Work tab. View maintenance tasks assigned to the current aircraft.' }
+    ]),
+    pilot: common('pilot', 'Pilot', [
+      { h: 'Log Flights', t: 'Bottom nav → Log Flights. Tap + New Flight. Enter pilot name, tach start/end, takeoff/landing times, route, and wing fuel before/after. Fuel used and consumption auto-calculate. Save to record the flight — ETSO/PTSO and intervals update automatically.' },
+      { h: 'Defects', t: 'Bottom nav → Mx/Defects → Defects tab. Report squawks if you find any issues during pre-flight or after flight.' },
+      { h: 'Dashboard', t: 'View the current aircraft status, inspection intervals remaining, and any alerts or grounding notices.' },
+      { h: 'Fuel Ops', t: 'View fuel stock levels before flight.' }
+    ]),
+    guest: common('guest', 'Guest', [
+      { h: 'Dashboard', t: 'View aircraft status, inspection intervals, open tasks, and alerts. Read-only.' },
+      { h: 'Log Flights', t: 'View flight history and details. Cannot create or edit flights.' },
+      { h: 'Defects', t: 'View open and resolved defects. Cannot report or resolve.' },
+      { h: 'Mx / Sign-offs', t: 'View maintenance tasks and their status. Cannot sign off.' },
+      { h: 'Parts', t: 'View parts inventory and stock levels. Cannot add or edit.' },
+      { h: 'Fuel Ops', t: 'View fuel stock levels and delivery history.' },
+      { h: 'Crew', t: 'View attendance records.' }
+    ])
+  };
+
+  const guide = guideHTML[role] || guideHTML.guest;
 
   app.innerHTML = `
     <div class="page">
@@ -1710,22 +1721,15 @@ function settingsView() {
         <div class="subtitle">${escHtml(name || '')} — ${roleLabel}</div>
       </div>
 
-      <div class="card">
-        <div class="card-header"><h3>${escHtml(roleLabel)} — ${guide.title}</h3></div>
-        <div style="padding:12px 16px">
-          <p class="text-muted small" style="margin-bottom:8px">What you can do in AACTS:</p>
-          <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.7">
-            ${guide.permissions.map(p => `<li>${p}</li>`).join('')}
-          </ul>
-        </div>
-      </div>
+      ${guide}
 
       <div class="card">
         <div class="card-header"><h3>Security</h3></div>
         <div style="padding:12px 16px">
           ${role !== 'guest' ? `
+          <p class="text-muted small" style="margin-bottom:8px">Your PIN is required to sign in. Default PIN is 1234 — change it below.</p>
           <button class="btn btn-primary btn-block" id="settings-change-pin">Change PIN</button>
-          ` : '<p class="text-muted small">Guest users cannot change PIN.</p>'}
+          ` : '<p class="text-muted small">Guest users sign in without a PIN.</p>'}
         </div>
       </div>
 
