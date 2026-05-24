@@ -65,10 +65,6 @@ function inventoryView() {
         <div id="inventory-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line" style="width:40%"></div></div>
       </div>
       <div class="card">
-        <div class="card-header"><h3>Bulk Fuel Stock</h3></div>
-        <div id="fuel-stock-inv"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>
-      </div>
-      <div class="card">
         <div class="card-header"><h3>Low Inventory Alerts</h3></div>
         <div id="low-stock-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>
       </div>
@@ -162,51 +158,9 @@ async function populateAdjustSelect() {
 }
 
 async function renderInventory() {
-  await seedFuelStock();
   const parts = await getParts();
   const list = document.getElementById('inventory-list');
   const lowEl = document.getElementById('low-stock-list');
-  const fuelEl = document.getElementById('fuel-stock-inv');
-
-  const fuelStocks = await getFuelStock();
-
-  if (!fuelStocks || fuelStocks.length === 0) {
-    fuelEl.innerHTML = '<p class="text-muted small">No fuel stock configured. Add fuel via <strong>Fuel</strong> tab or record a delivery.</p>';
-  } else {
-    fuelEl.innerHTML = fuelStocks.map(fs => {
-      const low = fs.quantityLiters <= fs.minSafeLevel;
-      const mixAlert = fs.id === 'mix' && fs.quantityLiters < 50;
-      return `
-      <div class="fuel-stock-item ${low ? 'fuel-low' : ''}" style="margin-bottom:10px">
-        <div class="fuel-stock-header" style="display:flex;justify-content:space-between;align-items:center">
-          <strong>${escHtml(fs.name)}</strong>
-          <div style="display:flex;align-items:center;gap:4px">
-            <span style="font-size:16px;font-weight:700;${low ? 'color:var(--ruby)' : 'color:var(--emerald)'}">${fs.quantityLiters}L</span>
-            <button class="btn btn-sm btn-danger inv-del-fuel-stock-btn" data-id="${fs.id}" data-name="${escHtml(fs.name)}" style="padding:2px 6px;font-size:10px">&times;</button>
-          </div>
-        </div>
-        <div style="display:flex;gap:4px;margin-top:6px">
-          <button class="btn btn-sm btn-primary fuel-add-btn" data-id="${fs.id}" data-name="${escHtml(fs.name)}" style="padding:4px 8px;font-size:11px;flex:1">+ Add Stock</button>
-          <button class="btn btn-sm btn-danger fuel-reduce-btn" data-id="${fs.id}" data-name="${escHtml(fs.name)}" style="padding:4px 8px;font-size:11px;flex:1">- Reduce Stock</button>
-        </div>
-        <div class="progress-bar" style="margin-top:6px">
-          <div class="progress-fill ${low ? 'fill-red' : 'fill-green'}"
-               style="width:${Math.min(100, (fs.quantityLiters / (fs.minSafeLevel * 3)) * 100)}%"></div>
-        </div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
-          Min: ${fs.minSafeLevel}L ${low ? '&mdash; <span class="text-red">LOW STOCK</span>' : ''} ${mixAlert ? '&mdash; <span class="text-red">Below 50L threshold</span>' : ''}
-        </div>
-      </div>
-    `;
-    }).join('');
-
-    fuelEl.querySelectorAll('.fuel-add-btn').forEach(btn => {
-      btn.addEventListener('click', () => showFuelAddSheet(btn.dataset.id, btn.dataset.name));
-    });
-    fuelEl.querySelectorAll('.fuel-reduce-btn').forEach(btn => {
-      btn.addEventListener('click', () => showFuelReduceSheet(btn.dataset.id, btn.dataset.name));
-    });
-  }
 
   list.innerHTML = `
     <table class="inv-table">
@@ -240,18 +194,10 @@ async function renderInventory() {
   });
 
   const lowParts = parts.filter(p => p.quantityOnHand <= p.minSafeStock);
-  const lowFuels = fuelStocks.filter(fs => fs.quantityLiters <= fs.minSafeLevel);
-  const mixStock = fuelStocks.find(fs => fs.id === 'mix');
   const allLow = [];
 
   for (const p of lowParts) {
     allLow.push(`<div class="low-stock-item"><strong>${escHtml(p.partNumber)}</strong> - ${escHtml(p.description)}<br><span class="text-red">${p.quantityOnHand} on hand (min: ${p.minSafeStock})</span></div>`);
-  }
-  for (const fs of lowFuels) {
-    allLow.push(`<div class="low-stock-item" style="border-color:rgba(245,158,11,0.3)"><strong>${escHtml(fs.name)}</strong> - Bulk Fuel<br><span class="text-red">${fs.quantityLiters}L remaining (min: ${fs.minSafeLevel}L)</span></div>`);
-  }
-  if (mixStock && mixStock.quantityLiters < 50 && mixStock.quantityLiters > mixStock.minSafeLevel) {
-    allLow.push(`<div class="low-stock-item" style="border-color:rgba(239,68,68,0.3)"><strong>Mix</strong> - Bulk Fuel<br><span class="text-red">${mixStock.quantityLiters}L remaining — below 50L threshold</span></div>`);
   }
 
   if (allLow.length === 0) {
