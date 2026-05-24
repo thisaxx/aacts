@@ -223,7 +223,7 @@ async function getCrewStatusBoard() {
 }
 
 async function fetchWeather() {
-  const icao = localStorage.getItem('aac_weather_icao') || 'VCBI';
+  const icao = localStorage.getItem('aac_weather_icao') || 'VCCG';
   const cached = localStorage.getItem('aac_weather_cache');
   if (cached) {
     try {
@@ -236,22 +236,25 @@ async function fetchWeather() {
     return null;
   }
   try {
-    const res = await fetch(`https://aviationweather.gov/api/data/metar?ids=${icao}&format=json&hours=1`);
+    const res = await fetch(`https://wttr.in/${icao}?format=j1`);
     if (!res.ok) throw new Error('Weather fetch failed');
     const data = await res.json();
-    if (!data || data.length === 0) throw new Error('No METAR data');
-    const metar = data[0];
+    const cc = data?.current_condition?.[0];
+    if (!cc) throw new Error('No weather data');
+    const wmoCodes = { 0:'Clear',1:'Mainly clear',2:'Partly cloudy',3:'Overcast',45:'Foggy',48:'Foggy',51:'Light drizzle',53:'Drizzle',55:'Heavy drizzle',56:'Freezing drizzle',57:'Freezing drizzle',61:'Light rain',63:'Rain',65:'Heavy rain',66:'Freezing rain',67:'Freezing rain',71:'Light snow',73:'Snow',75:'Heavy snow',77:'Snow grains',80:'Light showers',81:'Showers',82:'Heavy showers',85:'Light snow showers',86:'Snow showers',95:'Thunderstorm',96:'Thunderstorm',99:'Thunderstorm' };
+    const wcode = parseInt(cc.weatherCode, 10);
+    const conditions = wmoCodes[wcode] || cc.weatherDesc?.[0]?.value || '—';
     const result = {
       icao,
-      raw: metar.rawOb || '',
-      temp: metar.temp || '—',
-      windDir: metar.wdir || '—',
-      windSpeed: metar.wspd || '—',
-      visibility: metar.visib || '—',
-      conditions: metar.flightCategory || metar.presentWeather || 'VFR',
-      dewpoint: metar.dewp || '—',
-      altimeter: metar.altim || '—',
-      time: metar.obsTime || new Date().toISOString(),
+      location: data.nearest_area?.[0]?.areaName?.[0]?.value || icao,
+      raw: '',
+      temp: cc.temp_C || '—',
+      windDir: cc.winddir16Point || '—',
+      windSpeed: cc.windspeedKmph || '—',
+      visibility: cc.visibility || '—',
+      conditions,
+      humidity: cc.humidity || '—',
+      time: cc.observation_time || '',
       ts: Date.now()
     };
     localStorage.setItem('aac_weather_cache', JSON.stringify(result));
@@ -264,11 +267,11 @@ async function fetchWeather() {
 
 function renderWeatherCard(weather) {
   if (!weather) return '<div class="card"><div class="card-header"><h3>Weather</h3></div><div style="padding:12px 16px"><p class="text-muted small">Weather data unavailable</p></div></div>';
-  const timeStr = weather.time ? new Date(weather.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+  const timeStr = weather.time || '';
   return `
     <div class="card">
       <div class="card-header">
-        <h3>Weather — ${weather.icao}</h3>
+        <h3>&#9925; ${weather.icao} — ${weather.location || weather.icao}</h3>
         <span class="text-muted small">${timeStr}</span>
       </div>
       <div style="padding:8px 16px">
@@ -278,19 +281,19 @@ function renderWeatherCard(weather) {
             <div class="text-muted small">Temp</div>
           </div>
           <div style="flex:1;text-align:center;padding:8px;background:var(--surface);border-radius:8px">
-            <div style="font-size:22px;font-weight:700">${weather.windSpeed}${weather.windDir !== '—' ? `/${weather.windDir}` : ''}</div>
-            <div class="text-muted small">Wind (kt)</div>
+            <div style="font-size:22px;font-weight:700">${weather.windSpeed}${weather.windDir !== '—' ? ` ${weather.windDir}` : ''}</div>
+            <div class="text-muted small">Wind (km/h)</div>
           </div>
           <div style="flex:1;text-align:center;padding:8px;background:var(--surface);border-radius:8px">
-            <div style="font-size:22px;font-weight:700">${weather.visibility}</div>
-            <div class="text-muted small">Vis (mi)</div>
+            <div style="font-size:22px;font-weight:700">${weather.humidity || '—'}%</div>
+            <div class="text-muted small">Humidity</div>
           </div>
           <div style="flex:1;text-align:center;padding:8px;background:var(--surface);border-radius:8px">
             <div style="font-size:18px;font-weight:700">${weather.conditions}</div>
             <div class="text-muted small">Conditions</div>
           </div>
         </div>
-        ${weather.raw ? `<div style="margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--text-muted);word-break:break-all">${escHtml(weather.raw)}</div>` : ''}
+        ${weather.visibility ? `<div style="margin-top:6px;font-size:11px;color:var(--text-muted);text-align:center">Visibility: ${weather.visibility} km</div>` : ''}
       </div>
     </div>`;
 }
