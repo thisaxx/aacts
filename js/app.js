@@ -6,6 +6,14 @@ function showToast(msg, type = 'success') {
   setTimeout(() => el.classList.remove('show'), 3000);
 }
 
+function denyGuest() {
+  if (localStorage.getItem('aac_user_role') === 'guest') {
+    showToast('Guests are view-only', 'error');
+    return true;
+  }
+  return false;
+}
+
 function haptic() {
   if ('vibrate' in navigator) navigator.vibrate(8);
 }
@@ -198,13 +206,11 @@ async function renderActivityFeed() {
 async function getCrewStatusBoard() {
   const users = await DB.getAll('users');
   const attendance = await DB.getAll('attendance');
-  const tasks = await DB.getAll('maintenance_tasks');
   const today = new Date().toISOString().slice(0, 10);
   const activeAttendance = attendance.filter(a => a.date === today && (a.status === 'approved' || a.status === 'pending'));
   return users.map(u => {
     const att = activeAttendance.find(a => a.userName === u.name);
-    const assignedTasks = tasks.filter(t => t.assignedTo === u.name && t.status === 'open');
-    return { user: u, attendance: att || null, tasks: assignedTasks };
+    return { user: u, attendance: att || null };
   });
 }
 
@@ -1527,7 +1533,7 @@ function showLoginGate() {
     }
   });
 
-  document.getElementById('login-btn').addEventListener('click', () => {
+  document.getElementById('login-btn').addEventListener('click', async () => {
     const sel = document.getElementById('login-user');
     const name = sel.value;
     const role = sel.options[sel.selectedIndex]?.dataset?.role || '';
@@ -1544,6 +1550,14 @@ function showLoginGate() {
     }
     localStorage.setItem('aac_user', escHtml(name));
     localStorage.setItem('aac_user_role', role);
+    // Restore profile photo from DB
+    const allUsers = await DB.getAll('users');
+    const match = allUsers.find(u => u.name === name);
+    if (match && match.photo) {
+      localStorage.setItem('aac_user_photo', match.photo);
+    } else {
+      localStorage.removeItem('aac_user_photo');
+    }
     if (sidebar) sidebar.style.display = '';
     if (overlay) overlay.style.display = '';
     document.getElementById('hamburger-btn').style.display = '';
@@ -1597,30 +1611,33 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Seed user database if not yet set
   if (!localStorage.getItem('aac_users')) {
-const defaultUsers = [
-  { name: 'Pasan Anishka', role: 'admin' },
-  { name: 'Buddika Chandrarathna', role: 'engineer' },
-  { name: 'Thisanga', role: 'production_planner' },
-  { name: 'Chandrakeerthi', role: 'senior_technician' },
-  { name: 'Deshan', role: 'technician' },
-  { name: 'Shalana', role: 'technician' },
-  { name: 'Rehan', role: 'technician' },
-  { name: 'Binada', role: 'technician' },
-  { name: 'Bihandu', role: 'technician' },
-  { name: 'Ginod', role: 'technician' },
-  { name: 'Kalum', role: 'technician' },
-  { name: 'Rajapaksha', role: 'technician' },
-  { name: 'Guest', role: 'guest' }
-];
-
-function denyGuest() {
-  if (localStorage.getItem('aac_user_role') === 'guest') {
-    showToast('Guests are view-only', 'error');
-    return true;
-  }
-  return false;
-}
+    const defaultUsers = [
+      { name: 'Pasan Anishka', role: 'admin' },
+      { name: 'Buddika Chandrarathna', role: 'engineer' },
+      { name: 'Thisanga', role: 'production_planner' },
+      { name: 'Chandrakeerthi', role: 'senior_technician' },
+      { name: 'Deshan', role: 'technician' },
+      { name: 'Shalana', role: 'technician' },
+      { name: 'Rehan', role: 'technician' },
+      { name: 'Binada', role: 'technician' },
+      { name: 'Bihandu', role: 'technician' },
+      { name: 'Ginod', role: 'technician' },
+      { name: 'Kalum', role: 'technician' },
+      { name: 'Rajapaksha', role: 'technician' },
+      { name: 'Guest', role: 'guest' }
+    ];
     localStorage.setItem('aac_users', JSON.stringify(defaultUsers));
+  }
+
+  // Sync login users into DB so crew board shows everyone
+  const seedUsers = JSON.parse(localStorage.getItem('aac_users') || '[]');
+  const existingDbUsers = await DB.getAll('users');
+  const existingNames = new Set(existingDbUsers.map(u => u.name));
+  for (const su of seedUsers) {
+    if (!existingNames.has(su.name)) {
+      const id = 'user_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+      await DB.put('users', { id, name: su.name, role: su.role, photo: '', createdAt: new Date().toISOString() });
+    }
   }
 
   // Login gate: require name & role before using the app

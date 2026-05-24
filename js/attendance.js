@@ -281,23 +281,20 @@ async function renderCrewStatusBoard() {
     return;
   }
   el.innerHTML = statuses.map(s => {
-    const statusIcon = s.attendance
-      ? (s.attendance.status === 'approved' ? '&#10003;' : '&#9203;')
-      : '&#10007;';
-    const statusClass = s.attendance
-      ? (s.attendance.status === 'approved' ? 'crew-present' : 'crew-pending')
-      : 'crew-absent';
-    const taskCount = s.tasks.length;
+    const isPresent = s.attendance && s.attendance.status === 'approved';
+    const isPending = s.attendance && s.attendance.status === 'pending';
+    const photo = s.user.photo;
     return `
-      <div class="flight-row" style="border-left:3px solid ${s.attendance && s.attendance.status === 'approved' ? 'var(--success)' : s.attendance ? 'var(--gold)' : 'var(--danger)'};padding-left:10px;margin-bottom:4px">
-        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
-          <span class="${statusClass}" style="font-size:16px">${statusIcon}</span>
-          <div style="flex:1;min-width:0">
-            <strong>${escHtml(s.user.name)}</strong>
-            <div class="flight-date">${s.user.role ? s.user.role.replace(/_/g, ' ') : ''}${s.attendance ? ' &middot; In: ' + s.attendance.checkinTime : ''}</div>
+      <div class="crew-row" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="width:36px;height:36px;border-radius:50%;overflow:hidden;background:var(--surface);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;border:2px solid ${isPresent ? 'var(--text)' : isPending ? 'var(--gold)' : 'var(--border)'}">
+          ${photo ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover">` : (s.user.name ? s.user.name[0].toUpperCase() : '?')}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:var(--mono);font-size:13px;font-weight:600">${escHtml(s.user.name)}</div>
+          <div style="font-family:var(--mono);font-size:9px;color:${isPresent ? 'var(--text)' : isPending ? 'var(--gold)' : 'var(--text-muted)'}">
+            ${isPresent ? '&#10003; Signed in' + (s.attendance.checkinTime ? ' at ' + s.attendance.checkinTime : '') : isPending ? '&#9203; Pending' : '&#10007; Not signed in'}
           </div>
         </div>
-        ${taskCount > 0 ? `<span class="badge badge-open" style="font-size:10px">${taskCount} open</span>` : ''}
       </div>
     `;
   }).join('');
