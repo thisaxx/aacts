@@ -817,6 +817,7 @@ function navigate(view) {
     case 'profile': profileView(); break;
     case 'notifications': notificationsView(); break;
     case 'activity': activityFeedView(); break;
+    case 'settings': settingsView(); break;
   }
   return false;
 }
@@ -884,11 +885,8 @@ function updateSidebarUser() {
     avatar.textContent = name ? name[0].toUpperCase() : '?';
     avatar.style.background = '';
   }
-  // Role-based sidebar visibility
   const isPrivileged = role === 'engineer' || role === 'admin' || role === 'production_planner';
-  document.querySelectorAll('#sidebar-pincode, #sidebar-reset').forEach(el => {
-    el.style.display = isPrivileged ? '' : 'none';
-  });
+  document.getElementById('sidebar-reset').style.display = isPrivileged ? '' : 'none';
   applyRoleVisibility();
 }
 
@@ -1620,6 +1618,172 @@ async function populateACSelector() {
   ).join('');
 }
 
+function settingsView() {
+  const app = document.getElementById('app');
+  const role = localStorage.getItem('aac_user_role');
+  const name = localStorage.getItem('aac_user');
+  const roleLabel = role ? role.replace(/_/g, ' ') : '—';
+
+  const guides = {
+    admin: {
+      title: 'Full System Access',
+      permissions: [
+        'Full CRS authority — issue daily CRS and task releases',
+        'Manage aircraft — add, edit, delete fleet',
+        'Delete any flight or defect record',
+        'Manage parts inventory and fuel stock',
+        'Approve crew attendance',
+        'Factory reset — wipe all data',
+        'Access all views and features'
+      ]
+    },
+    engineer: {
+      title: 'Technical Authority',
+      permissions: [
+        'Issue CRS — daily CRS and task releases to service',
+        'Manage aircraft — add, edit, delete fleet',
+        'Resolve defects and grounding squawks',
+        'Rectify and release maintenance tasks',
+        'Approve crew attendance',
+        'Manage parts inventory and fuel stock',
+        'Log flights and report defects'
+      ]
+    },
+    production_planner: {
+      title: 'Planning & Coordination',
+      permissions: [
+        'Manage aircraft — add, edit, delete fleet',
+        'Create and manage work orders',
+        'Rectify maintenance tasks',
+        'Manage parts inventory and fuel stock',
+        'Delete flights',
+        'Approve crew attendance',
+        'CANNOT issue CRS (Engineer or Admin only)'
+      ]
+    },
+    senior_technician: {
+      title: 'Senior Technical',
+      permissions: [
+        'Sign off after-flight inspections',
+        'Rectify maintenance tasks',
+        'Resolve defects',
+        'Approve crew attendance',
+        'Log flights and report defects',
+        'View and manage inventory'
+      ]
+    },
+    technician: {
+      title: 'Technical Staff',
+      permissions: [
+        'Log flights with tach times and fuel',
+        'Report defects (squawks)',
+        'View maintenance tasks',
+        'Manage parts inventory',
+        'View fleet data and dashboard'
+      ]
+    },
+    pilot: {
+      title: 'Flight Operations',
+      permissions: [
+        'Log flights and record fuel usage',
+        'Report defects',
+        'View dashboard, fleet status, and history',
+        'View maintenance and inventory read-only'
+      ]
+    },
+    guest: {
+      title: 'Read-Only Access',
+      permissions: [
+        'View dashboard — aircraft status and stats',
+        'View flights, defects, and maintenance records',
+        'View parts inventory and fuel stock',
+        'View crew attendance',
+        'CANNOT create, edit, or delete any data'
+      ]
+    }
+  };
+
+  const guide = guides[role] || guides.guest;
+
+  app.innerHTML = `
+    <div class="page">
+      <div class="page-header">
+        <h2>Settings</h2>
+        <div class="subtitle">${escHtml(name || '')} — ${roleLabel}</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3>${escHtml(roleLabel)} — ${guide.title}</h3></div>
+        <div style="padding:12px 16px">
+          <p class="text-muted small" style="margin-bottom:8px">What you can do in AACTS:</p>
+          <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.7">
+            ${guide.permissions.map(p => `<li>${p}</li>`).join('')}
+          </ul>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3>Security</h3></div>
+        <div style="padding:12px 16px">
+          ${role !== 'guest' ? `
+          <button class="btn btn-primary btn-block" id="settings-change-pin">Change PIN</button>
+          ` : '<p class="text-muted small">Guest users cannot change PIN.</p>'}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3>Appearance</h3></div>
+        <div style="padding:12px 16px">
+          <button class="btn btn-secondary btn-block" id="settings-toggle-theme">Toggle Dark/Light Theme</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3>About</h3></div>
+        <div style="padding:12px 16px">
+          <p class="text-muted small">AAC Technical Services v1.0</p>
+          <p class="text-muted small">Offline-ready PWA for flight school maintenance, flight logging, and inventory management.</p>
+        </div>
+      </div>
+    </div>`;
+
+  const pinBtn = document.getElementById('settings-change-pin');
+  if (pinBtn) {
+    pinBtn.addEventListener('click', async () => {
+      const currentUser = localStorage.getItem('aac_user');
+      if (!currentUser) { showToast('No user logged in', 'error'); return; }
+      let userPins = {};
+      try { userPins = JSON.parse(localStorage.getItem('aac_user_pins')) || {}; } catch(e) {}
+      const current = userPins[currentUser] || '1234';
+      const old = await showPromptDialog('Change PIN', 'Enter current PIN:');
+      if (old === null) return;
+      if (old.trim() !== current) { showToast('Incorrect PIN', 'error'); return; }
+      const newPin = await showPromptDialog('Change PIN', 'Enter new PIN:');
+      if (newPin === null) return;
+      if (!newPin.trim()) { showToast('PIN cannot be empty', 'error'); return; }
+      const confirmPin = await showPromptDialog('Change PIN', 'Confirm new PIN:');
+      if (confirmPin === null || confirmPin.trim() !== newPin.trim()) { showToast('PINs do not match', 'error'); return; }
+      userPins[currentUser] = newPin.trim();
+      localStorage.setItem('aac_user_pins', JSON.stringify(userPins));
+      showToast('PIN changed successfully');
+    });
+  }
+
+  document.getElementById('settings-toggle-theme').addEventListener('click', () => {
+    const html = document.documentElement;
+    const isLight = html.getAttribute('data-theme') === 'light';
+    if (isLight) {
+      html.removeAttribute('data-theme');
+      localStorage.setItem('aac_theme', 'dark');
+    } else {
+      html.setAttribute('data-theme', 'light');
+      localStorage.setItem('aac_theme', 'light');
+    }
+    document.getElementById('sidebar-theme-toggle').innerHTML = isLight ? '&#127769;' : '&#127774;';
+    showToast(isLight ? 'Dark mode' : 'Light mode');
+  });
+}
+
 function showLoginGate() {
   const app = document.getElementById('app');
   const sidebar = document.getElementById('sidebar');
@@ -1630,7 +1794,6 @@ function showLoginGate() {
 
   let users = [];
   try { users = JSON.parse(localStorage.getItem('aac_users')) || []; } catch(e) {}
-  const privilegedRoles = ['admin', 'engineer', 'production_planner', 'senior_technician'];
 
   app.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:var(--bg)">
@@ -1665,11 +1828,7 @@ function showLoginGate() {
     const pinGroup = document.getElementById('login-pin-group');
     const error = document.getElementById('login-error');
     error.style.display = 'none';
-    if (privilegedRoles.includes(role)) {
-      pinGroup.style.display = '';
-    } else {
-      pinGroup.style.display = 'none';
-    }
+    pinGroup.style.display = role === 'guest' ? 'none' : '';
   });
 
   document.getElementById('login-btn').addEventListener('click', async () => {
@@ -1679,12 +1838,12 @@ function showLoginGate() {
     const error = document.getElementById('login-error');
     error.style.display = 'none';
     if (!name) { showToast('Select a user', 'error'); return; }
-    if (privilegedRoles.includes(role)) {
+    if (role !== 'guest') {
       const pin = document.getElementById('login-pin').value.trim();
       let userPins = {};
       try { userPins = JSON.parse(localStorage.getItem('aac_user_pins')) || {}; } catch(e) {}
       const storedPin = userPins[name] || '1234';
-      if (!pin) { error.textContent = 'PIN required for this role'; error.style.display = ''; return; }
+      if (!pin) { error.textContent = 'PIN required'; error.style.display = ''; return; }
       if (pin !== storedPin) { error.textContent = 'Incorrect PIN'; error.style.display = ''; return; }
     }
     localStorage.setItem('aac_user', escHtml(name));
@@ -1850,26 +2009,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     e.preventDefault();
     closeSidebar();
     navigate('profile');
-  });
-  document.getElementById('sidebar-pincode').addEventListener('click', async e => {
-    e.preventDefault();
-    closeSidebar();
-    const currentUser = localStorage.getItem('aac_user');
-    if (!currentUser) { showToast('No user logged in', 'error'); return; }
-    let userPins = {};
-    try { userPins = JSON.parse(localStorage.getItem('aac_user_pins')) || {}; } catch(e) {}
-    const current = userPins[currentUser] || '1234';
-    const old = await showPromptDialog('Change PIN', 'Enter current PIN:');
-    if (old === null) return;
-    if (old.trim() !== current) { showToast('Incorrect PIN', 'error'); return; }
-    const newPin = await showPromptDialog('Change PIN', 'Enter new PIN:');
-    if (newPin === null) return;
-    if (!newPin.trim()) { showToast('PIN cannot be empty', 'error'); return; }
-    const confirmPin = await showPromptDialog('Change PIN', 'Confirm new PIN:');
-    if (confirmPin === null || confirmPin.trim() !== newPin.trim()) { showToast('PINs do not match', 'error'); return; }
-    userPins[currentUser] = newPin.trim();
-    localStorage.setItem('aac_user_pins', JSON.stringify(userPins));
-    showToast('PIN changed successfully');
   });
   document.getElementById('sidebar-export').addEventListener('click', async e => {
     e.preventDefault();
