@@ -930,8 +930,10 @@ function profileView() {
     if (!r) { showToast('Select your role', 'error'); return; }
 
     if (r === 'admin' || r === 'engineer' || r === 'production_planner' || r === 'senior_technician') {
-      const pin = localStorage.getItem('aac_pin') || '1234';
-      const entered = await showPromptDialog('PIN Required', `Enter admin PIN to set role as ${r.replace(/_/g, ' ')}:`);
+      const userPins = JSON.parse(localStorage.getItem('aac_user_pins') || '{}');
+      const currentUser = localStorage.getItem('aac_user') || n;
+      const pin = userPins[currentUser] || '1234';
+      const entered = await showPromptDialog('PIN Required', `Enter your PIN to set role as ${r.replace(/_/g, ' ')}:`);
       if (entered === null) { showToast('Profile save cancelled', 'warning'); return; }
       if (entered.trim() !== pin) { showToast('Incorrect PIN', 'error'); return; }
     }
