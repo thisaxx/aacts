@@ -1839,8 +1839,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('offline-banner')?.classList.remove('hidden');
   }
 
-  await populateACSelector();
-
   // Seed per-user PINs if not yet set
   if (!localStorage.getItem('aac_user_pins')) {
     const pins = {};
