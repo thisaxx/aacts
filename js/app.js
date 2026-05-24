@@ -214,7 +214,6 @@ async function getCrewStatusBoard() {
     const canonicalName = similar ? (u.name.length >= similar.name.length ? u.name : similar.name) : u.name;
     const existing = canon.get(canonicalName);
     if (!existing || (u.photo && !existing.photo)) {
-      if (existing && existing.id !== u.id) canonicalName; // keep the better one
       u.name = canonicalName;
       canon.set(canonicalName, u);
     }
@@ -1339,7 +1338,121 @@ async function generateDailyTechLog() {
   window.__sheetClose(true);
 }
 
+function generateEngineerGuide() {
+  const { jsPDF } = window.jspdf;
+  if (!jsPDF) { showToast('PDF library not loaded', 'error'); return; }
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const w = 210;
+  let y = 20;
+  const line = () => { doc.line(14, y, 196, y); y += 6; };
+  const text = (t, size = 10, indent = 14) => { doc.setFontSize(size); doc.text(t, indent, y); y += size * 0.5; };
+  const section = (t) => { y += 4; doc.setFontSize(13); doc.text(t, 14, y); y += 7; doc.setDrawColor(100); doc.line(14, y - 2, 196, y - 2); };
+
+  doc.setFontSize(20);
+  doc.text('AAC Technical Services', w / 2, y, { align: 'center' }); y += 8;
+  doc.setFontSize(14);
+  doc.text('Engineer User Guide', w / 2, y, { align: 'center' }); y += 6;
+  doc.setFontSize(9);
+  doc.text(`Issued: ${new Date().toLocaleDateString()}`, w / 2, y, { align: 'center' }); y += 14;
+  line();
+
+  section('1. Getting Started');
+  text('1.1 Select your name on the login screen and enter your PIN.', 10);
+  text('1.2 The Dashboard shows fleet status: tach time, 50hr / 100hr remaining, open tasks, low stock, fuel, and defects.', 10);
+  text('1.3 Use the sidebar (top-left hamburger icon) to navigate between modules.', 10);
+
+  section('2. Fleet Manager (Aircraft Management)');
+  text('2.1 Navigate to Fleet Manager in the sidebar to add, edit, or remove aircraft.', 10);
+  text('2.2 Each aircraft stores tail number, type, tach time, engine/prop TBO, and 50hr / 100hr baselines.', 10);
+  text('2.3 To edit an aircraft, tap its row in the fleet list and update the fields.', 10);
+  text('2.4 The default aircraft is marked with a star. Switch the default by tapping the star on another aircraft.', 10);
+  text('2.5 You can upload an aircraft photo from the fleet manager edit view.', 10);
+
+  section('3. Flight Operations');
+  text('3.1 Log Flights: enter pilot, tach start/end, route, and remarks.', 10);
+  text('3.2 The system auto-calculates flown hours, ETA (add 10 min), and arrival reminders.', 10);
+  text('3.3 Deleting a flight rolls back tach time, engine ETSO, prop PTSO, and 50hr / 100hr baselines.', 10);
+  text('3.4 Departure is blocked when the aircraft is grounded (active grounding defect).', 10);
+  text('3.5 Fuel Ops: log fuel uplifts and track current fuel state per aircraft.', 10);
+
+  section('4. Maintenance & Defects');
+  text('4.1 Defects: log defects with urgency (grounding / normal) and assign to a crew member.', 10);
+  text('4.2 Grounding defects auto-ground the aircraft (blocks departures).', 10);
+  text('4.3 Work Orders: create tasks from the Maintenance view, assign to a technician.', 10);
+  text('4.4 Rectify: mark a task as rectified (requires PIN for engineer role).', 10);
+  text('4.5 CRS (Release to Service): only Engineer and Admin can issue a CRS. This releases the task.', 10);
+  text('4.6 Production Planner CANNOT issue a CRS — only sign-offs.', 10);
+
+  section('5. Inspections');
+  text('5.1 The system tracks 50hr (oil change) and 100hr (structural) intervals automatically.', 10);
+  text('5.2 Engine TBO and Prop TBO are tracked via ETSO / PTSO counters.', 10);
+  text('5.3 Inspection reminders appear in the sidebar and as dashboard notifications.', 10);
+  text('5.4 Overdue alerts escalate automatically (e.g. 100hr overdue by 10 hrs).', 10);
+
+  section('6. Crew & Attendance');
+  text('6.1 Crew Board shows all users with their sign-in status for the day.', 10);
+  text('6.2 Approved sign-ins count as "On Duty". Pending sign-ins require approval.', 10);
+  text('6.3 Admin and Engineer can approve / reject attendance requests.', 10);
+
+  section('7. Parts & Inventory');
+  text('7.1 Track parts stock with low-stock alerts on the dashboard.', 10);
+  text('7.2 Use the Parts view to add, adjust, or delete inventory items.', 10);
+  text('7.3 Fuel stock is managed separately under Fuel Ops.', 10);
+
+  section('8. Notifications & Alerts');
+  text('8.1 Notifications appear for flight arrivals, inspections due, and defect reports.', 10);
+  text('8.2 Admin can delete individual notifications. All users can mark them as read.', 10);
+  text('8.3 Push notifications are sent via Firebase Cloud Messaging.', 10);
+
+  section('9. Reports & Export');
+  text('9.1 Export / Tech Log: generate a PDF report of selected data with date range and aircraft filter.', 10);
+  text('9.2 Daily Tech Log Summary: generates a one-page PDF with today\'s flights, work orders, defects, and aircraft status.', 10);
+  text('9.3 The PDF can be printed or shared from your device.', 10);
+
+  section('10. Offline Mode');
+  text('10.1 The app works offline. Data syncs when connectivity is restored.', 10);
+  text('10.2 A sync indicator (top-right) shows the sync status.', 10);
+  text('10.3 Buttons are disabled when offline to prevent data loss.', 10);
+
+  section('11. Role Permissions Summary');
+  doc.setFontSize(9);
+  const roles = [
+    ['Function', 'Admin', 'Engineer', 'Prod Plan', 'Sr Tech', 'Tech', 'Pilot', 'Guest'],
+    ['CRS (Release)', 'Yes', 'Yes', 'No', 'No', 'No', 'No', 'No'],
+    ['Rectify Tasks', 'Yes', 'Yes', 'Yes', 'Yes', 'No', 'No', 'No'],
+    ['Fleet Manager', 'Yes', 'Yes', 'Yes', 'No', 'No', 'No', 'No'],
+    ['Delete Flights', 'Yes', 'Yes', 'Yes', 'No', 'No', 'No', 'No'],
+    ['Manage Parts', 'Yes', 'Yes', 'Yes', 'No', 'No', 'No', 'No'],
+    ['Manage Fuel', 'Yes', 'Yes', 'Yes', 'No', 'No', 'No', 'No'],
+    ['Attendance', 'Yes', 'Yes', 'Yes', 'Yes', 'No', 'No', 'No'],
+    ['Factory Reset', 'Yes', 'No', 'No', 'No', 'No', 'No', 'No'],
+    ['All Read-Only', 'No', 'No', 'No', 'No', 'No', 'No', 'Yes'],
+  ];
+  const colW = [50, 20, 22, 24, 18, 18, 14, 16];
+  const rolesStartY = y + 4;
+  let ry = rolesStartY;
+  roles.forEach((row, ri) => {
+    let cx = 14;
+    row.forEach((cell, ci) => {
+      doc.setFontSize(ci === 0 ? 8 : 7);
+      doc.text(cell, cx, ry);
+      cx += colW[ci] || 20;
+    });
+    ry += 5;
+    if (ri === 0) { doc.line(14, ry - 2, 196, ry - 2); }
+  });
+  doc.line(14, ry - 2, 196, ry - 2);
+
+  y = ry + 10;
+  section('12. Support');
+  text('For issues or feature requests, contact the system administrator.', 10);
+
+  doc.save('aacts-engineer-guide.pdf');
+  showToast('Engineer guide PDF generated');
+}
+
 async function renderACListSheet() {
+  const all = await getAllAircraft();
   const all = await getAllAircraft();
   const current = getCurrentAircraftKey();
   const role = localStorage.getItem('aac_user_role');
@@ -1737,29 +1850,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     localStorage.setItem('aac_user_pins', JSON.stringify(pins));
   }
 
-  // Clean up duplicate user names (e.g. "Pasan" vs "Pasan Anishka")
-  let localUsers = [];
-  try { localUsers = JSON.parse(localStorage.getItem('aac_users')) || []; } catch(e) {}
-  const seenNames = new Set();
-  const cleanedLocal = [];
-  for (const u of localUsers) {
-    // Check if this name is a substring of or contains another existing name
-    const dup = localUsers.find(other =>
-      other.name !== u.name && (other.name.includes(u.name) || u.name.includes(other.name))
-    );
-    if (dup) {
-      // Keep the longer name, skip the shorter one
-      const longer = u.name.length >= dup.name.length ? u : dup;
-      if (!seenNames.has(longer.name)) {
-        seenNames.add(longer.name);
-        cleanedLocal.push(longer);
+  if (localStorage.getItem('aac_users')) {
+    // Clean up duplicate user names (e.g. "Pasan" vs "Pasan Anishka")
+    let localUsers = [];
+    try { localUsers = JSON.parse(localStorage.getItem('aac_users')) || []; } catch(e) {}
+    if (localUsers.length > 0) {
+      const seenNames = new Set();
+      const cleanedLocal = [];
+      for (const u of localUsers) {
+        const dup = localUsers.find(other =>
+          other.name !== u.name && (other.name.includes(u.name) || u.name.includes(other.name))
+        );
+        if (dup) {
+          const longer = u.name.length >= dup.name.length ? u : dup;
+          if (!seenNames.has(longer.name)) {
+            seenNames.add(longer.name);
+            cleanedLocal.push(longer);
+          }
+        } else if (!seenNames.has(u.name)) {
+          seenNames.add(u.name);
+          cleanedLocal.push(u);
+        }
       }
-    } else if (!seenNames.has(u.name)) {
-      seenNames.add(u.name);
-      cleanedLocal.push(u);
+      localStorage.setItem('aac_users', JSON.stringify(cleanedLocal));
     }
   }
-  localStorage.setItem('aac_users', JSON.stringify(cleanedLocal));
 
   // Seed user database if not yet set
   if (!localStorage.getItem('aac_users')) {
@@ -1917,6 +2032,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     e.preventDefault();
     closeSidebar();
     showExportSheet();
+  });
+  document.getElementById('sidebar-guide').addEventListener('click', async e => {
+    e.preventDefault();
+    closeSidebar();
+    generateEngineerGuide();
   });
 
   updateSidebarUser();
