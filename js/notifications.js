@@ -76,7 +76,8 @@ function notifTypeIcon(type) {
     inspection: '&#128197;',
     sortie: '&#9992;',
     fuel: '&#9981;',
-    system: '&#8505;'
+    system: '&#8505;',
+    arrival: '&#128196;'
   };
   return icons[type] || '&#9679;';
 }
@@ -120,6 +121,32 @@ function notificationsView() {
   renderNotifList();
 }
 
+const FLIGHT_NOTIF_TYPES = ['sortie', 'fuel', 'arrival'];
+const MAINT_NOTIF_TYPES = ['squawk', 'task', 'inspection', 'crs', 'system'];
+
+function notifTypeSection(type) {
+  if (FLIGHT_NOTIF_TYPES.includes(type)) return 'flight';
+  if (MAINT_NOTIF_TYPES.includes(type)) return 'maintenance';
+  return 'other';
+}
+
+function renderNotifGroup(notifs, title, icon) {
+  if (notifs.length === 0) return '';
+  return `
+    <div class="notif-section-title">${icon} ${title} <span class="notif-section-count">${notifs.length}</span></div>
+    ${notifs.map(n => `
+      <div class="task-card notif-card ${n.read ? '' : 'notif-unread'}" data-id="${n.id}" style="cursor:pointer">
+        <div class="task-header">
+          <span>${notifTypeIcon(n.type)} ${escHtml(n.title)}</span>
+          <span class="badge ${n.read ? 'badge-rectified' : 'badge-open'}" style="font-size:10px">${n.read ? 'Read' : 'New'}</span>
+        </div>
+        <p class="task-desc">${escHtml(n.message)}</p>
+        <p class="task-meta">${new Date(n.createdAt).toLocaleString()}</p>
+      </div>
+    `).join('')}
+  `;
+}
+
 async function renderNotifList() {
   const el = document.getElementById('notif-list');
   const notifs = await getNotifications();
@@ -127,16 +154,14 @@ async function renderNotifList() {
     el.innerHTML = emptyState('&#128276;', 'No notifications yet');
     return;
   }
-  el.innerHTML = notifs.map(n => `
-    <div class="task-card notif-card ${n.read ? '' : 'notif-unread'}" data-id="${n.id}" style="cursor:pointer">
-      <div class="task-header">
-        <span>${notifTypeIcon(n.type)} ${escHtml(n.title)}</span>
-        <span class="badge ${n.read ? 'badge-rectified' : 'badge-open'}" style="font-size:10px">${n.read ? 'Read' : 'New'}</span>
-      </div>
-      <p class="task-desc">${escHtml(n.message)}</p>
-      <p class="task-meta">${new Date(n.createdAt).toLocaleString()}</p>
-    </div>
-  `).join('');
+
+  const flightNotifs = notifs.filter(n => notifTypeSection(n.type) === 'flight');
+  const maintNotifs = notifs.filter(n => notifTypeSection(n.type) === 'maintenance');
+  const otherNotifs = notifs.filter(n => notifTypeSection(n.type) === 'other');
+
+  el.innerHTML = renderNotifGroup(flightNotifs, 'Flight Notifications', '&#9992;') +
+    renderNotifGroup(maintNotifs, 'Maintenance Notifications', '&#9881;') +
+    renderNotifGroup(otherNotifs, 'Other', '&#9679;');
 
   el.querySelectorAll('.notif-card').forEach(card => {
     card.addEventListener('click', async () => {

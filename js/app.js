@@ -350,6 +350,22 @@ function initToggles() {
   });
 }
 
+function renderFlightStatusBar(flight) {
+  const etaDisplay = flight.eta ? `&middot; ETA <strong>${escHtml(flight.eta)}</strong>` : '';
+  return `
+    <div class="flight-status-bar">
+      <div class="flight-status-bar-inner">
+        <div class="flight-status-bar-row">
+          <span class="flight-status-bar-icon">&#9992;</span>
+          <span class="flight-status-bar-text">Airborne &middot; ${escHtml(flight.pilotName)} &middot; Dep ${escHtml(flight.takeoffTime)} ${etaDisplay}</span>
+        </div>
+        <div class="flight-status-bar-progress">
+          <div class="flight-status-bar-track"></div>
+        </div>
+      </div>
+    </div>`;
+}
+
 async function dashboardView() {
   const app = document.getElementById('app');
   const ac = await getAircraft();
@@ -451,6 +467,8 @@ async function dashboardView() {
           </div>
         </div>
       </div>
+
+      ${isAirborne ? renderFlightStatusBar(flights.find(f => f.aircraftId === ac.tailNumber && f.status === 'departed')) : ''}
 
       <div class="dashboard-grid">
         <div class="stat-card">
@@ -1376,6 +1394,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   await initFirebase();
+
+  if (typeof restoreArrivalReminders === 'function') restoreArrivalReminders();
 
   window.addEventListener('online', () => {
     document.getElementById('offline-banner')?.classList.add('hidden');

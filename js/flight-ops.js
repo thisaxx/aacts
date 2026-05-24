@@ -106,6 +106,10 @@ function flightOpsView() {
           <label for="takeoff-time">Departure Time</label>
           <input type="time" id="takeoff-time" class="form-input">
         </div>
+        <div class="form-group">
+          <label for="flight-duration">Flight Duration <span class="text-muted small">(optional, min)</span></label>
+          <input type="number" id="flight-duration" class="form-input" min="0" step="1" placeholder="e.g. 45">
+        </div>
         <div class="card-header" style="margin-top:6px"><h3>Pre-flight Fuel</h3></div>
         <div class="row">
           <div class="form-group">
@@ -257,7 +261,7 @@ async function renderDepartedList() {
     <div class="flight-row departed-item" data-id="${f.id}" style="cursor:pointer;border-left:3px solid var(--gold);padding-left:10px;margin-bottom:6px">
       <div style="flex:1;min-width:0">
         <div class="flight-pilot">${escHtml(f.pilotName)} &middot; ${f.flightDate}</div>
-        <div class="flight-date">Departed ${f.takeoffTime} &middot; Pre-flight: ${((f.fuelBeforeLeft||0)+(f.fuelBeforeRight||0)).toFixed(1)} gal</div>
+        <div class="flight-date">Departed ${f.takeoffTime}${f.eta ? ` &middot; ETA ${f.eta}` : ''} &middot; Pre-flight: ${((f.fuelBeforeLeft||0)+(f.fuelBeforeRight||0)).toFixed(1)} gal</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
         <span class="badge badge-rectified" style="font-size:9px">DEPARTED</span>
@@ -340,10 +344,21 @@ async function onDepartureSubmit(e) {
   const pilot = document.getElementById('pilot-name').value.trim() || 'Unknown';
   const takeoffTime = document.getElementById('takeoff-time').value;
   const flightDate = document.getElementById('flight-date').value;
+  const flightDurationMin = parseInt(document.getElementById('flight-duration').value) || 0;
 
   if (!takeoffTime) {
     showToast('Enter departure time', 'error');
     return;
+  }
+
+  let eta = null;
+  if (flightDurationMin > 0) {
+    const [h, m] = takeoffTime.split(':').map(Number);
+    const depTotal = h * 60 + m;
+    const etaTotal = depTotal + flightDurationMin;
+    const etaH = Math.floor(etaTotal / 60) % 24;
+    const etaM = etaTotal % 60;
+    eta = `${String(etaH).padStart(2, '0')}:${String(etaM).padStart(2, '0')}`;
   }
 
   const ac = await getAircraft();
@@ -353,6 +368,7 @@ async function onDepartureSubmit(e) {
     flightDate,
     pilotName: pilot,
     takeoffTime,
+    eta,
     landingTime: null,
     flownHours: 0,
     fuelBeforeLeft: fuelVal('fuel-before-left'),
@@ -371,17 +387,50 @@ async function onDepartureSubmit(e) {
   await DB.put('flights', flight);
   await queueSync('flights', 'create', flight);
 
+  if (eta) {
+    const etaDate = new Date();
+    const [eh, em] = eta.split(':').map(Number);
+    etaDate.setHours(eh, em, 0, 0);
+    if (etaDate < new Date()) etaDate.setDate(etaDate.getDate() + 1);
+    const reminderTime = etaDate.getTime() - 10 * 60 * 1000;
+    scheduleArrivalReminder(flight, ac, reminderTime);
+  }
+
   document.getElementById('depart-form').reset();
   document.getElementById('flight-date').valueAsDate = new Date();
 
   showToast('Departure recorded — awaiting arrival');
 
-  createNotification('sortie', 'Departure Recorded', `${pilot} departed in ${ac.tailNumber} at ${takeoffTime}`, 'flight-ops');
-  logActivity('departure', `${pilot} departed in ${ac.tailNumber} at ${takeoffTime}`, flight.id);
+  createNotification('sortie', 'Departure Recorded', `${pilot} departed in ${ac.tailNumber} at ${takeoffTime}${eta ? `, ETA ${eta}` : ''}`, 'flight-ops');
+  logActivity('departure', `${pilot} departed in ${ac.tailNumber} at ${takeoffTime}${eta ? `, ETA ${eta}` : ''}`, flight.id);
 
   renderDepartedList();
   renderRecentFlights();
   showArrivalForm(flight.id);
+}
+
+function scheduleArrivalReminder(flight, ac, reminderTime) {
+  const delay = reminderTime - Date.now();
+  const key = `arrival_reminder_${flight.id}`;
+  const existing = window[key];
+  if (existing) clearTimeout(existing);
+  if (delay <= 0) {
+    // Reminder window already passed — fire if still departed
+    setTimeout(async () => {
+      const f = await DB.get('flights', flight.id);
+      if (f && f.status === 'departed') {
+        createNotification('arrival', 'Arrival Expected Soon', `${flight.pilotName} in ${ac.tailNumber} expected to arrive in ~10 min (dep ${flight.takeoffTime})`, 'flight-ops');
+      }
+    }, 0);
+    return;
+  }
+  window[key] = setTimeout(async () => {
+    const f = await DB.get('flights', flight.id);
+    if (f && f.status === 'departed') {
+      createNotification('arrival', 'Arrival Expected Soon', `${flight.pilotName} in ${ac.tailNumber} expected to arrive in ~10 min (dep ${flight.takeoffTime})`, 'flight-ops');
+    }
+    delete window[key];
+  }, delay);
 }
 
 async function onArrivalSubmit(e) {
@@ -412,6 +461,9 @@ async function onArrivalSubmit(e) {
   const refuelAmt = refueled ? parseFloat(document.getElementById('refuel-amount')?.value) || 0 : 0;
   const refuelSrc = refueled ? document.getElementById('refuel-source')?.value : '';
   const fuelType = refueled ? document.getElementById('fuel-type')?.value : '';
+
+  const reminderKey = `arrival_reminder_${flight.id}`;
+  if (window[reminderKey]) { clearTimeout(window[reminderKey]); delete window[reminderKey]; }
 
   flight.landingTime = landingTime;
   flight.flownHours = duration;
@@ -854,4 +906,20 @@ async function editFlight(flightId) {
     renderDepartedList();
   });
   document.getElementById('cancel-edit-flight-btn').addEventListener('click', () => window.__sheetClose(null));
+}
+
+async function restoreArrivalReminders() {
+  try {
+    const ac = await getAircraft();
+    const departed = (await DB.getAll('flights'))
+      .filter(f => f.aircraftId === ac.tailNumber && f.status === 'departed' && f.eta);
+    for (const f of departed) {
+      const etaDate = new Date();
+      const [eh, em] = f.eta.split(':').map(Number);
+      etaDate.setHours(eh, em, 0, 0);
+      if (etaDate < new Date()) etaDate.setDate(etaDate.getDate() + 1);
+      const reminderTime = etaDate.getTime() - 10 * 60 * 1000;
+      scheduleArrivalReminder(f, ac, reminderTime);
+    }
+  } catch (e) { /* not ready yet */ }
 }
