@@ -2521,6 +2521,7 @@ function showLoginGate() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  try {
   // Apply saved theme
   const savedTheme = localStorage.getItem('aac_theme');
   const isLight = savedTheme === 'light';
@@ -2563,16 +2564,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('offline-banner')?.classList.remove('hidden');
   }
 
-  await populateACSelector();
-
-  // Seed per-user PINs if not yet set
-  if (!localStorage.getItem('aac_user_pins')) {
-    const pins = {};
-    let users = [];
-    try { users = JSON.parse(localStorage.getItem('aac_users')) || []; } catch(e) {}
-    users.forEach(u => { pins[u.name] = '1234'; });
-    localStorage.setItem('aac_user_pins', JSON.stringify(pins));
-  }
+  try { await populateACSelector(); } catch (e) { /* selector will just be empty */ }
 
   // Seed user database if not yet set
   if (!localStorage.getItem('aac_users')) {
@@ -2594,6 +2586,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     localStorage.setItem('aac_users', JSON.stringify(defaultUsers));
   }
 
+  // Seed per-user PINs if not yet set (run AFTER users seeded)
+  if (!localStorage.getItem('aac_user_pins')) {
+    const pins = {};
+    let users = [];
+    try { users = JSON.parse(localStorage.getItem('aac_users')) || []; } catch(e) {}
+    users.forEach(u => { pins[u.name] = '1234'; });
+    localStorage.setItem('aac_user_pins', JSON.stringify(pins));
+  }
+
   // Seed pilot list (separate from login users) — empty by default
   if (!localStorage.getItem('aac_pilots')) {
     localStorage.setItem('aac_pilots', JSON.stringify([]));
@@ -2609,15 +2610,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch(e) {}
 
   // Sync login users into DB so crew board shows everyone
-  const seedUsers = JSON.parse(localStorage.getItem('aac_users') || '[]');
-  const existingDbUsers = await DB.getAll('users');
-  const existingNames = new Set(existingDbUsers.map(u => u.name));
-  for (const su of seedUsers) {
-    if (!existingNames.has(su.name)) {
-      const id = 'user_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-      await DB.put('users', { id, name: su.name, role: su.role, photo: '', createdAt: new Date().toISOString() });
+  try {
+    const seedUsers = JSON.parse(localStorage.getItem('aac_users') || '[]');
+    const existingDbUsers = await DB.getAll('users');
+    const existingNames = new Set(existingDbUsers.map(u => u.name));
+    for (const su of seedUsers) {
+      if (!existingNames.has(su.name)) {
+        const id = 'user_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+        await DB.put('users', { id, name: su.name, role: su.role, photo: '', createdAt: new Date().toISOString() });
+      }
     }
-  }
+  } catch (e) { /* skip user sync — non-critical */ }
 
   // Seed a default aircraft if the database is empty (e.g. after data reset)
   try {
@@ -2728,6 +2731,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     navigate(lastView);
     checkInspectionNotifications();
     scheduleEndOfDayCheck();
+  }
+  } catch (e) {
+    console.warn('App init error — showing fallback UI', e);
+    // Show a basic fallback so the page is never blank
+    const app = document.getElementById('app');
+    if (app && !app.innerHTML.trim()) {
+      app.innerHTML = '<div class="page"><div class="card" style="padding:20px;text-align:center"><h3>App load error</h3><p class="text-muted" style="margin-top:8px">Please refresh or clear site data and try again.</p><button class="btn btn-primary btn-block" style="margin-top:16px" onclick="location.reload()">Reload</button></div></div>';
+    }
   }
 });
 

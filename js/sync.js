@@ -162,36 +162,42 @@ async function updateSyncBadge() {
   }
 }
 
+let _syncBusy = false;
 async function processSyncQueue() {
-  if (!db_firestore || !navigator.onLine) return;
-  const entries = await DB.getAll('sync_queue');
-  for (const entry of entries) {
-    try {
-      const { collection, action, data } = entry;
-      const toSync = JSON.parse(JSON.stringify(data));
-      // Refresh timestamp so incremental polls on other devices pick this up
-      toSync._updatedAt = Date.now();
-      toSync._deviceId = _deviceId;
-      if (toSync.photoData) delete toSync.photoData;
-      if (action === 'delete') {
-        await db_firestore.collection(collection).doc(getDocId(collection, data)).delete();
-      } else {
-        await db_firestore.collection(collection).doc(getDocId(collection, data)).set(toSync, { merge: true });
-      }
-      await DB.del('sync_queue', entry.id);
-      // Notify other tabs to pull latest
-      try { _syncChannel.postMessage('sync'); } catch (e) { /* no channel */ }
-    } catch (e) {
-      // Increment retry count; discard after 5 failures to prevent buildup
-      const retries = (entry.retries || 0) + 1;
-      if (retries >= 5) {
-        await DB.del('sync_queue', entry.id).catch(() => {});
-      } else {
-        await DB.put('sync_queue', { ...entry, retries }).catch(() => {});
+  if (!db_firestore || !navigator.onLine || _syncBusy) return;
+  _syncBusy = true;
+  try {
+    const entries = await DB.getAll('sync_queue');
+    for (const entry of entries) {
+      try {
+        const { collection, action, data } = entry;
+        const toSync = JSON.parse(JSON.stringify(data));
+        // Refresh timestamp so incremental polls on other devices pick this up
+        toSync._updatedAt = Date.now();
+        toSync._deviceId = _deviceId;
+        if (toSync.photoData) delete toSync.photoData;
+        if (action === 'delete') {
+          await db_firestore.collection(collection).doc(getDocId(collection, data)).delete();
+        } else {
+          await db_firestore.collection(collection).doc(getDocId(collection, data)).set(toSync, { merge: true });
+        }
+        await DB.del('sync_queue', entry.id);
+        // Notify other tabs to pull latest
+        try { _syncChannel.postMessage('sync'); } catch (e) { /* no channel */ }
+      } catch (e) {
+        // Increment retry count; discard after 5 failures to prevent buildup
+        const retries = (entry.retries || 0) + 1;
+        if (retries >= 5) {
+          await DB.del('sync_queue', entry.id).catch(() => {});
+        } else {
+          await DB.put('sync_queue', { ...entry, retries }).catch(() => {});
+        }
       }
     }
+  } finally {
+    _syncBusy = false;
+    updateSyncBadge();
   }
-  updateSyncBadge();
 }
 
 window.addEventListener('online', () => {
