@@ -369,11 +369,7 @@ function startFlightBarProgress(flight) {
     if (elapsed < 0) elapsed += 24 * 60 * 60 * 1000;
     const pct = Math.min(100, Math.max(0, (elapsed / totalDuration) * 100));
     fillEl.style.width = pct + '%';
-    fillEl.style.background = pct < 50
-      ? 'linear-gradient(90deg, #3b82f6, #8b5cf6)'
-      : pct < 80
-      ? 'linear-gradient(90deg, #f59e0b, #f97316)'
-      : 'linear-gradient(90deg, #ef4444, #dc2626)';
+    fillEl.style.background = '#6b7280';
     if (planeEl) {
       planeEl.style.left = `calc(${pct}% - 10px)`;
       planeEl.style.opacity = '1';
@@ -542,7 +538,7 @@ async function dashboardView() {
       <div class="dash-alerts">
         ${alerts.map(a => `<div class="dash-alert">&#9888; ${a}</div>`).join('')}
         ${ac.groundedAfterInspection ? `<div class="dash-alert" style="border-color:var(--danger)">&#128308; Aircraft grounded — daily CRS required before next flight</div>` : ''}
-        ${(!crsIssuedToday || ac.groundedAfterInspection) && (userRole === 'engineer' || userRole === 'production_planner' || userRole === 'admin') ? `
+        ${(!crsIssuedToday || ac.groundedAfterInspection) && (userRole === 'engineer' || userRole === 'admin') ? `
         <button class="btn btn-primary btn-block" id="issue-daily-crs-btn" style="margin-top:8px">${ac.groundedAfterInspection ? '&#9989; Issue Daily CRS for Airworthiness' : 'Issue Daily CRS'}</button>` : ''}
         ${inspectionOverdue ? `<button class="btn btn-primary btn-block" id="perform-inspection-btn" style="margin-top:8px">&#9881; Perform Inspection Sign-off</button>` : ''}
       </div>` : ''}
@@ -680,6 +676,8 @@ async function dashboardView() {
   const crsBtn = document.getElementById('issue-daily-crs-btn');
   if (crsBtn) {
   crsBtn.addEventListener('click', async () => {
+      const role = localStorage.getItem('aac_user_role');
+      if (role !== 'engineer' && role !== 'admin') { showToast('Only Engineer or Admin can issue CRS', 'error'); return; }
       const ac = await getAircraft();
       const hoursSinceOil = (ac.totalTachTime || 0) - (ac.lastOilChangeTach || 0);
       const oilDue = hoursSinceOil >= (ac.oilInterval || 50);
@@ -872,7 +870,7 @@ function profileView() {
   const roles = [
     { value: 'technician', label: 'Technician', desc: 'Can record sorties, report squawks, view data' },
     { value: 'senior_technician', label: 'Senior Technician', desc: 'Above + can approve sign-ins' },
-    { value: 'production_planner', label: 'Production Planner', desc: 'Above + can end flying, issue CRS, manage fleet' },
+    { value: 'production_planner', label: 'Production Planner', desc: 'Above + can end flying, view CRS, manage fleet' },
     { value: 'engineer', label: 'Engineer', desc: 'Above + can approve CRS (Release to Service)' },
     { value: 'admin', label: 'Admin', desc: 'Full access to all features' }
   ];

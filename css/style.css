@@ -1153,8 +1153,8 @@ select {
   height: 4px;
   width: 0%;
   border-radius: 4px;
-  transition: width 2s linear, background 2s ease;
-  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  transition: width 2s linear;
+  background: #6b7280;
   z-index: 2;
 }
 .flight-status-bar-fill::after {
