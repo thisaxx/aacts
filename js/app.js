@@ -350,18 +350,51 @@ function initToggles() {
   });
 }
 
+function startFlightBarProgress(flight) {
+  if (!flight.eta || !flight.takeoffTime) return;
+  const fillEl = document.getElementById(`fsb-fill-${flight.id}`);
+  if (!fillEl) return;
+  const [dh, dm] = flight.takeoffTime.split(':').map(Number);
+  const [eh, em] = flight.eta.split(':').map(Number);
+  const depMs = (dh * 60 + dm) * 60 * 1000;
+  const etaMs = (eh * 60 + em) * 60 * 1000;
+  let totalDuration = etaMs - depMs;
+  if (totalDuration <= 0) totalDuration += 24 * 60 * 60 * 1000;
+  function tick() {
+    const now = new Date();
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const nowMs = now.getTime() - todayMidnight;
+    let elapsed = nowMs - depMs;
+    if (elapsed < 0) elapsed += 24 * 60 * 60 * 1000;
+    const pct = Math.min(100, Math.max(0, (elapsed / totalDuration) * 100));
+    fillEl.style.width = pct + '%';
+    fillEl.style.background = pct < 50
+      ? 'linear-gradient(90deg, #3b82f6, #8b5cf6)'
+      : pct < 80
+      ? 'linear-gradient(90deg, #f59e0b, #f97316)'
+      : 'linear-gradient(90deg, #ef4444, #dc2626)';
+  }
+  tick();
+  const interval = setInterval(tick, 2000);
+  const key = `fsb_${flight.id}`;
+  if (window[key]) clearInterval(window[key]);
+  window[key] = interval;
+}
+
 function renderFlightStatusBar(flight) {
   const etaDisplay = flight.eta ? `&middot; ETA <strong>${escHtml(flight.eta)}</strong>` : '';
+  const hasProgress = flight.eta && flight.takeoffTime;
+  const progressHtml = hasProgress
+    ? `<div class="flight-status-bar-progress"><div class="flight-status-bar-fill" id="fsb-fill-${escHtml(flight.id)}"></div></div>`
+    : `<div class="flight-status-bar-progress"><div class="flight-status-bar-track"></div></div>`;
   return `
-    <div class="flight-status-bar">
+    <div class="flight-status-bar" id="fsb-${escHtml(flight.id)}">
       <div class="flight-status-bar-inner">
         <div class="flight-status-bar-row">
           <span class="flight-status-bar-icon">&#9992;</span>
           <span class="flight-status-bar-text">Airborne &middot; ${escHtml(flight.pilotName)} &middot; Dep ${escHtml(flight.takeoffTime)} ${etaDisplay}</span>
         </div>
-        <div class="flight-status-bar-progress">
-          <div class="flight-status-bar-track"></div>
-        </div>
+        ${progressHtml}
       </div>
     </div>`;
 }
@@ -608,6 +641,11 @@ async function dashboardView() {
   `;
 
   document.getElementById('dashboard-hero').addEventListener('click', () => showAircraftSheet());
+
+  if (isAirborne) {
+    const departedFlight = flights.find(f => f.aircraftId === ac.tailNumber && f.status === 'departed');
+    if (departedFlight) startFlightBarProgress(departedFlight);
+  }
 
   checkAndCreateInspectionTasks(ac);
 
@@ -1396,6 +1434,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await initFirebase();
 
   if (typeof restoreArrivalReminders === 'function') restoreArrivalReminders();
+  if (typeof restoreFlightProgressBars === 'function') restoreFlightProgressBars();
 
   window.addEventListener('online', () => {
     document.getElementById('offline-banner')?.classList.add('hidden');

@@ -107,8 +107,8 @@ function flightOpsView() {
           <input type="time" id="takeoff-time" class="form-input">
         </div>
         <div class="form-group">
-          <label for="flight-duration">Flight Duration <span class="text-muted small">(optional, min)</span></label>
-          <input type="number" id="flight-duration" class="form-input" min="0" step="1" placeholder="e.g. 45">
+          <label for="flight-duration">Flight Duration <span class="text-muted small">(optional, hours)</span></label>
+          <input type="number" id="flight-duration" class="form-input" min="0" step="0.1" placeholder="e.g. 0.8">
         </div>
         <div class="card-header" style="margin-top:6px"><h3>Pre-flight Fuel</h3></div>
         <div class="row">
@@ -344,7 +344,8 @@ async function onDepartureSubmit(e) {
   const pilot = document.getElementById('pilot-name').value.trim() || 'Unknown';
   const takeoffTime = document.getElementById('takeoff-time').value;
   const flightDate = document.getElementById('flight-date').value;
-  const flightDurationMin = parseInt(document.getElementById('flight-duration').value) || 0;
+  const flightDurationHrs = parseFloat(document.getElementById('flight-duration').value) || 0;
+  const flightDurationMin = Math.round(flightDurationHrs * 60);
 
   if (!takeoffTime) {
     showToast('Enter departure time', 'error');
@@ -369,6 +370,7 @@ async function onDepartureSubmit(e) {
     pilotName: pilot,
     takeoffTime,
     eta,
+    flightDurationHrs: flightDurationHrs > 0 ? flightDurationHrs : undefined,
     landingTime: null,
     flownHours: 0,
     fuelBeforeLeft: fuelVal('fuel-before-left'),
@@ -464,6 +466,8 @@ async function onArrivalSubmit(e) {
 
   const reminderKey = `arrival_reminder_${flight.id}`;
   if (window[reminderKey]) { clearTimeout(window[reminderKey]); delete window[reminderKey]; }
+  const fsbKey = `fsb_${flight.id}`;
+  if (window[fsbKey]) { clearInterval(window[fsbKey]); delete window[fsbKey]; }
 
   flight.landingTime = landingTime;
   flight.flownHours = duration;
@@ -920,6 +924,17 @@ async function restoreArrivalReminders() {
       if (etaDate < new Date()) etaDate.setDate(etaDate.getDate() + 1);
       const reminderTime = etaDate.getTime() - 10 * 60 * 1000;
       scheduleArrivalReminder(f, ac, reminderTime);
+    }
+  } catch (e) { /* not ready yet */ }
+}
+
+async function restoreFlightProgressBars() {
+  try {
+    const ac = await getAircraft();
+    const departed = (await DB.getAll('flights'))
+      .filter(f => f.aircraftId === ac.tailNumber && f.status === 'departed' && f.eta);
+    for (const f of departed) {
+      if (typeof startFlightBarProgress === 'function') startFlightBarProgress(f);
     }
   } catch (e) { /* not ready yet */ }
 }

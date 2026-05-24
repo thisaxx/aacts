@@ -1117,6 +1117,21 @@ select {
   animation: flightBarShimmer 1.5s ease-in-out infinite, flightBarPulse 2s ease-in-out infinite;
   border-radius: 2px;
 }
+.flight-status-bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 2px;
+  transition: width 2s linear, background 2s ease;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  position: relative;
+}
+.flight-status-bar-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2));
+  animation: flightBarShimmer 1.5s ease-in-out infinite;
+}
 @keyframes flightBarShimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
