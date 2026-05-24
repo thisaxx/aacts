@@ -855,6 +855,15 @@ async function renderRecentFlights() {
   el.querySelectorAll('.edit-flight-btn').forEach(btn => {
     btn.addEventListener('click', () => editFlight(btn.dataset.id));
   });
+  // Swipe gestures on flight rows
+  el.querySelectorAll('.flight-row').forEach(row => {
+    const delBtn = row.querySelector('.del-flight-btn');
+    const editBtn = row.querySelector('.edit-flight-btn');
+    enableSwipe(row, {
+      onSwipeLeft: () => { if (editBtn) editBtn.click(); },
+      onSwipeRight: () => { if (delBtn) delBtn.click(); }
+    });
+  });
 }
 
 async function editFlight(flightId) {

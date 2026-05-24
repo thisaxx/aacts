@@ -1,5 +1,5 @@
 const DB_NAME = 'aac';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 function denyGuest() {
   if (localStorage.getItem('aac_user_role') === 'guest') {
@@ -51,6 +51,12 @@ function openDB() {
       }
       if (!db.objectStoreNames.contains('components')) {
         db.createObjectStore('components', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('calibration_tools')) {
+        db.createObjectStore('calibration_tools', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('certificates')) {
+        db.createObjectStore('certificates', { keyPath: 'id' });
       }
     };
     req.onsuccess = () => resolve(req.result);

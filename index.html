@@ -39,6 +39,7 @@
       <a href="#" class="sidebar-link" data-view="flight-ops"><span class="s-icon">&#9992;</span> Log Flights</a>
       <a href="#" class="sidebar-link" data-view="fuel"><span class="s-icon">&#9981;</span> Fuel Ops</a>
       <a href="#" class="sidebar-link" data-view="calendar"><span class="s-icon">&#128197;</span> Logbook</a>
+      <a href="#" class="sidebar-link" data-view="reports"><span class="s-icon">&#128200;</span> Reports</a>
       <div class="sidebar-group-label">Technical</div>
       <a href="#" class="sidebar-link" data-view="maintenance"><span class="s-icon">&#9881;</span> Mx / Sign-offs</a>
       <a href="#" class="sidebar-link" data-view="defects"><span class="s-icon">&#9888;</span> Defects</a>
@@ -76,8 +77,10 @@
     </div>
   </header>
 
+  <div class="pull-indicator" id="pull-indicator">&#8593; Pull to refresh</div>
   <div id="app"></div>
 
+  <button class="fab hidden" id="fab" title="Log Flight">&#9992;</button>
   <div id="toast" class="toast"></div>
   <input type="file" id="ac-photo-input" accept="image/*" style="display:none">
 

@@ -18,5 +18,19 @@
       "sizes": "512x512",
       "type": "image/png"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Log Flight",
+      "short_name": "Flight",
+      "description": "Quick log a flight",
+      "url": "./?view=flight-ops"
+    },
+    {
+      "name": "Dashboard",
+      "short_name": "Home",
+      "description": "View dashboard",
+      "url": "./?view=dashboard"
+    }
   ]
 }

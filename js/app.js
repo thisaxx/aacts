@@ -18,6 +18,56 @@ function haptic() {
   if ('vibrate' in navigator) navigator.vibrate(8);
 }
 
+function playAlert() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.setValueAtTime(660, ctx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.4);
+  } catch(e) {}
+}
+
+let _pullStartY = 0;
+let _pullThreshold = 80;
+function initPullToRefresh() {
+  const app = document.getElementById('app');
+  if (!app) return;
+  app.addEventListener('touchstart', e => { _pullStartY = e.touches[0].clientY; }, { passive: true });
+  app.addEventListener('touchmove', e => {
+    if (window.__sheetOpen || document.getElementById('app').scrollTop > 0) return;
+    const dy = e.touches[0].clientY - _pullStartY;
+    const ind = document.getElementById('pull-indicator');
+    if (dy > 40) {
+      ind.textContent = dy > _pullThreshold ? '&#8593; Release to refresh' : '&#8593; Pull to refresh';
+      ind.classList.add('visible');
+    } else {
+      ind.classList.remove('visible');
+    }
+  }, { passive: true });
+  app.addEventListener('touchend', async () => {
+    const ind = document.getElementById('pull-indicator');
+    if (ind.classList.contains('visible') && ind.textContent.includes('Release')) {
+      ind.textContent = '&#8635; Refreshing...';
+      await refreshCurrentView();
+    }
+    ind.classList.remove('visible');
+  }, { passive: true });
+}
+
+async function refreshCurrentView() {
+  const active = document.querySelector('.nav-link.active');
+  const view = active ? active.dataset.view : 'dashboard';
+  showToast('Refreshed');
+  navigate(view);
+}
+
 async function addComment(parentType, parentId, text) {
   if (!text.trim()) return;
   const user = localStorage.getItem('aac_user') || 'Unknown';
@@ -697,6 +747,12 @@ async function dashboardView() {
     </div>
   `;
 
+  // Play alert sound for critical dash conditions
+  if ((groundingDefects > 0 || minRemaining <= 0 || ac.groundedAfterInspection) && !window._alertedThisSession) {
+    setTimeout(playAlert, 500);
+    window._alertedThisSession = true;
+  }
+
   document.getElementById('dashboard-hero').addEventListener('click', () => showAircraftSheet());
 
   if (isAirborne) {
@@ -791,6 +847,281 @@ async function dashboardView() {
   }
 }
 
+/* ── Reports View ── */
+async function reportsView() {
+  const app = document.getElementById('app');
+  const ac = await getAircraft();
+  const allFlights = await DB.getAll('flights');
+  const flights = allFlights.filter(f => f.aircraftId === (ac ? ac.tailNumber : ''));
+  const now = new Date();
+
+  // Monthly breakdown per aircraft
+  const monthly = {};
+  flights.forEach(f => {
+    if (!f.flownHours) return;
+    const month = (f.flightDate || '').slice(0, 7);
+    if (!month) return;
+    if (!monthly[month]) monthly[month] = { hours: 0, count: 0, pilotHours: {} };
+    monthly[month].hours += f.flownHours;
+    monthly[month].count++;
+    const pilot = f.pilotName || 'Unknown';
+    if (!monthly[month].pilotHours[pilot]) monthly[month].pilotHours[pilot] = 0;
+    monthly[month].pilotHours[pilot] += f.flownHours;
+  });
+  const months = Object.keys(monthly).sort().reverse();
+
+  // Total per pilot
+  const pilotTotals = {};
+  flights.forEach(f => {
+    if (!f.flownHours) return;
+    const pilot = f.pilotName || 'Unknown';
+    pilotTotals[pilot] = (pilotTotals[pilot] || 0) + f.flownHours;
+  });
+
+  // Calendar year totals
+  const thisYear = now.getFullYear();
+  const yearFlights = flights.filter(f => (f.flightDate || '').startsWith(String(thisYear)));
+  const yearHours = yearFlights.reduce((s, f) => s + (f.flownHours || 0), 0);
+
+  let html = `
+    <div class="page">
+      <div class="page-header">
+        <h2>&#128200; Flight Reports</h2>
+        <div class="subtitle">${ac ? escHtml(ac.tailNumber) : 'N/A'} &middot; ${escHtml(String(thisYear))} total: ${yearHours.toFixed(1)}h</div>
+      </div>
+      <div class="report-grid">`;
+  const cards = [
+    { icon: '&#9992;', label: `${flights.length} Flights` },
+    { icon: '&#9201;', label: `${flights.reduce((s,f) => s+(f.flownHours||0),0).toFixed(1)} Total Hrs` },
+    { icon: '&#128101;', label: `${Object.keys(pilotTotals).length} Pilots` },
+    { icon: '&#128197;', label: `${months.length} Months` }
+  ];
+  cards.forEach(c => { html += `<div class="report-card"><div class="rc-icon">${c.icon}</div><div class="rc-label">${c.label}</div></div>`; });
+  html += `</div>`;
+
+  // Pilot breakdown
+  const sortedPilots = Object.entries(pilotTotals).sort((a, b) => b[1] - a[1]);
+  html += `<div class="card"><div class="card-header"><h3>&#128101; Pilot Hours</h3></div><div style="padding:4px 16px 12px">`;
+  sortedPilots.forEach(([pilot, hrs]) => {
+    const pct = Math.min(100, (hrs / (sortedPilots[0][1] || 1)) * 100);
+    html += `
+      <div style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;font-size:12px">
+          <span>${escHtml(pilot)}</span><span>${hrs.toFixed(1)}h</span>
+        </div>
+        <div class="progress-bar" style="height:6px"><div class="progress-fill fill-green" style="width:${pct}%;height:6px"></div></div>
+      </div>`;
+  });
+  html += `</div></div>`;
+
+  // Monthly table
+  html += `<div class="card"><div class="card-header"><h3>&#128200; Monthly Hours</h3></div><div style="padding:4px 16px 12px">`;
+  months.forEach(m => {
+    const d = monthly[m];
+    html += `<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid var(--glass-border)">
+      <span>${m}</span><span>${d.hours.toFixed(1)}h (${d.count} flights)</span>
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  // Certificates section
+  html += `<div class="card"><div class="card-header"><h3>&#128196; Certificate Expiry Tracker</h3></div><div style="padding:0 16px"><div id="certs-list"></div>
+    <button class="btn btn-sm btn-primary" id="add-cert-btn" style="margin:8px 0">+ Add Certificate</button>
+  </div></div>`;
+
+  // Calibration tools section
+  html += `<div class="card"><div class="card-header"><h3>&#128295; Calibration Tracker</h3></div><div style="padding:0 16px"><div id="cal-tools-list"></div>
+    <button class="btn btn-sm btn-primary" id="add-cal-btn" style="margin:8px 0">+ Add Tool</button>
+  </div></div>`;
+
+  html += `</div>`;
+  app.innerHTML = html;
+
+  // Render certs and tools
+  renderCerts();
+  renderCalibrationTools();
+
+  document.getElementById('add-cert-btn').addEventListener('click', () => addCertDialog());
+  document.getElementById('add-cal-btn').addEventListener('click', () => addCalToolDialog());
+}
+
+async function renderCerts() {
+  const el = document.getElementById('certs-list');
+  if (!el) return;
+  const certs = (await DB.getAll('certificates')).sort((a,b) => (a.expiry||'').localeCompare(b.expiry||''));
+  if (certs.length === 0) { el.innerHTML = '<p class="text-muted small" style="padding:8px 0">No certificates tracked</p>'; return; }
+  const today = new Date();
+  el.innerHTML = certs.map(c => {
+    const exp = c.expiry ? new Date(c.expiry) : null;
+    const daysLeft = exp ? Math.ceil((exp - today) / 86400000) : null;
+    const isExpired = daysLeft !== null && daysLeft <= 0;
+    const isSoon = daysLeft !== null && daysLeft > 0 && daysLeft <= 30;
+    const statusColor = isExpired ? '#ef4444' : isSoon ? '#f59e0b' : '#22c55e';
+    const statusDot = isExpired ? '&#128308;' : isSoon ? '&#128992;' : '&#128994;';
+    return `<div class="cert-row">
+      <div style="width:32px;text-align:center;font-size:18px">${statusDot}</div>
+      <div class="cert-info">
+        <div class="cert-name">${escHtml(c.name)}</div>
+        <div class="cert-meta">${c.issuer ? escHtml(c.issuer) + ' &middot; ' : ''}Expires: ${c.expiry || '—'} ${daysLeft !== null ? '(' + daysLeft + 'd)' : ''}</div>
+      </div>
+      <button class="btn btn-sm btn-ghost del-cert-btn" data-id="${c.id}" style="font-size:14px;padding:4px 8px">&times;</button>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.del-cert-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const confirmed = await showConfirmDialog('Delete Certificate', 'Remove this certificate?');
+      if (!confirmed) return;
+      await DB.del('certificates', btn.dataset.id);
+      await queueSync('certificates', 'delete', { id: btn.dataset.id });
+      renderCerts();
+    });
+  });
+}
+
+async function addCertDialog() {
+  const name = await showPromptDialog('Add Certificate', 'Certificate name (e.g. C of A, ARC, ELT Battery, Insurance):');
+  if (!name || !name.trim()) return;
+  const issuer = await showPromptDialog('Add Certificate', 'Issuer / notes (optional):');
+  if (issuer === null) return;
+  const expiry = await showPromptDialog('Add Certificate', 'Expiry date (YYYY-MM-DD):');
+  if (!expiry || !expiry.trim()) return;
+  const cert = { id: 'cert_' + Date.now(), name: name.trim(), issuer: (issuer||'').trim(), expiry: expiry.trim(), createdAt: new Date().toISOString() };
+  await DB.put('certificates', cert);
+  await queueSync('certificates', 'create', cert);
+  showToast('Certificate added');
+  renderCerts();
+}
+
+async function renderCalibrationTools() {
+  const el = document.getElementById('cal-tools-list');
+  if (!el) return;
+  const tools = (await DB.getAll('calibration_tools')).sort((a,b) => (a.nextDue||'').localeCompare(b.nextDue||''));
+  if (tools.length === 0) { el.innerHTML = '<p class="text-muted small" style="padding:8px 0">No calibration tools tracked</p>'; return; }
+  const now = new Date();
+  el.innerHTML = tools.map(t => {
+    const due = t.nextDue ? new Date(t.nextDue) : null;
+    const daysLeft = due ? Math.ceil((due - now) / 86400000) : null;
+    const isOverdue = daysLeft !== null && daysLeft <= 0;
+    const isSoon = daysLeft !== null && daysLeft > 0 && daysLeft <= 30;
+    const statusColor = isOverdue ? '#ef4444' : isSoon ? '#f59e0b' : '#22c55e';
+    return `<div class="cal-row">
+      <div style="width:8px;height:8px;border-radius:50%;background:${statusColor};flex-shrink:0"></div>
+      <div class="cal-info">
+        <div class="cal-name">${escHtml(t.name)}</div>
+        <div class="cal-meta">S/N: ${escHtml(t.serial || '—')} &middot; Last cal: ${t.lastCal || '—'} &middot; Next due: ${t.nextDue || '—'} ${daysLeft !== null ? '(' + daysLeft + 'd)' : ''}</div>
+      </div>
+      <button class="btn btn-sm btn-ghost del-cal-btn" data-id="${t.id}" style="font-size:14px;padding:4px 8px">&times;</button>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.del-cal-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const confirmed = await showConfirmDialog('Delete Tool', 'Remove this calibration tool?');
+      if (!confirmed) return;
+      await DB.del('calibration_tools', btn.dataset.id);
+      await queueSync('calibration_tools', 'delete', { id: btn.dataset.id });
+      renderCalibrationTools();
+    });
+  });
+}
+
+async function addCalToolDialog() {
+  const name = await showPromptDialog('Add Tool', 'Tool name (e.g. Torque Wrench 1/2"):');
+  if (!name || !name.trim()) return;
+  const serial = await showPromptDialog('Add Tool', 'Serial number:');
+  if (serial === null) return;
+  const lastCal = await showPromptDialog('Add Tool', 'Last calibration date (YYYY-MM-DD):');
+  if (lastCal === null) return;
+  const intervalMonths = await showPromptDialog('Add Tool', 'Calibration interval (months):', '12');
+  if (intervalMonths === null) return;
+  const months = parseInt(intervalMonths, 10) || 12;
+  const nextDue = lastCal.trim() ? new Date(lastCal.trim()).toISOString().slice(0, 10) : '';
+  if (nextDue) {
+    const d = new Date(nextDue);
+    d.setMonth(d.getMonth() + months);
+    const tool = { id: 'cal_' + Date.now(), name: name.trim(), serial: (serial||'').trim(), lastCal: lastCal.trim(), nextDue: d.toISOString().slice(0, 10), intervalMonths: months, createdAt: new Date().toISOString() };
+    await DB.put('calibration_tools', tool);
+    await queueSync('calibration_tools', 'create', tool);
+    showToast('Tool added');
+    renderCalibrationTools();
+  } else {
+    const tool = { id: 'cal_' + Date.now(), name: name.trim(), serial: (serial||'').trim(), lastCal: '', nextDue: '', intervalMonths: months, createdAt: new Date().toISOString() };
+    await DB.put('calibration_tools', tool);
+    await queueSync('calibration_tools', 'create', tool);
+    showToast('Tool added');
+    renderCalibrationTools();
+  }
+}
+
+/* ── Recurring Task Scheduler ── */
+async function checkAndCreateInspectionTasks(ac) {
+  if (!ac) return;
+  try {
+    const allTasks = await DB.getAll('maintenance_tasks');
+    const existing = allTasks.filter(t => t.aircraftId === ac.tailNumber && t.status === 'open');
+    const tach = ac.totalTachTime || 0;
+    const oilSince = tach - (ac.lastOilChangeTach || 0);
+    const structSince = tach - (ac.last100hrTach || 0);
+    const oilInterval = ac.oilInterval || 50;
+    const structInterval = ac.structInterval || 100;
+
+    // Auto-create 50hr inspection task
+    if (oilSince >= oilInterval - 5 && !existing.some(t => t.type === 'inspection_50hr')) {
+      const task = {
+        id: 'mnt_' + Date.now() + '_50hr',
+        aircraftId: ac.tailNumber,
+        description: `50hr inspection due — ${oilSince.toFixed(1)} hrs since last change (interval ${oilInterval}h)`,
+        priority: 'high',
+        assignedTo: [],
+        type: 'inspection_50hr',
+        status: 'open',
+        technicianNotes: '',
+        rectifiedBy: '', rectifiedAt: '',
+        releasedBy: '', releasedAt: '',
+        createdAt: new Date().toISOString()
+      };
+      await DB.put('maintenance_tasks', task);
+      await queueSync('maintenance_tasks', 'create', task);
+      createNotification('task', 'Inspection Due', `50hr inspection auto-created for ${ac.tailNumber}`, 'maintenance');
+    }
+    // Auto-create 100hr inspection task
+    if (structSince >= structInterval - 5 && !existing.some(t => t.type === 'inspection_100hr')) {
+      const task = {
+        id: 'mnt_' + Date.now() + '_100hr',
+        aircraftId: ac.tailNumber,
+        description: `100hr inspection due — ${structSince.toFixed(1)} hrs since last check (interval ${structInterval}h)`,
+        priority: 'high',
+        assignedTo: [],
+        type: 'inspection_100hr',
+        status: 'open',
+        technicianNotes: '',
+        rectifiedBy: '', rectifiedAt: '',
+        releasedBy: '', releasedAt: '',
+        createdAt: new Date().toISOString()
+      };
+      await DB.put('maintenance_tasks', task);
+      await queueSync('maintenance_tasks', 'create', task);
+      createNotification('task', 'Inspection Due', `100hr inspection auto-created for ${ac.tailNumber}`, 'maintenance');
+    }
+  } catch(e) { /* not critical */ }
+}
+
+/* ── Swipe gesture helpers ── */
+function enableSwipe(el, { onSwipeLeft, onSwipeRight }) {
+  let startX = 0, startY = 0;
+  el.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  el.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx > 0 && onSwipeRight) onSwipeRight();
+      else if (dx < 0 && onSwipeLeft) onSwipeLeft();
+    }
+  }, { passive: true });
+}
+
 function navigate(view) {
   _currentView = view;
   document.querySelectorAll('.nav-link').forEach(a => a.classList.remove('active'));
@@ -816,8 +1147,12 @@ function navigate(view) {
     case 'profile': profileView(); break;
     case 'notifications': notificationsView(); break;
     case 'activity': activityFeedView(); break;
+    case 'reports': reportsView(); break;
     case 'settings': settingsView(); break;
   }
+  // Show FAB only on flight-ops view
+  const fab = document.getElementById('fab');
+  if (fab) { fab.classList.toggle('hidden', view !== 'flight-ops'); }
   return false;
 }
 
@@ -1677,7 +2012,7 @@ function showEditAircraftForm(ac) {
 }
 
 async function clearAllData() {
-  const stores = ['flights','aircraft','defects','fuel_logs','fuel_stock','maintenance_tasks','parts','sync_queue','users','attendance','notifications'];
+  const stores = ['flights','aircraft','defects','fuel_logs','fuel_stock','maintenance_tasks','parts','sync_queue','users','attendance','notifications','comments','components','calibration_tools','certificates'];
   const db = await openDB();
   for (const s of stores) {
     await new Promise((res, rej) => {
@@ -2142,12 +2477,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       navigate(a.dataset.view);
     });
   });
+  document.getElementById('fab')?.addEventListener('click', () => {
+    haptic();
+    navigate('flight-ops');
+  });
 
   // Global haptic on actionable elements
   document.addEventListener('click', e => {
     const t = e.target.closest('.btn, .quick-action, .sidebar-link, .header-btn, .hamburger-btn');
     if (t) haptic();
   });
+
+  initPullToRefresh();
 
   if (needsLogin) {
     showLoginGate();

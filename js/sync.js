@@ -51,7 +51,7 @@ async function initFCM() {
 }
 
 const FIRESTORE_COLLECTIONS = [
-  'aircraft', 'flights', 'defects', 'fuel_logs', 'fuel_stock', 'maintenance_tasks', 'parts', 'users', 'attendance', 'notifications', 'components'
+  'aircraft', 'flights', 'defects', 'fuel_logs', 'fuel_stock', 'maintenance_tasks', 'parts', 'users', 'attendance', 'notifications', 'components', 'calibration_tools', 'certificates'
 ];
 
 function subscribeToAll() {
