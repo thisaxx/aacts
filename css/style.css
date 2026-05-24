@@ -108,7 +108,31 @@ body {
   color: var(--text);
 }
 .header-right { display: flex; align-items: center; gap: 8px; }
-
+.ac-selector-wrap { position: relative; }
+.ac-selector {
+  appearance: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 10px;
+  font-family: var(--mono);
+  padding: 3px 18px 3px 6px;
+  outline: none;
+  cursor: pointer;
+  min-width: 72px;
+  max-width: 100px;
+}
+.ac-selector option { background: var(--surface); color: var(--text); }
+.ac-selector-wrap::after {
+  content: '';
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 4px solid transparent;
+  border-top-color: var(--text-muted);
+  pointer-events: none;
+}
 .sync-badge {
   background: var(--text);
   color: var(--bg);

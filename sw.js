@@ -1,4 +1,4 @@
-const CACHE = 'aac-v11';
+const CACHE = 'aac-v9';
 const BASE = self.location.pathname.replace(/\/[^/]*$/, '') || '/aacts';
 const ASSETS = [
   BASE + '/',
