@@ -267,6 +267,9 @@ async function renderTasks() {
 async function editTask(taskId) {
   const task = await DB.get('maintenance_tasks', taskId);
   if (!task) { showToast('Work order not found', 'error'); return; }
+  const assigned = task.assignedTo || [];
+  let crew = [];
+  try { crew = JSON.parse(localStorage.getItem('aac_users')) || []; } catch(e) {}
   showBottomSheet(`
     <div class="card-header"><h3>Edit Work Order</h3></div>
     <div class="form-group">
@@ -282,6 +285,12 @@ async function editTask(taskId) {
         <option value="critical" ${task.priority === 'critical' ? 'selected' : ''}>Critical</option>
       </select>
     </div>
+    <div class="form-group">
+      <label>Assign To</label>
+      <div id="edit-task-assign-list" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px">
+        ${crew.map(u => `<label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;cursor:pointer"><input type="checkbox" class="edit-task-assign-cb" value="${escHtml(u.name)}"${assigned.includes(u.name) ? ' checked' : ''}>${escHtml(u.name)}</label>`).join('')}
+      </div>
+    </div>
     <button class="btn btn-primary btn-block" id="save-edit-task-btn">Save Changes</button>
     <button class="btn btn-secondary btn-block" id="cancel-edit-task-btn" style="margin-top:8px">Cancel</button>
   `);
@@ -290,6 +299,8 @@ async function editTask(taskId) {
     if (!desc) { showToast('Enter a description', 'error'); return; }
     task.description = desc;
     task.priority = document.getElementById('edit-task-priority').value;
+    const editCbs = document.querySelectorAll('.edit-task-assign-cb:checked');
+    task.assignedTo = Array.from(editCbs).map(cb => cb.value);
     await DB.put('maintenance_tasks', task);
     await queueSync('maintenance_tasks', 'update', task);
     showToast('Work order updated');
