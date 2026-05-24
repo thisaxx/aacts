@@ -212,13 +212,15 @@ function flightOpsView() {
               <div class="form-group">
                 <label for="refuel-source">Source</label>
                 <select id="refuel-source">
-                  <option value="Main Pump">Main Pump</option>
+                  <option value="Main Pump" selected>Main Pump</option>
                 </select>
               </div>
               <div class="form-group">
                 <label for="fuel-type">Fuel Type</label>
                 <select id="fuel-type">
-                  <option value="mix">Mix</option>
+                  <option value="mix" selected>Mix (Avgas + Mogas)</option>
+                  <option value="avgas_100ll">Avgas 100LL</option>
+                  <option value="mogas">Mogas</option>
                 </select>
               </div>
             </div>
@@ -400,9 +402,14 @@ function updateArrivalCalc() {
   });
 }
 
+let _submitting = false;
+
 async function onDepartureSubmit(e) {
   e.preventDefault();
   if (typeof denyGuest === 'function' && denyGuest()) return;
+  if (_submitting) return;
+  _submitting = true;
+  try {
   const pilot = document.getElementById('pilot-name').value.trim() || 'Unknown';
   const takeoffTime = document.getElementById('takeoff-time').value;
   const flightDate = document.getElementById('flight-date').value;
@@ -471,6 +478,7 @@ async function onDepartureSubmit(e) {
   renderDepartedList();
   renderRecentFlights();
   showArrivalForm(flight.id);
+  } finally { _submitting = false; }
 }
 
 function fireArrivalNotification(flight, ac) {
@@ -504,6 +512,9 @@ function scheduleArrivalReminder(flight, ac, reminderTime) {
 async function onArrivalSubmit(e) {
   e.preventDefault();
   if (typeof denyGuest === 'function' && denyGuest()) return;
+  if (_submitting) return;
+  _submitting = true;
+  try {
   const flightId = document.getElementById('arrival-flight-id').value;
   const flight = await DB.get('flights', flightId);
   if (!flight) { showToast('Flight record not found', 'error'); return; }
@@ -586,24 +597,6 @@ async function onArrivalSubmit(e) {
     showToast('Sortie completed');
   }
 
-  // After-flight inspection — created after every landing
-  const inspTask = {
-    id: 'insp_' + Date.now(),
-    type: 'after-flight',
-    aircraftId: ac.tailNumber,
-    description: `After-flight inspection for ${flight.flightDate} sortie (${(duration * 60).toFixed(0)} min)`,
-    priority: 'medium',
-    status: 'open',
-    notes: '',
-    rectifiedBy: '',
-    rectifiedAt: '',
-    rectifiedRole: '',
-    createdAt: new Date().toISOString()
-  };
-  await DB.put('maintenance_tasks', inspTask);
-  await queueSync('maintenance_tasks', 'create', inspTask);
-  createNotification('inspection', 'After-Flight Inspection Created', `After-flight inspection due for ${ac.tailNumber} after ${flight.flightDate} sortie`, 'maintenance');
-
   createNotification('sortie', 'Sortie Completed', `${flight.pilotName} completed sortie in ${ac.tailNumber} (${(duration*60).toFixed(0)} min)`, 'flight-ops');
   logActivity('arrival', `${flight.pilotName} completed sortie in ${ac.tailNumber} (${(duration*60).toFixed(0)} min)`, flight.id);
   notifyDataChange();
@@ -622,6 +615,7 @@ async function onArrivalSubmit(e) {
   renderIntervalBars();
   renderRecentFlights();
   renderDepartedList();
+  } finally { _submitting = false; }
 }
 
 async function onUpdateMeters() {

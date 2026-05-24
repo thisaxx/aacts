@@ -52,7 +52,7 @@ async function initFCM() {
 }
 
 const FIRESTORE_COLLECTIONS = [
-  'aircraft', 'flights', 'defects', 'fuel_logs', 'fuel_stock', 'maintenance_tasks', 'parts', 'users', 'attendance', 'components'
+  'aircraft', 'flights', 'defects', 'fuel_logs', 'fuel_stock', 'maintenance_tasks', 'parts', 'users', 'attendance', 'components', 'pilots'
 ];
 
 let _pollInterval;

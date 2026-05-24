@@ -1070,6 +1070,7 @@ function enableSwipe(el, { onSwipeLeft, onSwipeRight }) {
 
 function navigate(view) {
   _currentView = view;
+  try { sessionStorage.setItem('aac_last_view', view); } catch(e) {}
   document.querySelectorAll('.nav-link').forEach(a => a.classList.remove('active'));
   const link = document.querySelector(`.nav-link[data-view="${view}"]`);
   if (link) link.classList.add('active');
@@ -2397,8 +2398,12 @@ function renderPilotList() {
     btn.addEventListener('click', () => {
       const pilots = getPilots();
       const idx = parseInt(btn.dataset.index);
+      const name = pilots[idx];
       pilots.splice(idx, 1);
       savePilots(pilots);
+      // Remove from Firestore sync
+      DB.del('pilots', 'pilot_' + name).catch(() => {});
+      if (typeof queueSync === 'function') queueSync('pilots', 'delete', { id: 'pilot_' + name });
       renderPilotList();
     });
   });
@@ -2412,6 +2417,10 @@ function addPilot() {
   if (pilots.includes(name)) { showToast('Pilot already exists', 'error'); return; }
   pilots.push(name);
   savePilots(pilots);
+  // Sync to Firestore via IndexedDB
+  const doc = { id: 'pilot_' + name, name };
+  DB.put('pilots', doc).catch(() => {});
+  if (typeof queueSync === 'function') queueSync('pilots', 'create', doc);
   input.value = '';
   renderPilotList();
   showToast(`Pilot "${name}" added`);
@@ -2567,6 +2576,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!localStorage.getItem('aac_pilots')) {
     localStorage.setItem('aac_pilots', JSON.stringify([]));
   }
+  // Merge pilots synced from Firestore into localStorage
+  try {
+    const syncedPilots = await DB.getAll('pilots');
+    if (syncedPilots && syncedPilots.length > 0) {
+      const localPilots = JSON.parse(localStorage.getItem('aac_pilots') || '[]');
+      const merged = [...new Set([...localPilots, ...syncedPilots.map(p => p.name)])];
+      localStorage.setItem('aac_pilots', JSON.stringify(merged));
+    }
+  } catch(e) {}
 
   // Sync login users into DB so crew board shows everyone
   const seedUsers = JSON.parse(localStorage.getItem('aac_users') || '[]');
@@ -2674,7 +2692,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (needsLogin) {
     showLoginGate();
   } else {
-    navigate('dashboard');
+    const lastView = sessionStorage.getItem('aac_last_view') || 'dashboard';
+    navigate(lastView);
     checkInspectionNotifications();
     scheduleEndOfDayCheck();
   }
