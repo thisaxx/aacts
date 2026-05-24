@@ -205,15 +205,21 @@ async function renderActivityFeed() {
 
 async function getCrewStatusBoard() {
   const users = await DB.getAll('users');
-  // Deduplicate by name (keep the one with photo if available)
-  const seen = new Map();
+  // Deduplicate by canonical name (merge e.g. "Pasan" → "Pasan Anishka")
+  const canon = new Map();
   for (const u of users) {
-    const existing = seen.get(u.name);
+    const similar = users.find(other =>
+      other.name !== u.name && (other.name.includes(u.name) || u.name.includes(other.name))
+    );
+    const canonicalName = similar ? (u.name.length >= similar.name.length ? u.name : similar.name) : u.name;
+    const existing = canon.get(canonicalName);
     if (!existing || (u.photo && !existing.photo)) {
-      seen.set(u.name, u);
+      if (existing && existing.id !== u.id) canonicalName; // keep the better one
+      u.name = canonicalName;
+      canon.set(canonicalName, u);
     }
   }
-  const unique = [...seen.values()];
+  const unique = [...canon.values()];
   const attendance = await DB.getAll('attendance');
   const today = new Date().toISOString().slice(0, 10);
   const activeAttendance = attendance.filter(a => a.date === today && (a.status === 'approved' || a.status === 'pending'));
@@ -1662,7 +1668,11 @@ function showLoginGate() {
     localStorage.setItem('aac_user_role', role);
     // Restore profile photo from DB and set user ID
     const allUsers = await DB.getAll('users');
-    const match = allUsers.find(u => u.name === name);
+    // Match by canonical name (e.g. "Pasan" → "Pasan Anishka")
+    let match = allUsers.find(u => u.name === name);
+    if (!match) {
+      match = allUsers.find(u => u.name.includes(name) || name.includes(u.name));
+    }
     if (match) {
       localStorage.setItem('aac_user_id', match.id);
       if (match.photo) {
@@ -1670,6 +1680,8 @@ function showLoginGate() {
       } else {
         localStorage.removeItem('aac_user_photo');
       }
+      // Store canonical name
+      localStorage.setItem('aac_user', match.name);
     } else {
       localStorage.removeItem('aac_user_photo');
       localStorage.removeItem('aac_user_id');
@@ -1725,6 +1737,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     localStorage.setItem('aac_user_pins', JSON.stringify(pins));
   }
 
+  // Clean up duplicate user names (e.g. "Pasan" vs "Pasan Anishka")
+  let localUsers = [];
+  try { localUsers = JSON.parse(localStorage.getItem('aac_users')) || []; } catch(e) {}
+  const seenNames = new Set();
+  const cleanedLocal = [];
+  for (const u of localUsers) {
+    // Check if this name is a substring of or contains another existing name
+    const dup = localUsers.find(other =>
+      other.name !== u.name && (other.name.includes(u.name) || u.name.includes(other.name))
+    );
+    if (dup) {
+      // Keep the longer name, skip the shorter one
+      const longer = u.name.length >= dup.name.length ? u : dup;
+      if (!seenNames.has(longer.name)) {
+        seenNames.add(longer.name);
+        cleanedLocal.push(longer);
+      }
+    } else if (!seenNames.has(u.name)) {
+      seenNames.add(u.name);
+      cleanedLocal.push(u);
+    }
+  }
+  localStorage.setItem('aac_users', JSON.stringify(cleanedLocal));
+
   // Seed user database if not yet set
   if (!localStorage.getItem('aac_users')) {
     const defaultUsers = [
@@ -1747,19 +1783,42 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Sync login users into DB so crew board shows everyone
   const seedUsers = JSON.parse(localStorage.getItem('aac_users') || '[]');
-  // Dedup existing DB users by name (keep the one with photo or latest)
+  // Dedup existing DB users by name, merging similar names (e.g. "Pasan" → "Pasan Anishka")
   const existingDbUsers = await DB.getAll('users');
-  const seen = new Map();
+  // Map: canonical name → user object
+  const canon = new Map();
   for (const u of existingDbUsers) {
-    const prev = seen.get(u.name);
-    if (!prev || (u.photo && !prev.photo) || (!prev.photo && !u.photo && u.createdAt > prev.createdAt)) {
+    // Find if this name is a substring of or contains another existing name
+    const similar = existingDbUsers.find(other =>
+      other.name !== u.name && (other.name.includes(u.name) || u.name.includes(other.name))
+    );
+    const canonicalName = similar ? (u.name.length >= similar.name.length ? u.name : similar.name) : u.name;
+    const prev = canon.get(canonicalName);
+    const better = !prev || (u.photo && !prev.photo) || (!prev.photo && !u.photo && u.createdAt > prev.createdAt);
+    if (better) {
       if (prev && prev.id !== u.id) await DB.del('users', prev.id);
-      seen.set(u.name, u);
+      // Update name to canonical if needed
+      if (u.name !== canonicalName) {
+        u.name = canonicalName;
+        await DB.put('users', u);
+      }
+      canon.set(canonicalName, u);
     } else {
       await DB.del('users', u.id);
     }
   }
-  const existingNames = new Set(seen.keys());
+  // Update localStorage user name if logged-in user had a non-canonical name
+  const curUser = localStorage.getItem('aac_user');
+  if (curUser) {
+    for (const [canonicalName, u] of canon) {
+      if (curUser !== canonicalName && (curUser.includes(canonicalName) || canonicalName.includes(curUser))) {
+        localStorage.setItem('aac_user', canonicalName);
+        localStorage.setItem('aac_user_id', u.id);
+        break;
+      }
+    }
+  }
+  const existingNames = new Set(canon.keys());
   for (const su of seedUsers) {
     if (!existingNames.has(su.name)) {
       const id = 'user_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
