@@ -1517,11 +1517,6 @@ function showAircraftSheet() {
     populateACSelector();
   });
 
-  document.getElementById('export-tech-log-btn').addEventListener('click', async () => {
-    generateDailyTechLog();
-  });
-
-  document.getElementById('close-export-btn').addEventListener('click', () => window.__sheetClose(null));
 }
 
 async function showComponentsSheet(ac) {
@@ -2782,6 +2777,7 @@ async function showExportSheet() {
     showToast('PDF report downloaded');
     window.__sheetClose(true);
   });
+  document.getElementById('export-tech-log-btn').addEventListener('click', () => generateDailyTechLog());
   document.getElementById('close-export-btn').addEventListener('click', () => window.__sheetClose(null));
 }
 
