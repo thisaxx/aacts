@@ -57,6 +57,8 @@ const FIRESTORE_COLLECTIONS = [
 
 let _pollInterval;
 let _pollCount = 0;
+let _syncChannel;
+try { _syncChannel = new BroadcastChannel('aac-sync'); _syncChannel.onmessage = () => { pullAllCollections(); }; } catch (e) { /* no BroadcastChannel support */ }
 
 function startPolling() {
   pullAllCollections();
@@ -68,9 +70,11 @@ async function pullAllCollections() {
   const lastSync = parseInt(localStorage.getItem('aac_last_sync') || '0');
   _pollCount++;
   const isFullSync = lastSync === 0 || _pollCount % 10 === 0;
+  // Capture wall-clock time BEFORE query to avoid write-gap window
+  const queryTime = Date.now();
   const hadRemote = await Promise.all(FIRESTORE_COLLECTIONS.map(async name => {
     try {
-      const localDocs = isFullSync ? await DB.getAll(name) : [];
+      const localDocs = await DB.getAll(name);
       const localMap = new Map(localDocs.map(d => [getDocId(name, d), d]));
       let query = db_firestore.collection(name);
       if (!isFullSync) query = query.where('_updatedAt', '>=', lastSync);
@@ -79,25 +83,22 @@ async function pullAllCollections() {
       for (const doc of snap.docs) {
         remoteIds.add(doc.id);
         const data = doc.data();
-        if (data._deviceId && data._deviceId === _deviceId) continue;
         const local = await DB.get(name, doc.id);
         if (!local || (data._updatedAt && (!local._updatedAt || data._updatedAt >= local._updatedAt))) {
           if (local && !data.photoData && local.photoData) data.photoData = local.photoData;
           await DB.put(name, data);
         }
       }
-      // On full sync, detect deletions
-      if (isFullSync) {
-        for (const [id, local] of localMap) {
-          if (!remoteIds.has(id) && local._deviceId !== _deviceId) {
-            await DB.del(name, id);
-          }
+      // Detect deletions on every poll (not just full sync)
+      for (const [id, local] of localMap) {
+        if (!remoteIds.has(id) && local._deviceId !== _deviceId) {
+          await DB.del(name, id);
         }
       }
       return true;
     } catch (e) { return false; }
   }));
-  localStorage.setItem('aac_last_sync', String(Date.now()));
+  localStorage.setItem('aac_last_sync', String(queryTime));
   updateSyncBadge();
   if (hadRemote.some(Boolean) && typeof onRemoteUpdate === 'function') onRemoteUpdate();
 }
@@ -122,6 +123,8 @@ async function queueSync(collection, action, data) {
     } else {
       await db_firestore.collection(collection).doc(getDocId(collection, data)).set(toSync, { merge: true });
     }
+    // Notify other tabs to pull latest
+    try { _syncChannel.postMessage('sync'); } catch (e) { /* no channel */ }
   } catch (e) {
     // Offline — save to retry queue (original data for offline retry)
     try {
@@ -157,6 +160,9 @@ async function processSyncQueue() {
     try {
       const { collection, action, data } = entry;
       const toSync = JSON.parse(JSON.stringify(data));
+      // Refresh timestamp so incremental polls on other devices pick this up
+      toSync._updatedAt = Date.now();
+      toSync._deviceId = _deviceId;
       if (toSync.photoData) delete toSync.photoData;
       if (action === 'delete') {
         await db_firestore.collection(collection).doc(getDocId(collection, data)).delete();
@@ -164,6 +170,8 @@ async function processSyncQueue() {
         await db_firestore.collection(collection).doc(getDocId(collection, data)).set(toSync, { merge: true });
       }
       await DB.del('sync_queue', entry.id);
+      // Notify other tabs to pull latest
+      try { _syncChannel.postMessage('sync'); } catch (e) { /* no channel */ }
     } catch (e) { break; } // still offline, stop processing
   }
   updateSyncBadge();
