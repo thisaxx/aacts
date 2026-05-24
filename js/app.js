@@ -1978,6 +1978,7 @@ async function clearAllData() {
   }
   db.close();
   localStorage.removeItem('aac_current_aircraft');
+  localStorage.removeItem('aac_pilots');
   // Also clear Firestore
   if (db_firestore) {
     const cols = stores.filter(s => s !== 'sync_queue');
@@ -2123,6 +2124,18 @@ function settingsView() {
       </div>
 
       <div class="card">
+        <div class="card-header"><h3>Pilot Management</h3></div>
+        <div style="padding:12px 16px" id="pilot-management">
+          <p class="text-muted small" style="margin-bottom:8px">Manage the pilot list used in flight logging.</p>
+          <div id="pilot-list"></div>
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <input type="text" id="new-pilot-name" class="form-input" placeholder="Enter pilot name" style="flex:1">
+            <button class="btn btn-primary" id="add-pilot-btn">Add</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
         <div class="card-header"><h3>Appearance</h3></div>
         <div style="padding:12px 16px">
           <button class="btn btn-secondary btn-block" id="settings-toggle-theme">Toggle Dark/Light Theme</button>
@@ -2193,6 +2206,58 @@ function settingsView() {
       if (confirmed) await clearAllData();
     });
   }
+
+  renderPilotList();
+  document.getElementById('add-pilot-btn').addEventListener('click', addPilot);
+  document.getElementById('new-pilot-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addPilot();
+  });
+}
+
+function getPilots() {
+  try { return JSON.parse(localStorage.getItem('aac_pilots')) || []; } catch(e) { return []; }
+}
+
+function savePilots(list) {
+  localStorage.setItem('aac_pilots', JSON.stringify(list));
+}
+
+function renderPilotList() {
+  const el = document.getElementById('pilot-list');
+  if (!el) return;
+  const pilots = getPilots();
+  if (pilots.length === 0) {
+    el.innerHTML = '<div class="text-muted small" style="padding:4px 0">No pilots added yet.</div>';
+    return;
+  }
+  el.innerHTML = pilots.map((p, i) =>
+    `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:13px">${escHtml(p)}</span>
+      <button class="btn btn-small btn-danger" data-index="${i}" style="padding:2px 8px;font-size:11px">×</button>
+    </div>`
+  ).join('');
+  el.querySelectorAll('[data-index]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pilots = getPilots();
+      const idx = parseInt(btn.dataset.index);
+      pilots.splice(idx, 1);
+      savePilots(pilots);
+      renderPilotList();
+    });
+  });
+}
+
+function addPilot() {
+  const input = document.getElementById('new-pilot-name');
+  const name = input.value.trim();
+  if (!name) { showToast('Enter a pilot name', 'error'); return; }
+  const pilots = getPilots();
+  if (pilots.includes(name)) { showToast('Pilot already exists', 'error'); return; }
+  pilots.push(name);
+  savePilots(pilots);
+  input.value = '';
+  renderPilotList();
+  showToast(`Pilot "${name}" added`);
 }
 
 function showLoginGate() {
@@ -2339,6 +2404,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       { name: 'Guest', role: 'guest' }
     ];
     localStorage.setItem('aac_users', JSON.stringify(defaultUsers));
+  }
+
+  // Seed pilot list (separate from login users)
+  if (!localStorage.getItem('aac_pilots')) {
+    const defaultPilots = [
+      'Pasan Anishka', 'Buddika Chandrarathna', 'Thisanga',
+      'Chandrakeerthi', 'Deshan', 'Shalana', 'Rehan',
+      'Binada', 'Bihandu', 'Ginod', 'Kalum', 'Rajapaksha'
+    ];
+    localStorage.setItem('aac_pilots', JSON.stringify(defaultPilots));
   }
 
   // Sync login users into DB so crew board shows everyone

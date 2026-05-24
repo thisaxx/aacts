@@ -18,7 +18,7 @@ async function initFirebase() {
     db_firestore.settings({ merge: true });
     await firebase.auth().signInAnonymously();
     _deviceId = firebase.auth().currentUser.uid;
-    subscribeToAll();
+    startPolling();
     initFCM();
     processSyncQueue();
     scheduleCleanup();
@@ -55,29 +55,51 @@ const FIRESTORE_COLLECTIONS = [
   'aircraft', 'flights', 'defects', 'fuel_logs', 'fuel_stock', 'maintenance_tasks', 'parts', 'users', 'attendance', 'components'
 ];
 
-function subscribeToAll() {
-  FIRESTORE_COLLECTIONS.forEach(name => {
-    db_firestore.collection(name).onSnapshot(async snapshot => {
-      let hadRemote = false;
-      for (const change of snapshot.docChanges()) {
-        if (change.type === 'removed') {
-          await DB.del(name, change.doc.id);
-          hadRemote = true;
-          continue;
-        }
-        const data = change.doc.data();
+let _pollInterval;
+let _pollCount = 0;
+
+function startPolling() {
+  pullAllCollections();
+  _pollInterval = setInterval(pullAllCollections, 60000);
+}
+
+async function pullAllCollections() {
+  if (!db_firestore || !navigator.onLine) return;
+  const lastSync = parseInt(localStorage.getItem('aac_last_sync') || '0');
+  _pollCount++;
+  const isFullSync = lastSync === 0 || _pollCount % 10 === 0;
+  const hadRemote = await Promise.all(FIRESTORE_COLLECTIONS.map(async name => {
+    try {
+      const localDocs = isFullSync ? await DB.getAll(name) : [];
+      const localMap = new Map(localDocs.map(d => [getDocId(name, d), d]));
+      let query = db_firestore.collection(name);
+      if (!isFullSync) query = query.where('_updatedAt', '>=', lastSync);
+      const snap = await query.get();
+      const remoteIds = new Set();
+      for (const doc of snap.docs) {
+        remoteIds.add(doc.id);
+        const data = doc.data();
         if (data._deviceId && data._deviceId === _deviceId) continue;
-        const local = await DB.get(name, change.doc.id);
+        const local = await DB.get(name, doc.id);
         if (!local || (data._updatedAt && (!local._updatedAt || data._updatedAt >= local._updatedAt))) {
           if (local && !data.photoData && local.photoData) data.photoData = local.photoData;
           await DB.put(name, data);
-          hadRemote = true;
         }
       }
-      updateSyncBadge();
-      if (hadRemote && typeof onRemoteUpdate === 'function') onRemoteUpdate();
-    }, () => { updateSyncBadge(); });
-  });
+      // On full sync, detect deletions
+      if (isFullSync) {
+        for (const [id, local] of localMap) {
+          if (!remoteIds.has(id) && local._deviceId !== _deviceId) {
+            await DB.del(name, id);
+          }
+        }
+      }
+      return true;
+    } catch (e) { return false; }
+  }));
+  localStorage.setItem('aac_last_sync', String(Date.now()));
+  updateSyncBadge();
+  if (hadRemote.some(Boolean) && typeof onRemoteUpdate === 'function') onRemoteUpdate();
 }
 
 function getDocId(collection, data) {
@@ -152,6 +174,7 @@ firebase.auth().onAuthStateChanged(() => { updateSyncBadge(); processSyncQueue()
 window.addEventListener('online', () => {
   updateSyncBadge();
   processSyncQueue();
+  pullAllCollections();
   document.body.classList.remove('offline');
   showSyncToast('Online — syncing...', 'success');
 });

@@ -276,15 +276,15 @@ function flightOpsView() {
 
     document.getElementById('flight-date').valueAsDate = new Date();
 
-    // Populate pilot dropdown from aac_users
+    // Populate pilot dropdown from aac_pilots
     const pilotSel = document.getElementById('pilot-name');
     if (pilotSel) {
-      let users = [];
-      try { users = JSON.parse(localStorage.getItem('aac_users')) || []; } catch(e) {}
-      users.forEach(u => {
+      let pilots = [];
+      try { pilots = JSON.parse(localStorage.getItem('aac_pilots')) || []; } catch(e) {}
+      pilots.forEach(name => {
         const opt = document.createElement('option');
-        opt.value = u.name;
-        opt.textContent = u.name;
+        opt.value = name;
+        opt.textContent = name;
         pilotSel.appendChild(opt);
       });
     }
@@ -906,7 +906,10 @@ async function editFlight(flightId) {
     </div>
     <div class="form-group">
       <label>Pilot Name</label>
-      <input type="text" id="edit-flight-pilot" class="form-input" value="${escHtml(flight.pilotName)}">
+      <select id="edit-flight-pilot" class="form-input">
+        <option value="">— Select pilot —</option>
+        ${(() => { try { const pilots = JSON.parse(localStorage.getItem('aac_pilots') || '[]'); const exists = pilots.includes(flight.pilotName); return pilots.map(n => `<option value="${escHtml(n)}"${n === flight.pilotName ? ' selected' : ''}>${escHtml(n)}</option>`).join('') + (!exists && flight.pilotName ? `<option value="${escHtml(flight.pilotName)}" selected>${escHtml(flight.pilotName)}</option>` : ''); } catch(e) { return ''; } })()}
+      </select>
     </div>
     <div class="row">
       <div class="form-group">
