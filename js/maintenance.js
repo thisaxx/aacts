@@ -366,6 +366,18 @@ async function showTaskDetail(taskId) {
   await DB.put('maintenance_tasks', task);
   await queueSync('maintenance_tasks', 'update', task);
   showToast('Work order marked as rectified');
+
+  // After-flight inspection rectified → ground the aircraft
+  if (task.type === 'after-flight') {
+    const ac2 = await DB.get('aircraft', task.aircraftId);
+    if (ac2) {
+      ac2.groundedAfterInspection = true;
+      ac2.groundedAfterInspAt = new Date().toISOString();
+      await DB.put('aircraft', ac2);
+      await queueSync('aircraft', 'update', ac2);
+      showToast('Aircraft grounded — daily CRS required before next flight');
+    }
+  }
   const user = localStorage.getItem('aac_user') || 'Unknown';
   createNotification('task', 'Work Order Rectified', `${user} completed work on ${task.aircraftId}: ${task.description}`, 'maintenance');
   logActivity('task_rectified', `${user} rectified work order: ${task.description}`, task.id);
@@ -401,19 +413,6 @@ async function onRelease(taskId) {
   const user = localStorage.getItem('aac_user') || 'Unknown';
   createNotification('crs', task.type === 'after-flight' ? 'After-Flight Inspection Signed' : 'CRS Issued', `${user} released ${task.description} to service on ${task.aircraftId}`, 'maintenance');
   logActivity('task_released', `${user} released ${task.type === 'after-flight' ? 'after-flight inspection' : 'work order'}: ${task.description}`, task.id);
-
-  // If this is an after-flight inspection being released, ground the aircraft until next daily CRS
-  if (task.type === 'after-flight') {
-    const ac2 = await DB.get('aircraft', task.aircraftId);
-    if (ac2) {
-      ac2.groundedAfterInspection = true;
-      ac2.groundedAfterInspAt = new Date().toISOString();
-      await DB.put('aircraft', ac2);
-      await queueSync('aircraft', 'update', ac2);
-      showToast('Aircraft grounded — daily CRS required before next flight');
-      createNotification('system', 'Aircraft Grounded', `${ac2.tailNumber} grounded after after-flight inspection. Daily CRS required.`, 'dashboard');
-    }
-  }
 
   // Reset inspection counters when a 50hr or 100hr inspection is released
   if (task.type === 'inspection_50hr' || task.type === 'inspection_100hr') {

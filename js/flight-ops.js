@@ -730,14 +730,12 @@ async function showEndOfFlyingSheet() {
     };
     await DB.put('maintenance_tasks', inspTask);
     await queueSync('maintenance_tasks', 'create', inspTask);
-    ac2.groundedAfterInspection = true;
-    ac2.groundedAfterInspAt = new Date().toISOString();
     await DB.put('aircraft', ac2);
     await queueSync('aircraft', 'update', ac2);
     window.__sheetClose(true);
-    showToast('Aircraft grounded — after-flight inspection required');
-    createNotification('inspection', 'After-Flight Inspection Created', `End-of-day inspection due for ${ac2.tailNumber} — aircraft grounded`, 'maintenance');
-    logActivity('after_flight_created', `End-of-day after-flight inspection created for ${ac2.tailNumber} — grounded (tach: ${newTach.toFixed(1)})`, inspTask.id);
+    showToast('After-flight inspection created — rectify to ground aircraft');
+    createNotification('inspection', 'After-Flight Inspection Created', `End-of-day inspection due for ${ac2.tailNumber} — rectify to ground aircraft`, 'maintenance');
+    logActivity('after_flight_created', `End-of-day after-flight inspection created for ${ac2.tailNumber} (tach: ${newTach.toFixed(1)})`, inspTask.id);
     notifyDataChange();
   });
   document.getElementById('eof-cancel-btn').addEventListener('click', () => {
