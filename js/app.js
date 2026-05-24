@@ -2190,6 +2190,28 @@ function settingsView() {
         </div>
       </div>
 
+      ${role === 'admin' ? `
+      <div class="card">
+        <div class="card-header"><h3>User Management</h3></div>
+        <div style="padding:12px 16px" id="user-management">
+          <p class="text-muted small" style="margin-bottom:8px">Add or remove login users. Each user appears on the login screen with their role. Default PIN for new users is 1234.</p>
+          <div id="user-list"></div>
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <input type="text" id="new-user-name" class="form-input" placeholder="Full name" style="flex:1">
+            <select id="new-user-role" class="form-input" style="flex-shrink:0;max-width:110px;font-size:12px">
+              <option value="admin">Admin</option>
+              <option value="engineer">Engineer</option>
+              <option value="production_planner">Prod Planner</option>
+              <option value="senior_technician">Sr Tech</option>
+              <option value="technician">Technician</option>
+              <option value="pilot">Pilot</option>
+              <option value="guest">Guest</option>
+            </select>
+            <button class="btn btn-primary" id="add-user-btn">Add</button>
+          </div>
+        </div>
+      </div>` : ''}
+
       <div class="card">
         <div class="card-header"><h3>Appearance</h3></div>
         <div style="padding:12px 16px">
@@ -2267,6 +2289,86 @@ function settingsView() {
   document.getElementById('new-pilot-name').addEventListener('keydown', e => {
     if (e.key === 'Enter') addPilot();
   });
+
+  const addUserBtn = document.getElementById('add-user-btn');
+  if (addUserBtn) {
+    renderUserList();
+    addUserBtn.addEventListener('click', addLoginUser);
+    document.getElementById('new-user-name').addEventListener('keydown', e => {
+      if (e.key === 'Enter') addLoginUser();
+    });
+  }
+}
+
+function getLoginUsers() {
+  try { return JSON.parse(localStorage.getItem('aac_users')) || []; } catch(e) { return []; }
+}
+
+function saveLoginUsers(list) {
+  localStorage.setItem('aac_users', JSON.stringify(list));
+}
+
+function renderUserList() {
+  const el = document.getElementById('user-list');
+  if (!el) return;
+  const users = getLoginUsers();
+  const currentUser = localStorage.getItem('aac_user');
+  if (users.length === 0) {
+    el.innerHTML = '<div class="text-muted small" style="padding:4px 0">No users yet.</div>';
+    return;
+  }
+  el.innerHTML = users.map((u, i) =>
+    `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <span style="font-size:13px;font-weight:600">${escHtml(u.name)}</span>
+        <span class="badge" style="font-size:10px;margin-left:6px;background:var(--surface);color:var(--text-muted)">${u.role.replace(/_/g, ' ')}</span>
+        ${u.name === currentUser ? ' <span class="badge badge-released" style="font-size:9px">You</span>' : ''}
+      </div>
+      ${u.name !== currentUser ? `<button class="btn btn-small btn-danger del-user-btn" data-index="${i}" style="padding:2px 8px;font-size:11px">×</button>` : ''}
+    </div>`
+  ).join('');
+  el.querySelectorAll('.del-user-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const users = getLoginUsers();
+      const idx = parseInt(btn.dataset.index);
+      const name = users[idx].name;
+      const confirmed = await showConfirmDialog('Remove User', `Remove "${name}" from the login list?`);
+      if (!confirmed) return;
+      // Remove from aac_users
+      users.splice(idx, 1);
+      saveLoginUsers(users);
+      // Also remove from DB users
+      const dbUsers = await DB.getAll('users');
+      for (const du of dbUsers) {
+        if (du.name === name) { await DB.del('users', du.id); await queueSync('users', 'delete', { id: du.id }); }
+      }
+      renderUserList();
+    });
+  });
+}
+
+async function addLoginUser() {
+  const nameInput = document.getElementById('new-user-name');
+  const roleSel = document.getElementById('new-user-role');
+  const name = nameInput.value.trim();
+  const role = roleSel.value;
+  if (!name) { showToast('Enter a name', 'error'); return; }
+  const users = getLoginUsers();
+  if (users.some(u => u.name === name)) { showToast('User already exists', 'error'); return; }
+  users.push({ name, role });
+  saveLoginUsers(users);
+  // Sync to DB users store for crew board
+  const id = 'user_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+  await DB.put('users', { id, name, role, photo: '', createdAt: new Date().toISOString() });
+  await queueSync('users', 'create', { id, name, role, photo: '', createdAt: new Date().toISOString() });
+  // Seed their PIN
+  let userPins = {};
+  try { userPins = JSON.parse(localStorage.getItem('aac_user_pins')) || {}; } catch(e) {}
+  userPins[name] = '1234';
+  localStorage.setItem('aac_user_pins', JSON.stringify(userPins));
+  nameInput.value = '';
+  renderUserList();
+  showToast(`User "${name}" added as ${role.replace(/_/g, ' ')}`);
 }
 
 function getPilots() {
