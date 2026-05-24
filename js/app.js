@@ -228,7 +228,7 @@ async function fetchWeather() {
   if (cached) {
     try {
       const parsed = JSON.parse(cached);
-      if (Date.now() - parsed.ts < 30 * 60 * 1000) return parsed;
+      if (parsed.conditionCode && Date.now() - parsed.ts < 30 * 60 * 1000) return parsed;
     } catch(e) {}
   }
   if (!navigator.onLine) {
