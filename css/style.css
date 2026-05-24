@@ -1184,6 +1184,25 @@ select {
   50% { transform: translateY(-2px); }
 }
 
+/* ── Library ── */
+.lib-doc-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--glass-border);
+}
+.lib-doc-item:last-child { border-bottom: none; }
+.lib-doc-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+.lib-doc-info { flex: 1; min-width: 0; }
+.lib-doc-title { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--text); }
+.lib-doc-desc { font-family: var(--mono); font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+.lib-toggle {
+  font-size: 10px;
+  transition: transform 0.2s;
+  color: var(--text-muted);
+}
+
 /* ── Notification Sections ── */
 .notif-section-title {
   font-family: var(--mono);
