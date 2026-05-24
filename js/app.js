@@ -91,59 +91,43 @@ async function logActivity(type, description, relatedId) {
   await DB.put('flights', entry);
 }
 
+const INSPECTION_TEMPLATES = [
+  { type: 'inspection_50hr', label: '50-hour inspection due', interval: (ac) => ac.oilInterval || 50, getElapsed: (ac) => (ac.totalTachTime || 0) - (ac.lastOilChangeTach || 0) },
+  { type: 'inspection_100hr', label: '100-hour inspection due', interval: (ac) => ac.structInterval || 100, getElapsed: (ac) => (ac.totalTachTime || 0) - (ac.last100hrTach || 0) },
+  { type: 'inspection_engine_TBO', label: 'Engine TBO due', interval: (ac) => ac.engineTBO || 2000, getElapsed: (ac) => ac.engineETSO || 0 },
+  { type: 'inspection_prop_TBO', label: 'Propeller TBO due', interval: (ac) => ac.propellerTBO || 2000, getElapsed: (ac) => ac.propellerPTSO || 0 },
+];
+
 async function checkAndCreateInspectionTasks(ac) {
   if (!ac) return;
-  const tach = ac.totalTachTime || 0;
-  const hoursSinceOil = tach - (ac.lastOilChangeTach || 0);
-  const hoursSince100hr = tach - (ac.last100hrTach || 0);
   const tasks = await DB.getAll('maintenance_tasks');
   const acTasks = tasks.filter(t => t.aircraftId === ac.tailNumber);
 
-  if (hoursSinceOil >= (ac.oilInterval || 50)) {
-    const hasOpen = acTasks.some(t => t.type === 'inspection_50hr' && t.status === 'open');
-    if (!hasOpen) {
-      const task = {
-        id: 'mnt_' + Date.now(),
-        aircraftId: ac.tailNumber,
-        description: '50-hour inspection due',
-        type: 'inspection_50hr',
-        priority: 'high',
-        assignedTo: [],
-        status: 'open',
-        technicianNotes: '',
-        rectifiedBy: '',
-        rectifiedAt: '',
-        releasedBy: '',
-        releasedAt: '',
-        createdAt: new Date().toISOString()
-      };
-      await DB.put('maintenance_tasks', task);
-      await queueSync('maintenance_tasks', 'create', task);
-      showToast('⚠️ 50hr inspection task auto-created');
-    }
-  }
-
-  if (hoursSince100hr >= (ac.structInterval || 100)) {
-    const hasOpen = acTasks.some(t => t.type === 'inspection_100hr' && t.status === 'open');
-    if (!hasOpen) {
-      const task = {
-        id: 'mnt_' + Date.now(),
-        aircraftId: ac.tailNumber,
-        description: '100-hour inspection due',
-        type: 'inspection_100hr',
-        priority: 'high',
-        assignedTo: [],
-        status: 'open',
-        technicianNotes: '',
-        rectifiedBy: '',
-        rectifiedAt: '',
-        releasedBy: '',
-        releasedAt: '',
-        createdAt: new Date().toISOString()
-      };
-      await DB.put('maintenance_tasks', task);
-      await queueSync('maintenance_tasks', 'create', task);
-      showToast('⚠️ 100hr inspection task auto-created');
+  for (const tmpl of INSPECTION_TEMPLATES) {
+    const elapsed = tmpl.getElapsed(ac);
+    const interval = tmpl.interval(ac);
+    if (elapsed >= interval) {
+      const hasOpen = acTasks.some(t => t.type === tmpl.type && t.status === 'open');
+      if (!hasOpen) {
+        const task = {
+          id: 'mnt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+          aircraftId: ac.tailNumber,
+          description: tmpl.label,
+          type: tmpl.type,
+          priority: 'high',
+          assignedTo: [],
+          status: 'open',
+          technicianNotes: '',
+          rectifiedBy: '',
+          rectifiedAt: '',
+          releasedBy: '',
+          releasedAt: '',
+          createdAt: new Date().toISOString()
+        };
+        await DB.put('maintenance_tasks', task);
+        await queueSync('maintenance_tasks', 'create', task);
+        showToast('⚠ ' + tmpl.label.replace(' due', '') + ' task auto-created');
+      }
     }
   }
 }
@@ -163,20 +147,45 @@ function activityFeedView() {
         <h2>Activity Feed</h2>
         <div class="subtitle">Real-time crew activity</div>
       </div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="row" style="gap:6px">
+          <div class="form-group" style="flex:2">
+            <input type="text" id="activity-search" class="form-input" placeholder="Search activity..." style="font-size:12px">
+          </div>
+          <div class="form-group" style="flex:1">
+            <input type="date" id="activity-from" class="form-input" style="font-size:11px">
+          </div>
+          <div class="form-group" style="flex:1">
+            <input type="date" id="activity-to" class="form-input" style="font-size:11px">
+          </div>
+        </div>
+      </div>
       <div id="activity-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>
     </div>
   `;
   renderActivityFeed();
+  document.getElementById('activity-search').addEventListener('input', renderActivityFeed);
+  document.getElementById('activity-from').addEventListener('change', renderActivityFeed);
+  document.getElementById('activity-to').addEventListener('change', renderActivityFeed);
 }
 
 async function renderActivityFeed() {
   const el = document.getElementById('activity-list');
-  const entries = await getActivityFeed();
-  if (entries.length === 0) {
+  const entries = await getActivityFeed(500);
+  const q = (document.getElementById('activity-search')?.value || '').toLowerCase();
+  const from = document.getElementById('activity-from')?.value;
+  const to = document.getElementById('activity-to')?.value;
+  const filtered = entries.filter(e => {
+    if (q && !e.description?.toLowerCase().includes(q) && !e.performedBy?.toLowerCase().includes(q)) return false;
+    if (from && e.createdAt && e.createdAt.slice(0, 10) < from) return false;
+    if (to && e.createdAt && e.createdAt.slice(0, 10) > to) return false;
+    return true;
+  });
+  if (filtered.length === 0) {
     el.innerHTML = emptyState('&#128197;', 'No activity recorded yet');
     return;
   }
-  el.innerHTML = entries.map(e => `
+  el.innerHTML = filtered.map(e => `
     <div class="flight-row">
       <div style="flex:1;min-width:0">
         <div class="flight-pilot">${escHtml(e.description)}</div>
@@ -530,7 +539,7 @@ async function dashboardView() {
         </div>
         <div class="stat-card">
           <div class="stat-value ${openDefects > 0 ? 'text-red' : 'text-green'}">${openDefects}</div>
-          <div class="stat-label">Open Squawks</div>
+            <div class="stat-label">Open Defects</div>
         </div>
       </div>
 
@@ -558,20 +567,22 @@ async function dashboardView() {
             <div class="dw-label">100hr Inspection Left</div>
           </div>
         </div>
+        ${(userRole !== 'pilot' && userRole !== 'maintenance') ? `
         <div class="dash-widget" style="cursor:pointer" onclick="navigate('maintenance')">
           <div class="dw-icon">&#9881;</div>
           <div class="dw-info">
             <div class="dw-value ${openTasks > 0 ? 'text-orange' : 'text-green'}">${openTasks}</div>
             <div class="dw-label">Open Tasks</div>
           </div>
-        </div>
+        </div>` : ''}
+        ${(userRole !== 'pilot' && userRole !== 'maintenance') ? `
         <div class="dash-widget" style="cursor:pointer" onclick="navigate('inventory')">
           <div class="dw-icon">&#128230;</div>
           <div class="dw-info">
             <div class="dw-value ${lowParts > 0 ? 'text-red' : 'text-green'}">${lowParts}</div>
             <div class="dw-label">Low Stock Parts</div>
           </div>
-        </div>
+        </div>` : ''}
         <div class="dash-widget">
           <div class="dw-icon">&#9981;</div>
           <div class="dw-info">
@@ -583,32 +594,9 @@ async function dashboardView() {
           <div class="dw-icon">&#9888;</div>
           <div class="dw-info">
             <div class="dw-value ${groundingDefects > 0 ? 'text-red' : openDefects > 0 ? 'text-orange' : 'text-green'}">${openDefects}</div>
-            <div class="dw-label">Open Squawks</div>
+            <div class="dw-label">Open Defects</div>
           </div>
         </div>
-      </div>
-
-      <div class="quick-actions">
-        <a href="#" class="quick-action" data-view="flight-ops">
-          <div class="qa-icon">&#9992;</div>
-          <div class="qa-label">Log Flight</div>
-        </a>
-        <a href="#" class="quick-action" data-view="defects">
-          <div class="qa-icon">&#9888;</div>
-          <div class="qa-label">Squawks</div>
-        </a>
-        <a href="#" class="quick-action" data-view="maintenance">
-          <div class="qa-icon">&#9881;</div>
-          <div class="qa-label">Sign-offs</div>
-        </a>
-        <a href="#" class="quick-action" data-view="fuel">
-          <div class="qa-icon">&#9981;</div>
-          <div class="qa-label">Fuel</div>
-        </a>
-        <a href="#" class="quick-action" data-view="inventory">
-          <div class="qa-icon">&#128230;</div>
-          <div class="qa-label">Parts</div>
-        </a>
       </div>
 
       <div class="card">
@@ -704,14 +692,6 @@ async function dashboardView() {
 
   checkAndCreateInspectionTasks(ac);
 
-  // Quick-action navigation
-  document.querySelectorAll('.quick-action[data-view]').forEach(a => {
-    a.addEventListener('click', e => {
-      e.preventDefault();
-      navigate(a.dataset.view);
-    });
-  });
-
   const inspBtn = document.getElementById('perform-inspection-btn');
   if (inspBtn) {
     inspBtn.addEventListener('click', () => navigate('maintenance'));
@@ -719,6 +699,7 @@ async function dashboardView() {
   const crsBtn = document.getElementById('issue-daily-crs-btn');
   if (crsBtn) {
   crsBtn.addEventListener('click', async () => {
+      if (typeof denyGuest === 'function' && denyGuest()) return;
       const role = localStorage.getItem('aac_user_role');
       if (role !== 'engineer' && role !== 'admin') { showToast('Only Engineer or Admin can issue CRS', 'error'); return; }
       const ac = await getAircraft();
@@ -911,6 +892,7 @@ function profileView() {
   const role = localStorage.getItem('aac_user_role') || '';
   const photo = localStorage.getItem('aac_user_photo') || '';
   const roles = [
+    { value: 'guest', label: 'Guest', desc: 'View-only access to all data' },
     { value: 'technician', label: 'Technician', desc: 'Can record sorties, report squawks, view data' },
     { value: 'senior_technician', label: 'Senior Technician', desc: 'Above + can approve sign-ins' },
     { value: 'production_planner', label: 'Production Planner', desc: 'Above + can end flying, view CRS, manage fleet' },
@@ -981,6 +963,7 @@ function profileView() {
     if (sel && desc) desc.textContent = sel.desc;
   });
   document.getElementById('profile-save-btn').addEventListener('click', async () => {
+    if (typeof denyGuest === 'function' && denyGuest()) return;
     const n = document.getElementById('profile-name').value.trim();
     const r = document.getElementById('profile-role').value;
     if (!n) { showToast('Enter your name', 'error'); return; }
@@ -1081,6 +1064,7 @@ function showAircraftSheet() {
   });
 
   document.getElementById('add-ac-btn')?.addEventListener('click', async () => {
+    if (typeof denyGuest === 'function' && denyGuest()) return;
     const tail = document.getElementById('new-ac-tail').value.trim().toUpperCase();
     const type = document.getElementById('new-ac-type').value.trim() || 'Aircraft';
     if (!tail) { showToast('Enter a tail number', 'error'); return; }
@@ -1112,9 +1096,101 @@ function showAircraftSheet() {
     populateACSelector();
   });
 
-  document.getElementById('close-ac-btn').addEventListener('click', () => {
-    window.__sheetClose(null);
+  document.getElementById('export-tech-log-btn').addEventListener('click', async () => {
+    generateDailyTechLog();
   });
+
+  document.getElementById('close-export-btn').addEventListener('click', () => window.__sheetClose(null));
+}
+
+async function generateDailyTechLog() {
+  const today = new Date().toISOString().slice(0, 10);
+  const ac = await getAircraft();
+  if (!ac) { showToast('No aircraft selected', 'error'); return; }
+  const flights = await DB.getAll('flights');
+  const tasks = await DB.getAll('maintenance_tasks');
+  const defects = await DB.getAll('defects');
+  const allHistory = await getAllHistory();
+
+  const todayFlights = flights.filter(f => f.flightDate === today && f.aircraftId === ac.tailNumber);
+  const todayTasks = tasks.filter(t => t.createdAt?.slice(0, 10) === today && t.aircraftId === ac.tailNumber);
+  const todayDefects = defects.filter(d => d.createdAt?.slice(0, 10) === today && d.aircraftId === ac.tailNumber);
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  doc.setFontSize(18);
+  doc.text('Daily Tech Log', 14, 20);
+  doc.setFontSize(10);
+  doc.text(`Aircraft: ${ac.tailNumber} (${ac.type || 'Cessna 152'})`, 14, 28);
+  doc.text(`Date: ${today}`, 14, 34);
+  doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 40);
+  doc.setDrawColor(150);
+  doc.line(14, 44, 196, 44);
+
+  let y = 50;
+  doc.setFontSize(12);
+  doc.text('Flight Summary', 14, y); y += 8;
+  doc.setFontSize(9);
+  if (todayFlights.length === 0) {
+    doc.text('No flights recorded today.', 14, y); y += 6;
+  } else {
+    for (const f of todayFlights) {
+      doc.text(`${f.pilotName || 'Unknown'} | ${f.takeoffTime || '--'} - ${f.landingTime || '--'} | ${(f.flownHours || 0).toFixed(2)} hrs`, 14, y);
+      y += 5;
+      if (f.route) { doc.text(`  Route: ${f.route}`, 14, y); y += 5; }
+      if (f.remarks) { doc.text(`  Remarks: ${f.remarks}`, 14, y); y += 5; }
+    }
+  }
+
+  y += 4;
+  doc.setFontSize(12);
+  doc.text('Maintenance / Work Orders', 14, y); y += 8;
+  doc.setFontSize(9);
+  if (todayTasks.length === 0) {
+    doc.text('No work orders today.', 14, y); y += 6;
+  } else {
+    for (const t of todayTasks) {
+      doc.text(`[${t.status}] ${t.description}`, 14, y); y += 5;
+      if (t.rectifiedBy) doc.text(`  Rectified by: ${t.rectifiedBy}`, 14, y); y += 5;
+      if (t.releasedBy) doc.text(`  Released by: ${t.releasedBy}`, 14, y); y += 5;
+    }
+  }
+
+  y += 4;
+  doc.setFontSize(12);
+  doc.text('Defect Report', 14, y); y += 8;
+  doc.setFontSize(9);
+  if (todayDefects.length === 0) {
+    doc.text('No defects recorded today.', 14, y); y += 6;
+  } else {
+    for (const d of todayDefects) {
+      doc.text(`[${d.urgency}] ${d.description} - ${d.status}`, 14, y); y += 5;
+    }
+  }
+
+  y += 4;
+  doc.setFontSize(12);
+  doc.text('Aircraft Status', 14, y); y += 8;
+  doc.setFontSize(9);
+  doc.text(`Tach: ${ac.totalTachTime || 0} hrs`, 14, y); y += 5;
+  const hoursSinceOil = (ac.totalTachTime || 0) - (ac.lastOilChangeTach || 0);
+  const hoursSince100hr = (ac.totalTachTime || 0) - (ac.last100hrTach || 0);
+  doc.text(`50hr: ${Math.max(0, (ac.oilInterval || 50) - hoursSinceOil).toFixed(1)} hrs remaining`, 14, y); y += 5;
+  doc.text(`100hr: ${Math.max(0, (ac.structInterval || 100) - hoursSince100hr).toFixed(1)} hrs remaining`, 14, y); y += 5;
+  doc.text(`Engine TSO: ${(ac.engineETSO || 0).toFixed(1)} hrs`, 14, y); y += 5;
+  doc.text(`Prop TSO: ${(ac.propellerPTSO || 0).toFixed(1)} hrs`, 14, y); y += 5;
+
+  doc.line(14, y + 4, 196, y + 4);
+  y += 10;
+  doc.setFontSize(9);
+  doc.text('Maintenance Release / CRS:', 14, y); y += 6;
+  doc.line(14, y, 100, y); y += 8;
+  doc.text('Signature & Date', 14, y);
+
+  doc.save(`tech-log-${ac.tailNumber}-${today}.pdf`);
+  showToast('Daily tech log PDF generated');
+  window.__sheetClose(true);
 }
 
 async function renderACListSheet() {
@@ -1170,6 +1246,7 @@ async function renderACListSheet() {
 
   el.querySelectorAll('.reset-etso-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
+      if (typeof denyGuest === 'function' && denyGuest()) return;
       const confirmed = await showConfirmDialog('Reset Engine TSO', 'Confirm engine overhaul? This resets Engine TSO to 0.');
       if (!confirmed) return;
       const ac = await DB.get('aircraft', btn.dataset.tail);
@@ -1183,6 +1260,7 @@ async function renderACListSheet() {
   });
   el.querySelectorAll('.reset-ptso-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
+      if (typeof denyGuest === 'function' && denyGuest()) return;
       const confirmed = await showConfirmDialog('Reset Prop TSO', 'Confirm propeller overhaul? This resets Prop TSO to 0.');
       if (!confirmed) return;
       const ac = await DB.get('aircraft', btn.dataset.tail);
@@ -1226,6 +1304,7 @@ async function renderACListSheet() {
   });
   el.querySelectorAll('.del-ac-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
+      if (typeof denyGuest === 'function' && denyGuest()) return;
       const tail = btn.dataset.tail;
       const all = await getAllAircraft();
       if (all.length <= 1) return;
@@ -1518,20 +1597,29 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Seed user database if not yet set
   if (!localStorage.getItem('aac_users')) {
-    const defaultUsers = [
-      { name: 'Pasan Anishka', role: 'admin' },
-      { name: 'Buddika Chandrarathna', role: 'engineer' },
-      { name: 'Thisanga', role: 'production_planner' },
-      { name: 'Chandrakeerthi', role: 'senior_technician' },
-      { name: 'Deshan', role: 'technician' },
-      { name: 'Shalana', role: 'technician' },
-      { name: 'Rehan', role: 'technician' },
-      { name: 'Binada', role: 'technician' },
-      { name: 'Bihandu', role: 'technician' },
-      { name: 'Ginod', role: 'technician' },
-      { name: 'Kalum', role: 'technician' },
-      { name: 'Rajapaksha', role: 'technician' }
-    ];
+const defaultUsers = [
+  { name: 'Pasan Anishka', role: 'admin' },
+  { name: 'Buddika Chandrarathna', role: 'engineer' },
+  { name: 'Thisanga', role: 'production_planner' },
+  { name: 'Chandrakeerthi', role: 'senior_technician' },
+  { name: 'Deshan', role: 'technician' },
+  { name: 'Shalana', role: 'technician' },
+  { name: 'Rehan', role: 'technician' },
+  { name: 'Binada', role: 'technician' },
+  { name: 'Bihandu', role: 'technician' },
+  { name: 'Ginod', role: 'technician' },
+  { name: 'Kalum', role: 'technician' },
+  { name: 'Rajapaksha', role: 'technician' },
+  { name: 'Guest', role: 'guest' }
+];
+
+function denyGuest() {
+  if (localStorage.getItem('aac_user_role') === 'guest') {
+    showToast('Guests are view-only', 'error');
+    return true;
+  }
+  return false;
+}
     localStorage.setItem('aac_users', JSON.stringify(defaultUsers));
   }
 
@@ -1579,6 +1667,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('sidebar-reset').addEventListener('click', async e => {
     e.preventDefault();
     closeSidebar();
+    if (typeof denyGuest === 'function' && denyGuest()) return;
     const role = localStorage.getItem('aac_user_role');
     if (role !== 'admin') { showToast('Only Admin can reset all data', 'error'); return; }
     const confirmed = await showConfirmDialog('Factory Reset', 'This will delete ALL data including aircraft, sorties, defects, parts, and fuel. Are you sure?');
@@ -1716,7 +1805,7 @@ async function showExportSheet() {
   const storeDefs = [
     { key: 'aircraft', label: 'Aircraft', hasDate: false },
     { key: 'flights', label: 'Sorties', hasDate: true, dateField: 'flightDate' },
-    { key: 'defects', label: 'Squawks', hasDate: true, dateField: 'createdAt' },
+    { key: 'defects', label: 'Defects', hasDate: true, dateField: 'createdAt' },
     { key: 'maintenance_tasks', label: 'Work Orders', hasDate: true, dateField: 'createdAt' },
     { key: 'fuel_stock', label: 'Fuel Stock', hasDate: false },
     { key: 'fuel_logs', label: 'Fuel Logs', hasDate: true, dateField: 'createdAt' },
@@ -1754,6 +1843,7 @@ async function showExportSheet() {
       `).join('')}
     </div>
     <button class="btn btn-primary btn-block" id="export-all-btn">Generate PDF Report</button>
+    <button class="btn btn-secondary btn-block" id="export-tech-log-btn" style="margin-top:8px">&#128196; Daily Tech Log Summary</button>
     <button class="btn btn-secondary btn-block" id="close-export-btn" style="margin-top:8px">Close</button>
   `);
 

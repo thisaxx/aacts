@@ -34,6 +34,12 @@ function inventoryView() {
       </div>
 
       <div class="card">
+        <div class="form-group">
+          <input type="text" id="inv-search" class="form-input" placeholder="Search parts..." style="font-size:12px">
+        </div>
+      </div>
+
+      <div class="card">
         <div class="card-header">
           <h3>Component Catalog</h3>
           <button class="btn btn-sm btn-primary" id="add-part-btn">+ Add Part</button>
@@ -103,6 +109,7 @@ function inventoryView() {
   document.getElementById('save-part-btn').addEventListener('click', onSavePart);
   document.getElementById('adj-add').addEventListener('click', () => adjustPart(1));
   document.getElementById('adj-remove').addEventListener('click', () => adjustPart(-1));
+  document.getElementById('inv-search').addEventListener('input', renderInventory);
 
   seedParts().then(() => {
     renderInventory();
@@ -115,6 +122,7 @@ function inventoryView() {
 }
 
 async function onSavePart() {
+  if (typeof denyGuest === 'function' && denyGuest()) return;
   const pn = document.getElementById('part-number').value.trim().toUpperCase();
   const desc = document.getElementById('part-desc').value.trim();
   const qty = parseInt(document.getElementById('part-qty').value) || 0;
@@ -135,6 +143,7 @@ async function onSavePart() {
 }
 
 async function adjustPart(dir) {
+  if (typeof denyGuest === 'function' && denyGuest()) return;
   const select = document.getElementById('adjust-part');
   const pn = select.value;
   const qty = parseInt(document.getElementById('adjust-qty').value) || 1;
@@ -159,6 +168,8 @@ async function populateAdjustSelect() {
 
 async function renderInventory() {
   const parts = await getParts();
+  const q = (document.getElementById('inv-search')?.value || '').toLowerCase();
+  const filtered = q ? parts.filter(p => p.partNumber.toLowerCase().includes(q) || p.description.toLowerCase().includes(q)) : parts;
   const list = document.getElementById('inventory-list');
   const lowEl = document.getElementById('low-stock-list');
 
@@ -166,7 +177,7 @@ async function renderInventory() {
     <table class="inv-table">
       <thead><tr><th>Part #</th><th>Description</th><th>On Hand</th><th>Min</th><th></th></tr></thead>
       <tbody>
-        ${parts.map(p => {
+        ${filtered.map(p => {
           const low = p.quantityOnHand <= p.minSafeStock;
           return `<tr class="${low ? 'row-low' : ''}">
             <td>${escHtml(p.partNumber)}</td>
@@ -182,6 +193,7 @@ async function renderInventory() {
 
   list.querySelectorAll('.del-part-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
+      if (typeof denyGuest === 'function' && denyGuest()) return;
       const pn = btn.dataset.pn;
       const confirmed = await showConfirmDialog('Delete Part', `Delete ${pn} permanently?`);
       if (!confirmed) return;
@@ -235,6 +247,7 @@ function showFuelAddSheet(fuelId, fuelName) {
   `);
 
   document.getElementById('add-fuel-btn').addEventListener('click', async () => {
+    if (typeof denyGuest === 'function' && denyGuest()) return;
     const liters = parseFloat(document.getElementById('add-fuel-liters').value) || 0;
     const source = document.getElementById('add-fuel-source').value.trim() || 'Manual add';
     if (liters <= 0) { showToast('Enter valid liters', 'error'); return; }
@@ -271,6 +284,7 @@ function showFuelReduceSheet(fuelId, fuelName) {
   `);
   initSteppers();
   document.getElementById('confirm-reduce-stock-btn').addEventListener('click', async () => {
+    if (typeof denyGuest === 'function' && denyGuest()) return;
     const liters = parseFloat(document.getElementById('reduce-fuel-liters').value) || 0;
     const reason = document.getElementById('reduce-fuel-reason').value.trim() || 'Manual reduction';
     if (liters <= 0) { showToast('Enter valid liters', 'error'); return; }

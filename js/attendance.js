@@ -150,6 +150,7 @@ async function renderAttendance(viewDate) {
         haptic();
       });
       document.getElementById('att-checkin-btn').addEventListener('click', async () => {
+        if (typeof denyGuest === 'function' && denyGuest()) return;
         const notes = document.getElementById('att-notes').value.trim();
         const timeVal = document.getElementById('att-checkin-time-input').value;
         const now = new Date();
@@ -173,6 +174,7 @@ async function renderAttendance(viewDate) {
     const delBtn = selfEl.querySelector('.att-del-btn');
     if (delBtn) {
       delBtn.addEventListener('click', async () => {
+        if (typeof denyGuest === 'function' && denyGuest()) return;
         const confirmed = await showConfirmDialog('Delete Record', 'Delete this crew record?');
         if (!confirmed) return;
         await DB.del('attendance', active.id);
@@ -205,6 +207,7 @@ async function renderAttendance(viewDate) {
 
       pendingEl.querySelectorAll('.att-approve-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
+          if (typeof denyGuest === 'function' && denyGuest()) return;
           const rec = await DB.get('attendance', btn.dataset.id);
           if (!rec) return;
           rec.status = 'approved';
@@ -220,6 +223,7 @@ async function renderAttendance(viewDate) {
       });
       pendingEl.querySelectorAll('.att-reject-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
+          if (typeof denyGuest === 'function' && denyGuest()) return;
           const rec = await DB.get('attendance', btn.dataset.id);
           if (!rec) return;
           rec.status = 'rejected';

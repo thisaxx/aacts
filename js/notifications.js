@@ -104,6 +104,7 @@ function notificationsView() {
     showToast('All notifications marked read');
   });
   document.getElementById('clear-all-notifs-btn').addEventListener('click', async () => {
+    if (typeof denyGuest === 'function' && denyGuest()) return;
     const role = localStorage.getItem('aac_user_role');
     if (role !== 'admin') { showToast('Only Admin can clear all notifications', 'error'); return; }
     const confirmed = await showConfirmDialog('Clear All Notifications', 'Delete all notifications? This cannot be undone.');
@@ -132,13 +133,18 @@ function notifTypeSection(type) {
 
 function renderNotifGroup(notifs, title, icon) {
   if (notifs.length === 0) return '';
+  const role = localStorage.getItem('aac_user_role');
+  const isAdmin = role === 'admin';
   return `
     <div class="notif-section-title">${icon} ${title} <span class="notif-section-count">${notifs.length}</span></div>
     ${notifs.map(n => `
       <div class="task-card notif-card ${n.read ? '' : 'notif-unread'}" data-id="${n.id}" style="cursor:pointer">
         <div class="task-header">
           <span>${notifTypeIcon(n.type)} ${escHtml(n.title)}</span>
-          <span class="badge ${n.read ? 'badge-rectified' : 'badge-open'}" style="font-size:10px">${n.read ? 'Read' : 'New'}</span>
+          <span style="display:flex;align-items:center;gap:6px">
+            ${isAdmin ? `<button class="del-notif-btn" data-id="${n.id}" style="background:none;border:none;color:var(--text-muted);font-size:14px;cursor:pointer;padding:0;line-height:1">&times;</button>` : ''}
+            <span class="badge ${n.read ? 'badge-rectified' : 'badge-open'}" style="font-size:10px">${n.read ? 'Read' : 'New'}</span>
+          </span>
         </div>
         <p class="task-desc">${escHtml(n.message)}</p>
         <p class="task-meta">${new Date(n.createdAt).toLocaleString()}</p>
@@ -164,7 +170,8 @@ async function renderNotifList() {
     renderNotifGroup(otherNotifs, 'Other', '&#9679;');
 
   el.querySelectorAll('.notif-card').forEach(card => {
-    card.addEventListener('click', async () => {
+    card.addEventListener('click', async (e) => {
+      if (e.target.classList.contains('del-notif-btn')) return;
       const id = card.dataset.id;
       await markNotifRead(id);
       const notif = await DB.get('notifications', id);
@@ -173,6 +180,19 @@ async function renderNotifList() {
       } else {
         renderNotifList();
       }
+    });
+  });
+  el.querySelectorAll('.del-notif-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      const confirmed = await showConfirmDialog('Delete Notification', 'Delete this notification?');
+      if (!confirmed) return;
+      await DB.del('notifications', id);
+      await queueSync('notifications', 'delete', { id });
+      updateNotifBadge();
+      renderNotifList();
+      showToast('Notification deleted');
     });
   });
 }

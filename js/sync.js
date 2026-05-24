@@ -141,7 +141,30 @@ async function processSyncQueue() {
 
 firebase.auth().onAuthStateChanged(() => { updateSyncBadge(); processSyncQueue(); });
 
-window.addEventListener('online', () => { updateSyncBadge(); processSyncQueue(); });
-window.addEventListener('offline', () => { updateSyncBadge(); });
+window.addEventListener('online', () => {
+  updateSyncBadge();
+  processSyncQueue();
+  document.body.classList.remove('offline');
+  showSyncToast('Online — syncing...', 'success');
+});
+window.addEventListener('offline', () => {
+  updateSyncBadge();
+  document.body.classList.add('offline');
+  showSyncToast('Offline — changes saved locally', 'error');
+});
+
+// Initial offline check
+if (!navigator.onLine) document.body.classList.add('offline');
+
+function showSyncToast(msg, type) {
+  const existing = document.getElementById('sync-toast');
+  if (existing) existing.remove();
+  const t = document.createElement('div');
+  t.id = 'sync-toast';
+  t.className = `sync-toast show ${type}`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => { t.className = 'sync-toast'; }, 3000);
+}
 
 try { updateSyncBadge(); } catch (e) { /* firebase not yet inited */ }

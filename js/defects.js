@@ -16,15 +16,15 @@ function defectsView() {
   app.innerHTML = `
     <div class="page">
       <div class="page-header">
-        <h2>Squawks</h2>
+        <h2>Defects</h2>
         <div class="subtitle">Report issues &amp; track resolutions</div>
       </div>
 
-      <button class="btn btn-primary btn-block" id="report-defect-btn">+ Report Squawk</button>
+      <button class="btn btn-primary btn-block" id="report-defect-btn">+ Report Defect</button>
 
       <div class="card">
         <div class="card-header">
-          <h3>Open Squawks</h3>
+          <h3>Open Defects</h3>
         </div>
       <div id="open-defects"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line" style="width:50%"></div></div>
       <div class="card">
@@ -41,9 +41,9 @@ function defectsView() {
 
 function showDefectSheet() {
   showBottomSheet(`
-    <div class="card-header"><h3>Report New Squawk</h3></div>
+    <div class="card-header"><h3>Report New Defect</h3></div>
     <div class="form-group">
-      <label for="defect-desc">Description of Squawk</label>
+      <label for="defect-desc">Description of Defect</label>
       <textarea id="defect-desc" rows="3" placeholder="e.g. Rough engine idle, Fuel gauge fluctuating..."></textarea>
     </div>
     <div class="form-group">
@@ -73,7 +73,7 @@ function showDefectSheet() {
         <button class="btn btn-sm btn-ghost" id="defect-photo-remove" style="font-size:10px">Remove</button>
       </div>
     </div>
-    <button class="btn btn-primary btn-block" id="save-defect-btn">Submit Squawk</button>
+    <button class="btn btn-primary btn-block" id="save-defect-btn">Submit Defect</button>
     <button class="btn btn-secondary btn-block" id="cancel-defect-btn" style="margin-top:8px">Cancel</button>
   `);
 
@@ -119,6 +119,7 @@ function showDefectSheet() {
   });
 
   document.getElementById('save-defect-btn').addEventListener('click', async () => {
+    if (typeof denyGuest === 'function' && denyGuest()) return;
     const desc = document.getElementById('defect-desc').value.trim();
     const urgencyEl = document.querySelector('input[name="urgency"]:checked');
     const urgency = urgencyEl ? urgencyEl.value : 'monitor';
@@ -165,13 +166,13 @@ function showDefectSheet() {
       defect.workOrderId = task.id;
       await DB.put('defects', defect);
       await queueSync('defects', 'update', defect);
-      showToast('Grounding squawk reported & work order created', 'warning');
-      createNotification('squawk', 'Grounding Squawk Reported', `${user} reported a grounding squawk on ${defect.aircraftId}: ${desc}`, 'defects');
-      logActivity('defect_grounding', `${user} reported grounding squawk: ${desc} on ${defect.aircraftId}`, defect.id);
+      showToast('Grounding defect reported & work order created', 'warning');
+      createNotification('squawk', 'Grounding Defect Reported', `${user} reported a grounding defect on ${defect.aircraftId}: ${desc}`, 'defects');
+      logActivity('defect_grounding', `${user} reported grounding defect: ${desc} on ${defect.aircraftId}`, defect.id);
     } else {
-      showToast('Monitor squawk reported');
-      createNotification('squawk', 'Squawk Reported', `${user} reported a squawk on ${defect.aircraftId}: ${desc}`, 'defects');
-      logActivity('defect_reported', `${user} reported squawk: ${desc} on ${defect.aircraftId}`, defect.id);
+      showToast('Monitor defect reported');
+      createNotification('squawk', 'Defect Reported', `${user} reported a defect on ${defect.aircraftId}: ${desc}`, 'defects');
+      logActivity('defect_reported', `${user} reported defect: ${desc} on ${defect.aircraftId}`, defect.id);
     }
 
     window.__sheetClose(true);
@@ -224,17 +225,18 @@ async function renderDefects() {
   });
   document.querySelectorAll('.del-defect-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
+      if (typeof denyGuest === 'function' && denyGuest()) return;
       const role = localStorage.getItem('aac_user_role');
       if (role !== 'engineer' && role !== 'admin' && role !== 'production_planner') {
-        showToast('Only Engineer or Admin can delete squawks');
+        showToast('Only Engineer or Admin can delete defects');
         return;
       }
       const id = btn.dataset.id;
-      const confirmed = await showConfirmDialog('Delete Squawk', 'Delete this squawk permanently?');
+      const confirmed = await showConfirmDialog('Delete Defect', 'Delete this defect permanently?');
       if (!confirmed) return;
       await DB.del('defects', id);
       await queueSync('defects', 'delete', { id });
-      showToast('Squawk deleted');
+      showToast('Defect deleted');
       renderDefects();
     });
   });
@@ -275,21 +277,22 @@ function defectCard(defect) {
 }
 
 async function resolveDefect(defectId) {
+  if (typeof denyGuest === 'function' && denyGuest()) return;
   const role = localStorage.getItem('aac_user_role');
   if (role !== 'engineer' && role !== 'senior_technician' && role !== 'production_planner' && role !== 'admin') {
-    showToast('Only Engineer or Senior Technician can resolve squawks');
+    showToast('Only Engineer or Senior Technician can resolve defects');
     return;
   }
-  const confirmed = await showConfirmDialog('Resolve Squawk', 'Mark this squawk as rectified?');
+  const confirmed = await showConfirmDialog('Resolve Defect', 'Mark this defect as rectified?');
   if (!confirmed) return;
   const defect = await DB.get('defects', defectId);
   if (!defect) return;
   defect.status = 'rectified';
   await DB.put('defects', defect);
   await queueSync('defects', 'update', defect);
-  showToast('Squawk resolved');
+  showToast('Defect resolved');
   const user = localStorage.getItem('aac_user') || 'Unknown';
-  createNotification('squawk', 'Squawk Resolved', `${user} resolved squawk on ${defect.aircraftId}: ${defect.description}`, 'defects');
-  logActivity('defect_resolved', `${user} resolved squawk: ${defect.description}`, defect.id);
+  createNotification('squawk', 'Defect Resolved', `${user} resolved defect on ${defect.aircraftId}: ${defect.description}`, 'defects');
+  logActivity('defect_resolved', `${user} resolved defect: ${defect.description}`, defect.id);
   renderDefects();
 }

@@ -16,7 +16,7 @@ async function getAllHistory() {
   const ac = getCurrentAircraftKey();
   const [flights, defects, tasks, fuelLogs, attendance] = await Promise.all([
     DB.getAll('flights').then(l => l.filter(f => f.aircraftId === ac || !f.aircraftId).map(f => ({ ...f, _type: 'flight', _desc: `Sortie: ${f.pilotName || 'Unknown'} — ${f.flownHours ? (f.flownHours * 60).toFixed(0) + 'min' : ''}`, _date: f.flightDate || f.createdAt }))),
-    DB.getAll('defects').then(l => l.filter(d => d.aircraftId === ac || !d.aircraftId).map(d => ({ ...d, _type: 'defect', _desc: `Squawk: ${d.description}`, _date: d.createdAt || d.flightDate }))),
+    DB.getAll('defects').then(l => l.filter(d => d.aircraftId === ac || !d.aircraftId).map(d => ({ ...d, _type: 'defect', _desc: `Defect: ${d.description}`, _date: d.createdAt || d.flightDate }))),
     DB.getAll('maintenance_tasks').then(l => l.filter(t => t.aircraftId === ac || !t.aircraftId).map(t => ({ ...t, _type: 'task', _desc: `Work Order: ${t.description} (${t.status})`, _date: t.createdAt }))),
     DB.getAll('fuel_logs').then(l => l.filter(f => f.aircraftId === ac || !f.aircraftId).map(f => ({ ...f, _type: 'fuel', _desc: `Fuel Ops: ${f.type || 'refuel'} — ${f.liters || 0}L`, _date: f.createdAt }))),
     DB.getAll('attendance').then(l => l.map(a => ({ ...a, _type: 'attendance', _desc: `Crew: ${a.userName || a.userId} — ${a.status}`, _date: a.date || a.createdAt })))
@@ -46,6 +46,20 @@ function calendarView() {
           <button class="btn btn-secondary btn-sm" id="cal-next-btn" style="flex:1">Next Day</button>
         </div>
       </div>
+      <div class="card">
+        <div class="row" style="gap:6px">
+          <div class="form-group" style="flex:2">
+            <input type="text" id="cal-search" class="form-input" placeholder="Search flights..." style="font-size:12px">
+          </div>
+          <div class="form-group" style="flex:1">
+            <input type="date" id="cal-range-from" class="form-input" style="font-size:11px">
+          </div>
+          <div class="form-group" style="flex:1">
+            <input type="date" id="cal-range-to" class="form-input" style="font-size:11px" value="${today}">
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-sm btn-block" id="cal-apply-range">Apply Date Range</button>
+      </div>
       <div id="cal-results"><p class="text-muted small">Select a date to view activity</p></div>
     </div>
   `;
@@ -56,13 +70,29 @@ function calendarView() {
   async function loadDate(dateStr) {
     dateInput.value = dateStr;
     const all = await getAllHistory();
-    const filtered = all.filter(e => (e._date || '').slice(0, 10) === dateStr);
+    const searchQ = (document.getElementById('cal-search')?.value || '').toLowerCase();
+    const calFrom = document.getElementById('cal-range-from')?.value;
+    const calTo = document.getElementById('cal-range-to')?.value;
+    let filtered = all;
+    if (calFrom && calTo) {
+      const useRange = document.getElementById('cal-apply-range')?.textContent.includes('Clear');
+      if (useRange) {
+        filtered = all.filter(e => (e._date || '').slice(0, 10) >= calFrom && (e._date || '').slice(0, 10) <= calTo);
+      } else {
+        filtered = all.filter(e => (e._date || '').slice(0, 10) === dateStr);
+      }
+    } else {
+      filtered = all.filter(e => (e._date || '').slice(0, 10) === dateStr);
+    }
+    if (searchQ) {
+      filtered = filtered.filter(e => (e._desc || '').toLowerCase().includes(searchQ) || (e.performedBy || '').toLowerCase().includes(searchQ));
+    }
     const ac = await getAircraft();
 
     let html = '';
     const insp = getInspectionStatus(ac);
     html += `<div class="card"><div class="card-header"><h3>Inspections on ${dateStr}</h3></div>`;
-    if (dateStr === new Date().toISOString().slice(0, 10)) {
+    if (dateStr === new Date().toISOString().slice(0, 10) || (calFrom && calTo)) {
       html += `<div class="interval-item"><div class="interval-label"><span class="label">50hr Inspection</span><span class="interval-value ${insp.oilClass}">${insp.oilRemaining.toFixed(1)}h left</span></div><div class="progress-bar"><div class="progress-fill ${insp.oilFill}" style="width:${insp.oilPct}%"></div></div></div>`;
       html += `<div class="interval-item"><div class="interval-label"><span class="label">100hr Inspection</span><span class="interval-value ${insp.structClass}">${insp.structRemaining.toFixed(1)}h left</span></div><div class="progress-bar"><div class="progress-fill ${insp.structFill}" style="width:${insp.structPct}%"></div></div></div>`;
     } else {
@@ -71,7 +101,7 @@ function calendarView() {
     html += `</div>`;
 
     if (filtered.length === 0) {
-      html += `<p class="text-muted small" style="padding:20px 0">No activity on ${dateStr}</p>`;
+      html += `<p class="text-muted small" style="padding:20px 0">No activity matching your criteria</p>`;
     } else {
       html += `<div class="card"><div class="card-header"><h3>Activity (${filtered.length})</h3></div>`;
       filtered.forEach(e => {
@@ -84,17 +114,33 @@ function calendarView() {
     results.innerHTML = html;
   }
 
-  document.getElementById('cal-date').addEventListener('change', () => loadDate(document.getElementById('cal-date').value));
-  document.getElementById('cal-today-btn').addEventListener('click', () => loadDate(new Date().toISOString().slice(0, 10)));
+  document.getElementById('cal-date').addEventListener('change', () => {
+    document.getElementById('cal-apply-range').textContent = 'Apply Date Range';
+    loadDate(document.getElementById('cal-date').value);
+  });
+  document.getElementById('cal-today-btn').addEventListener('click', () => {
+    document.getElementById('cal-apply-range').textContent = 'Apply Date Range';
+    loadDate(new Date().toISOString().slice(0, 10));
+  });
   document.getElementById('cal-prev-btn').addEventListener('click', () => {
     const d = new Date(dateInput.value + 'T12:00:00');
     d.setDate(d.getDate() - 1);
+    document.getElementById('cal-apply-range').textContent = 'Apply Date Range';
     loadDate(d.toISOString().slice(0, 10));
   });
   document.getElementById('cal-next-btn').addEventListener('click', () => {
     const d = new Date(dateInput.value + 'T12:00:00');
     d.setDate(d.getDate() + 1);
+    document.getElementById('cal-apply-range').textContent = 'Apply Date Range';
     loadDate(d.toISOString().slice(0, 10));
+  });
+  document.getElementById('cal-search').addEventListener('input', () => loadDate(dateInput.value));
+  document.getElementById('cal-apply-range').addEventListener('click', function() {
+    const from = document.getElementById('cal-range-from').value;
+    const to = document.getElementById('cal-range-to').value;
+    if (!from || !to) { showToast('Select both dates', 'error'); return; }
+    this.textContent = this.textContent.includes('Clear') ? 'Apply Date Range' : '✓ Range Active — Click to Clear';
+    loadDate(dateInput.value);
   });
 
   loadDate(today);

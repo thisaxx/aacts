@@ -1,6 +1,13 @@
 const DB_NAME = 'aac';
 const DB_VERSION = 4;
 
+function denyGuest() {
+  if (localStorage.getItem('aac_user_role') === 'guest') {
+    return true;
+  }
+  return false;
+}
+
 function openDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);

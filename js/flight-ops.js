@@ -378,6 +378,7 @@ function updateArrivalCalc() {
 
 async function onDepartureSubmit(e) {
   e.preventDefault();
+  if (typeof denyGuest === 'function' && denyGuest()) return;
   const pilot = document.getElementById('pilot-name').value.trim() || 'Unknown';
   const takeoffTime = document.getElementById('takeoff-time').value;
   const flightDate = document.getElementById('flight-date').value;
@@ -474,6 +475,7 @@ function scheduleArrivalReminder(flight, ac, reminderTime) {
 
 async function onArrivalSubmit(e) {
   e.preventDefault();
+  if (typeof denyGuest === 'function' && denyGuest()) return;
   const flightId = document.getElementById('arrival-flight-id').value;
   const flight = await DB.get('flights', flightId);
   if (!flight) { showToast('Flight record not found', 'error'); return; }
@@ -595,6 +597,7 @@ async function onArrivalSubmit(e) {
 }
 
 async function onUpdateMeters() {
+  if (typeof denyGuest === 'function' && denyGuest()) return;
   const ac = await getAircraft();
   const newTach = parseFloat(document.getElementById('eod-tach').value) || 0;
   const newHobbs = parseFloat(document.getElementById('eod-hobbs').value) || 0;
@@ -785,6 +788,7 @@ async function renderIntervalBars() {
 }
 
 async function deleteFlight(flightId) {
+  if (typeof denyGuest === 'function' && denyGuest()) return;
   const flight = await DB.get('flights', flightId);
   if (!flight) return;
   const h = flight.flownHours || 0;

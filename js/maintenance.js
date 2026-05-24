@@ -244,6 +244,7 @@ function taskCard(task) {
 }
 
 async function showTaskDetail(taskId) {
+  if (typeof denyGuest === 'function' && denyGuest()) return;
   const task = await DB.get('maintenance_tasks', taskId);
   if (!task) return;
 
@@ -273,6 +274,7 @@ async function showTaskDetail(taskId) {
 }
 
 async function onRelease(taskId) {
+  if (typeof denyGuest === 'function' && denyGuest()) return;
   const task = await DB.get('maintenance_tasks', taskId);
   if (!task) return;
 

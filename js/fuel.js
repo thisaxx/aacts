@@ -22,6 +22,7 @@ async function getFuelStockById(id) {
 }
 
 async function deductFuel(fuelType, liters) {
+  if (typeof denyGuest === 'function' && denyGuest()) return null;
   await seedFuelStock();
   const stock = await DB.get('fuel_stock', fuelType);
   if (!stock) return;
@@ -33,6 +34,7 @@ async function deductFuel(fuelType, liters) {
 }
 
 async function addFuel(fuelType, liters) {
+  if (typeof denyGuest === 'function' && denyGuest()) return;
   await seedFuelStock();
   if (fuelType === 'mix') {
     const half = liters / 2;
