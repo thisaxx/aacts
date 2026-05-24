@@ -1453,7 +1453,6 @@ function generateEngineerGuide() {
 
 async function renderACListSheet() {
   const all = await getAllAircraft();
-  const all = await getAllAircraft();
   const current = getCurrentAircraftKey();
   const role = localStorage.getItem('aac_user_role');
   const canEdit = role === 'engineer' || role === 'production_planner' || role === 'admin';
@@ -2031,11 +2030,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     closeSidebar();
     showExportSheet();
   });
-  document.getElementById('sidebar-guide').addEventListener('click', async e => {
-    e.preventDefault();
-    closeSidebar();
-    generateEngineerGuide();
-  });
 
   updateSidebarUser();
   updateSidebarInspections();
@@ -2158,6 +2152,7 @@ async function showExportSheet() {
         </label>
       `).join('')}
     </div>
+    <button class="btn btn-secondary btn-block" id="export-guide-btn" style="margin-bottom:6px">&#128214; Engineer Guide</button>
     <button class="btn btn-primary btn-block" id="export-all-btn">Generate PDF Report</button>
     <button class="btn btn-secondary btn-block" id="export-tech-log-btn" style="margin-top:8px">&#128196; Daily Tech Log Summary</button>
     <button class="btn btn-secondary btn-block" id="close-export-btn" style="margin-top:8px">Close</button>
@@ -2173,6 +2168,10 @@ async function showExportSheet() {
         sel.appendChild(opt);
       });
     }
+  });
+
+  document.getElementById('export-guide-btn').addEventListener('click', () => {
+    generateEngineerGuide();
   });
 
   document.getElementById('export-all-btn').addEventListener('click', async () => {
