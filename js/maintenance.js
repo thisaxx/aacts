@@ -22,6 +22,26 @@ function maintenanceView() {
           <h3>Work Order Entry</h3>
         </div>
         <div class="form-group">
+          <label>Task Template (optional)</label>
+          <select id="task-template" class="form-input">
+            <option value="">— Blank —</option>
+            <option value="inspection_50hr">50hr Inspection</option>
+            <option value="inspection_100hr">100hr Inspection</option>
+            <option value="annual_inspection">Annual Inspection</option>
+            <option value="after-flight">After-Flight Inspection</option>
+            <option value="oil_change">Oil Change</option>
+            <option value="tire_replace">Tire Replacement</option>
+            <option value="brake_inspect">Brake Inspection</option>
+            <option value="spark_plug">Spark Plug Replacement</option>
+            <option value="battery_check">Battery Check / Replacement</option>
+            <option value="compass_swing">Compass Swing</option>
+            <option value="el_alt">ELT Test / Battery Replacement</option>
+            <option value="static_check">Pitot-Static System Test</option>
+            <option value="transponder">Transponder Certification</option>
+            <option value="weight_bal">Weight &amp; Balance Update</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label for="task-description">Work Description</label>
           <textarea id="task-description" rows="3" placeholder="Describe the maintenance issue..."></textarea>
         </div>
@@ -63,6 +83,32 @@ function maintenanceView() {
   });
   document.getElementById('save-task-btn').addEventListener('click', onNewTask);
 
+  // Task template auto-fill
+  const templateLabels = {
+    inspection_50hr: 'Perform 50-hour inspection per OEM maintenance manual. Check engine oil, spark plugs, air filter, tires, brakes, and control cables. Record findings and sign off.',
+    inspection_100hr: 'Perform 100-hour inspection per OEM maintenance manual. Includes all 50hr items plus compression check, valve clearance, carburetor inspection, magneto timing check, and detailed airframe inspection.',
+    annual_inspection: 'Perform Annual Inspection in accordance with applicable airworthiness regulations. Complete all required checks and return aircraft to service.',
+    'after-flight': 'Post-flight inspection — check for any abnormalities, damage, leaks, or wear. Verify all systems are serviceable. Ground aircraft until daily CRS is issued.',
+    oil_change: 'Drain and replace engine oil. Replace oil filter. Check oil pressure and temperature during run-up. Record oil type and quantity used.',
+    tire_replace: 'Replace main/nose tires as necessary. Check wheel bearings, brake wear, and tire pressure. Record new tire S/N and pressure.',
+    brake_inspect: 'Inspect brake pads, discs, and hydraulic lines for wear or leaks. Measure pad thickness. Replace if below limits. Bleed system if required.',
+    spark_plug: 'Remove, clean, gap, and test spark plugs. Replace any plugs showing excessive wear or fouling. Record plug type and gap setting.',
+    battery_check: 'Check battery voltage, specific gravity (if applicable), and electrolyte level. Load test. Replace if below 12.4V or showing signs of sulfation.',
+    compass_swing: 'Perform compass swing and adjustment. Record deviation card values and install updated card in cockpit.',
+    el_alt: 'Test ELT function and battery. Replace ELT battery if expired or low. Record new expiry date.',
+    static_check: 'Perform pitot-static system leak test and transponder/altimeter system test per 91.411 requirements. Record results.',
+    transponder: 'Perform transponder certification test per 91.413 requirements. Record mode C altitude verification and squawk codes.',
+    weight_bal: 'Update aircraft weight and balance records. Re-weigh if necessary. Compute new CG envelope and update flight manual.'
+  };
+  document.getElementById('task-template').addEventListener('change', function() {
+    const ta = document.getElementById('task-description');
+    if (this.value && templateLabels[this.value]) {
+      ta.value = templateLabels[this.value];
+    } else if (!this.value) {
+      ta.value = '';
+    }
+  });
+
   // Populate crew checkboxes from aac_users
   (function() {
     const container = document.getElementById('task-assign-list');
@@ -88,6 +134,7 @@ function maintenanceView() {
 async function onNewTask() {
   const desc = document.getElementById('task-description').value.trim();
   const priority = document.getElementById('task-priority').value;
+  const templateVal = document.getElementById('task-template').value;
   if (!desc) { showToast('Please enter a description', 'error'); return; }
 
   const assignedCbs = document.querySelectorAll('.task-assign-cb:checked');
@@ -99,6 +146,7 @@ async function onNewTask() {
     description: desc,
     priority,
     assignedTo,
+    type: templateVal || 'general',
     status: 'open',
     technicianNotes: '',
     rectifiedBy: '',
@@ -115,6 +163,7 @@ async function onNewTask() {
   createNotification('task', 'Work Order Created', `${user} created work order on ${task.aircraftId}: ${task.description}`, 'maintenance');
   document.getElementById('new-task-form').classList.add('hidden');
   document.getElementById('task-description').value = '';
+  document.getElementById('task-template').value = '';
   renderTasks();
 }
 

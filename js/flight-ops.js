@@ -449,26 +449,30 @@ async function onDepartureSubmit(e) {
   showArrivalForm(flight.id);
 }
 
+function fireArrivalNotification(flight, ac) {
+  const body = `${flight.pilotName} in ${ac.tailNumber} expected to arrive in ~10 min (dep ${flight.takeoffTime})`;
+  createNotification('arrival', 'Arrival Expected Soon', body, 'flight-ops');
+  if ('Notification' in window && Notification.permission === 'granted') {
+    const notifIcon = window.location.origin + (window.location.pathname.includes('/aacts/') ? '/aacts/img/icon-192.png' : '/img/icon-192.png');
+    new Notification('AAC — Arrival Expected Soon', { body, icon: notifIcon });
+  }
+}
+
 function scheduleArrivalReminder(flight, ac, reminderTime) {
   const delay = reminderTime - Date.now();
   const key = `arrival_reminder_${flight.id}`;
   const existing = window[key];
   if (existing) clearTimeout(existing);
   if (delay <= 0) {
-    // Reminder window already passed — fire if still departed
     setTimeout(async () => {
       const f = await DB.get('flights', flight.id);
-      if (f && f.status === 'departed') {
-        createNotification('arrival', 'Arrival Expected Soon', `${flight.pilotName} in ${ac.tailNumber} expected to arrive in ~10 min (dep ${flight.takeoffTime})`, 'flight-ops');
-      }
+      if (f && f.status === 'departed') fireArrivalNotification(f, ac);
     }, 0);
     return;
   }
   window[key] = setTimeout(async () => {
     const f = await DB.get('flights', flight.id);
-    if (f && f.status === 'departed') {
-      createNotification('arrival', 'Arrival Expected Soon', `${flight.pilotName} in ${ac.tailNumber} expected to arrive in ~10 min (dep ${flight.takeoffTime})`, 'flight-ops');
-    }
+    if (f && f.status === 'departed') fireArrivalNotification(f, ac);
     delete window[key];
   }, delay);
 }

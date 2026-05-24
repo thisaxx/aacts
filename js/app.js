@@ -218,6 +218,79 @@ async function getCrewStatusBoard() {
   });
 }
 
+async function fetchWeather() {
+  const icao = localStorage.getItem('aac_weather_icao') || 'VCBI';
+  const cached = localStorage.getItem('aac_weather_cache');
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached);
+      if (Date.now() - parsed.ts < 30 * 60 * 1000) return parsed;
+    } catch(e) {}
+  }
+  if (!navigator.onLine) {
+    if (cached) try { return JSON.parse(cached); } catch(e) {}
+    return null;
+  }
+  try {
+    const res = await fetch(`https://aviationweather.gov/api/data/metar?ids=${icao}&format=json&hours=1`);
+    if (!res.ok) throw new Error('Weather fetch failed');
+    const data = await res.json();
+    if (!data || data.length === 0) throw new Error('No METAR data');
+    const metar = data[0];
+    const result = {
+      icao,
+      raw: metar.rawOb || '',
+      temp: metar.temp || '—',
+      windDir: metar.wdir || '—',
+      windSpeed: metar.wspd || '—',
+      visibility: metar.visib || '—',
+      conditions: metar.flightCategory || metar.presentWeather || 'VFR',
+      dewpoint: metar.dewp || '—',
+      altimeter: metar.altim || '—',
+      time: metar.obsTime || new Date().toISOString(),
+      ts: Date.now()
+    };
+    localStorage.setItem('aac_weather_cache', JSON.stringify(result));
+    return result;
+  } catch (e) {
+    if (cached) try { return JSON.parse(cached); } catch(e) {}
+    return null;
+  }
+}
+
+function renderWeatherCard(weather) {
+  if (!weather) return '<div class="card"><div class="card-header"><h3>Weather</h3></div><div style="padding:12px 16px"><p class="text-muted small">Weather data unavailable</p></div></div>';
+  const timeStr = weather.time ? new Date(weather.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+  return `
+    <div class="card">
+      <div class="card-header">
+        <h3>Weather — ${weather.icao}</h3>
+        <span class="text-muted small">${timeStr}</span>
+      </div>
+      <div style="padding:8px 16px">
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <div style="flex:1;text-align:center;padding:8px;background:var(--surface);border-radius:8px">
+            <div style="font-size:22px;font-weight:700">${weather.temp}&deg;C</div>
+            <div class="text-muted small">Temp</div>
+          </div>
+          <div style="flex:1;text-align:center;padding:8px;background:var(--surface);border-radius:8px">
+            <div style="font-size:22px;font-weight:700">${weather.windSpeed}${weather.windDir !== '—' ? `/${weather.windDir}` : ''}</div>
+            <div class="text-muted small">Wind (kt)</div>
+          </div>
+          <div style="flex:1;text-align:center;padding:8px;background:var(--surface);border-radius:8px">
+            <div style="font-size:22px;font-weight:700">${weather.visibility}</div>
+            <div class="text-muted small">Vis (mi)</div>
+          </div>
+          <div style="flex:1;text-align:center;padding:8px;background:var(--surface);border-radius:8px">
+            <div style="font-size:18px;font-weight:700">${weather.conditions}</div>
+            <div class="text-muted small">Conditions</div>
+          </div>
+        </div>
+        ${weather.raw ? `<div style="margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--text-muted);word-break:break-all">${escHtml(weather.raw)}</div>` : ''}
+      </div>
+    </div>`;
+}
+
 function compressImage(dataUrl, maxW = 800, maxH = 600, quality = 0.7) {
   return new Promise(resolve => {
     const img = new Image();
@@ -456,6 +529,14 @@ async function dashboardView() {
   const fuelStocks = await getFuelStock();
   const userRole = localStorage.getItem('aac_user_role');
 
+  const cached = localStorage.getItem('aac_weather_cache');
+  let weather = cached ? JSON.parse(cached) : null;
+  fetchWeather().then(fresh => {
+    if (fresh) {
+      document.getElementById('weather-card')?.replaceWith(renderWeatherCard(fresh));
+    }
+  }).catch(() => {});
+
   const tach = ac.totalTachTime;
   const hoursSinceOil = tach - ac.lastOilChangeTach;
   const hoursSince100hr = tach - ac.last100hrTach;
@@ -561,6 +642,8 @@ async function dashboardView() {
         <button class="btn btn-primary btn-block" id="issue-daily-crs-btn" style="margin-top:8px">${ac.groundedAfterInspection ? '&#9989; Issue Daily CRS for Airworthiness' : 'Issue Daily CRS'}</button>` : ''}
         ${inspectionOverdue ? `<button class="btn btn-primary btn-block" id="perform-inspection-btn" style="margin-top:8px">&#9881; Perform Inspection Sign-off</button>` : ''}
       </div>` : ''}
+
+      <div id="weather-card">${renderWeatherCard(weather)}</div>
 
       <div class="dashboard-widgets">
         <div class="dash-widget">
@@ -1997,6 +2080,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js');
+  }
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission(); // fire-and-forget
   }
 
   await initFirebase();
