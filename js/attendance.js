@@ -78,13 +78,7 @@ function attendanceView() {
 async function renderAttendance(viewDate) {
   const user = await getCurrentUser();
   const now = viewDate || new Date();
-  // Attendance day runs 4 AM to 4 AM
   let today = now.toISOString().slice(0, 10);
-  if (now.getHours() < 4) {
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    today = yesterday.toISOString().slice(0, 10);
-  }
 
   // Self check-in card
   const selfEl = document.getElementById('attendance-self');
@@ -284,6 +278,7 @@ async function renderCrewStatusBoard() {
     const isPresent = s.attendance && s.attendance.status === 'approved';
     const isPending = s.attendance && s.attendance.status === 'pending';
     const photo = s.user.photo;
+    const roleLabel = (s.user.role || '').replace(/_/g, ' ');
     return `
       <div class="crew-row" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
         <div style="width:36px;height:36px;border-radius:50%;overflow:hidden;background:var(--surface);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;border:2px solid ${isPresent ? 'var(--text)' : isPending ? 'var(--gold)' : 'var(--border)'}">
@@ -291,9 +286,11 @@ async function renderCrewStatusBoard() {
         </div>
         <div style="flex:1;min-width:0">
           <div style="font-family:var(--mono);font-size:13px;font-weight:600">${escHtml(s.user.name)}</div>
-          <div style="font-family:var(--mono);font-size:9px;color:${isPresent ? 'var(--text)' : isPending ? 'var(--gold)' : 'var(--text-muted)'}">
-            ${isPresent ? '&#10003; Signed in' + (s.attendance.checkinTime ? ' at ' + s.attendance.checkinTime : '') : isPending ? '&#9203; Pending' : '&#10007; Not signed in'}
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px">${roleLabel}</div>
+          <div style="font-size:11px;margin-top:2px;color:${isPresent ? 'var(--text)' : isPending ? 'var(--gold)' : 'var(--text-muted)'}">
+            ${isPresent ? '&#10003; On Duty' + (s.attendance.checkinTime ? ' from ' + s.attendance.checkinTime : '') + (s.attendance.checkoutTime ? ' to ' + s.attendance.checkoutTime : '') : isPending ? '&#9203; Pending approval' : '&#10007; Not signed in'}
           </div>
+          ${s.attendance && s.attendance.notes ? `<div style="font-size:10px;color:var(--text-muted);margin-top:1px">${escHtml(s.attendance.notes)}</div>` : ''}
         </div>
       </div>
     `;

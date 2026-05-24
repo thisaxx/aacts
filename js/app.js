@@ -204,22 +204,17 @@ async function renderActivityFeed() {
 }
 
 async function getCrewStatusBoard() {
-  const users = await DB.getAll('users');
-  // Deduplicate by name (keep the one with photo if available)
-  const seen = new Map();
-  for (const u of users) {
-    const existing = seen.get(u.name);
-    if (!existing || (u.photo && !existing.photo)) {
-      seen.set(u.name, u);
-    }
-  }
-  const unique = [...seen.values()];
+  let seedUsers = [];
+  try { seedUsers = JSON.parse(localStorage.getItem('aac_users')) || []; } catch(e) {}
+  const dbUsers = await DB.getAll('users');
   const attendance = await DB.getAll('attendance');
   const today = new Date().toISOString().slice(0, 10);
   const activeAttendance = attendance.filter(a => a.date === today && (a.status === 'approved' || a.status === 'pending'));
-  return unique.map(u => {
-    const att = activeAttendance.find(a => a.userName === u.name);
-    return { user: u, attendance: att || null };
+  return seedUsers.map(su => {
+    const match = dbUsers.find(u => u.name === su.name);
+    const user = match || { name: su.name, role: su.role, photo: '' };
+    const att = activeAttendance.find(a => a.userName === su.name);
+    return { user, attendance: att || null };
   });
 }
 
@@ -1244,6 +1239,99 @@ function showAircraftSheet() {
   document.getElementById('close-export-btn').addEventListener('click', () => window.__sheetClose(null));
 }
 
+async function showComponentsSheet(ac) {
+  const tail = ac.tailNumber;
+  const components = (await DB.getAll('components')).filter(c => c.aircraftId === tail);
+  showBottomSheet(`
+    <div class="card-header"><h3>Components — ${escHtml(tail)}</h3></div>
+    <div style="margin-bottom:12px">
+      ${components.length === 0 ? '<p class="text-muted small">No components tracked yet. Add one below.</p>' : components.map(c => {
+        const tach = ac.totalTachTime || 0;
+        const hoursOnComp = tach - (c.installTach || 0);
+        const lifePct = c.lifeLimit > 0 ? (hoursOnComp / c.lifeLimit) * 100 : 0;
+        const overdue = c.lifeLimit > 0 && hoursOnComp >= c.lifeLimit;
+        return `
+        <div class="flight-row" style="flex-wrap:wrap">
+          <div style="flex:1;min-width:0">
+            <strong>${escHtml(c.name)}</strong>
+            <div class="flight-date">SN: ${escHtml(c.serialNumber || '—')} &middot; PN: ${escHtml(c.partNumber || '—')}</div>
+            <div class="flight-date">Installed: ${c.installDate || '—'} @ ${c.installTach ? c.installTach.toFixed(1) + 'h' : '—'} &middot; ${hoursOnComp.toFixed(1)}h used</div>
+            ${c.lifeLimit > 0 ? `<div class="progress-bar" style="margin-top:4px;height:6px"><div class="progress-fill ${overdue ? 'fill-red' : lifePct > 80 ? 'fill-orange' : 'fill-green'}" style="width:${Math.min(100, lifePct)}%"></div></div><div style="font-size:10px;color:${overdue ? 'var(--danger)' : 'var(--text-muted)'}">${overdue ? 'OVERDUE' : Math.max(0, c.lifeLimit - hoursOnComp).toFixed(1) + 'h remaining'}</div>` : ''}
+          </div>
+          <button class="btn btn-sm btn-danger del-comp-btn" data-id="${c.id}" style="margin-top:4px">&times;</button>
+        </div>`;
+      }).join('')}
+    </div>
+    <hr>
+    <div class="form-group">
+      <label>Component Name</label>
+      <input type="text" id="comp-name" class="form-input" placeholder="e.g. Battery, Alternator, Spark Plug">
+    </div>
+    <div class="row">
+      <div class="form-group">
+        <label>Serial Number</label>
+        <input type="text" id="comp-sn" class="form-input" placeholder="SN-12345">
+      </div>
+      <div class="form-group">
+        <label>Part Number</label>
+        <input type="text" id="comp-pn" class="form-input" placeholder="RG-24">
+      </div>
+    </div>
+    <div class="row">
+      <div class="form-group">
+        <label>Install Date</label>
+        <input type="date" id="comp-install-date" class="form-input">
+      </div>
+      <div class="form-group">
+        <label>Install Tach (hrs)</label>
+        <input type="number" id="comp-install-tach" class="form-input" value="${(ac.totalTachTime || 0).toFixed(1)}" step="0.1">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Life Limit (hours, 0 = unlimited)</label>
+      <input type="number" id="comp-life" class="form-input" value="0" min="0" step="10">
+    </div>
+    <button class="btn btn-primary btn-block" id="add-comp-btn">Add Component</button>
+    <button class="btn btn-secondary btn-block" id="close-comp-btn" style="margin-top:8px">Done</button>
+  `);
+
+  document.getElementById('add-comp-btn').addEventListener('click', async () => {
+    if (typeof denyGuest === 'function' && denyGuest()) return;
+    const name = document.getElementById('comp-name').value.trim();
+    if (!name) { showToast('Component name required', 'error'); return; }
+    const comp = {
+      id: 'comp_' + Date.now(),
+      aircraftId: tail,
+      name,
+      serialNumber: document.getElementById('comp-sn').value.trim(),
+      partNumber: document.getElementById('comp-pn').value.trim(),
+      installDate: document.getElementById('comp-install-date').value,
+      installTach: parseFloat(document.getElementById('comp-install-tach').value) || 0,
+      lifeLimit: parseFloat(document.getElementById('comp-life').value) || 0,
+      createdAt: new Date().toISOString()
+    };
+    await DB.put('components', comp);
+    await queueSync('components', 'create', comp);
+    showToast(`Added ${name}`);
+    window.__sheetClose(true);
+    showComponentsSheet(ac);
+  });
+
+  document.getElementById('close-comp-btn').addEventListener('click', () => window.__sheetClose(null));
+
+  document.querySelectorAll('.del-comp-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const confirmed = await showConfirmDialog('Delete Component', 'Remove this component?');
+      if (!confirmed) return;
+      await DB.del('components', btn.dataset.id);
+      await queueSync('components', 'delete', { id: btn.dataset.id });
+      showToast('Component deleted');
+      window.__sheetClose(true);
+      showComponentsSheet(ac);
+    });
+  });
+}
+
 async function generateDailyTechLog() {
   const today = new Date().toISOString().slice(0, 10);
   const ac = await getAircraft();
@@ -1371,6 +1459,7 @@ async function renderACListSheet() {
         ${canEdit ? `<div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">
           <button class="btn btn-ghost edit-ac-btn" data-tail="${ac.tailNumber}" style="font-size:9px;padding:4px 8px">Edit</button>
           <button class="btn btn-ghost change-photo-btn" data-tail="${ac.tailNumber}" style="font-size:9px;padding:4px 8px">Photo</button>
+          <button class="btn btn-ghost comp-btn" data-tail="${ac.tailNumber}" style="font-size:9px;padding:4px 8px">Components</button>
           ${!isDefault ? `<button class="btn btn-ghost set-default-ac-btn" data-tail="${ac.tailNumber}" style="font-size:9px;padding:4px 8px">&#9733; Set Default</button>` : ''}
         </div>` : ''}
       </div>
@@ -1424,6 +1513,13 @@ async function renderACListSheet() {
       const ac = await DB.get('aircraft', btn.dataset.tail);
       if (!ac) return;
       showEditAircraftForm(ac);
+    });
+  });
+  el.querySelectorAll('.comp-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const ac = await DB.get('aircraft', btn.dataset.tail);
+      if (!ac) return;
+      showComponentsSheet(ac);
     });
   });
   el.querySelectorAll('.switch-ac-btn').forEach(btn => {

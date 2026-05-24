@@ -85,6 +85,10 @@ function fuelView() {
         <div class="card-header"><h3>Refueling Log</h3></div>
         <div id="fuel-log-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>
       </div>
+      <div class="card">
+        <div class="card-header"><h3>Consumption Trends</h3></div>
+        <div id="fuel-trends-list"><div class="skeleton skeleton-line"></div></div>
+      </div>
     </div>
   `;
 
@@ -93,6 +97,7 @@ function fuelView() {
   seedFuelStock().then(() => {
     renderFuelStock();
     renderFuelLogs();
+    renderFuelTrends();
   });
 }
 
@@ -237,6 +242,55 @@ async function updateFuelStockQty(id, qty) {
   renderFuelStock();
   const invEl = document.getElementById('fuel-stock-inv');
   if (invEl && typeof renderInventory === 'function') renderInventory();
+}
+
+async function renderFuelTrends() {
+  const el = document.getElementById('fuel-trends-list');
+  if (!el) return;
+  const flights = await DB.getAll('flights');
+  const ac = await getAircraft();
+  const acFlights = flights.filter(f => f.aircraftId === ac.tailNumber && f.fuelUsed > 0)
+    .sort((a, b) => (a.flightDate || '').localeCompare(b.flightDate || ''));
+  const recent = acFlights.slice(-20);
+  if (recent.length < 2) {
+    el.innerHTML = '<p class="text-muted small">Need at least 2 flights with fuel data to show trends</p>';
+    return;
+  }
+  const avg = recent.reduce((s, f) => s + f.fuelUsed, 0) / recent.length;
+  const max = Math.max(...recent.map(f => f.fuelUsed));
+  const avgConsumption = recent.reduce((s, f) => {
+    if (f.flownHours > 0) return s + f.fuelUsed / f.flownHours;
+    return s;
+  }, 0) / recent.filter(f => f.flownHours > 0).length;
+  el.innerHTML = `
+    <div style="padding:8px 0">
+      <div style="display:flex;gap:16px;margin-bottom:12px">
+        <div style="flex:1;text-align:center">
+          <div style="font-size:20px;font-weight:700">${avg.toFixed(1)}</div>
+          <div class="text-muted small">Avg gal/flight</div>
+        </div>
+        <div style="flex:1;text-align:center">
+          <div style="font-size:20px;font-weight:700">${avgConsumption.toFixed(1)}</div>
+          <div class="text-muted small">Avg gal/hr</div>
+        </div>
+        <div style="flex:1;text-align:center">
+          <div style="font-size:20px;font-weight:700">${recent.length}</div>
+          <div class="text-muted small">Flights tracked</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Recent fuel usage per flight (last ${Math.min(20, recent.length)} flights):</div>
+      ${recent.map(f => {
+        const pct = max > 0 ? (f.fuelUsed / max) * 100 : 0;
+        return `
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <div style="width:60px;flex-shrink:0;font-size:10px;color:var(--text-muted);font-family:var(--mono)">${f.flightDate ? f.flightDate.slice(5) : '—'}</div>
+            <div style="flex:1;height:16px;background:var(--surface);border-radius:4px;overflow:hidden">
+              <div style="height:100%;width:${pct}%;background:${f.fuelUsed > avg * 1.2 ? 'var(--gold)' : 'var(--text)'};border-radius:4px;min-width:2px"></div>
+            </div>
+            <div style="width:40px;text-align:right;font-size:11px;font-family:var(--mono)">${f.fuelUsed.toFixed(1)}</div>
+          </div>`;
+      }).join('')}
+    </div>`;
 }
 
 async function deleteFuelLog(logId, logType, fuelType, liters) {
