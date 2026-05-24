@@ -2619,6 +2619,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  // Seed a default aircraft if the database is empty (e.g. after data reset)
+  try {
+    const existingAC = await DB.getAll('aircraft');
+    if (existingAC.length === 0) {
+      const defaultAC = { ...DEFAULT_AIRCRAFT, photoData: null, createdAt: new Date().toISOString() };
+      await DB.put('aircraft', defaultAC);
+      setCurrentAircraftKey(defaultAC.tailNumber);
+    }
+  } catch (e) { /* skip */ }
+
   // Login gate: require name & role before using the app
   const needsLogin = !localStorage.getItem('aac_user') || !localStorage.getItem('aac_user_role');
 
