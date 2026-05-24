@@ -1685,13 +1685,19 @@ function showLoginGate() {
     }
     localStorage.setItem('aac_user', escHtml(name));
     localStorage.setItem('aac_user_role', role);
-    // Restore profile photo from DB
+    // Restore profile photo from DB and set user ID
     const allUsers = await DB.getAll('users');
     const match = allUsers.find(u => u.name === name);
-    if (match && match.photo) {
-      localStorage.setItem('aac_user_photo', match.photo);
+    if (match) {
+      localStorage.setItem('aac_user_id', match.id);
+      if (match.photo) {
+        localStorage.setItem('aac_user_photo', match.photo);
+      } else {
+        localStorage.removeItem('aac_user_photo');
+      }
     } else {
       localStorage.removeItem('aac_user_photo');
+      localStorage.removeItem('aac_user_id');
     }
     if (sidebar) sidebar.style.display = '';
     if (overlay) overlay.style.display = '';
@@ -1766,8 +1772,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Sync login users into DB so crew board shows everyone
   const seedUsers = JSON.parse(localStorage.getItem('aac_users') || '[]');
+  // Dedup existing DB users by name (keep the one with photo or latest)
   const existingDbUsers = await DB.getAll('users');
-  const existingNames = new Set(existingDbUsers.map(u => u.name));
+  const seen = new Map();
+  for (const u of existingDbUsers) {
+    const prev = seen.get(u.name);
+    if (!prev || (u.photo && !prev.photo) || (!prev.photo && !u.photo && u.createdAt > prev.createdAt)) {
+      if (prev && prev.id !== u.id) await DB.del('users', prev.id);
+      seen.set(u.name, u);
+    } else {
+      await DB.del('users', u.id);
+    }
+  }
+  const existingNames = new Set(seen.keys());
   for (const su of seedUsers) {
     if (!existingNames.has(su.name)) {
       const id = 'user_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
