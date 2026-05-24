@@ -2754,7 +2754,7 @@ async function showExportSheet() {
         fuel_stock: ['name', 'quantityLiters', 'capacity', 'minSafeLevel', 'fuelType'],
         fuel_logs: ['date', 'fuelType', 'quantityLiters', 'supplier', 'cost', 'notes', 'aircraftId'],
         parts: ['partNumber', 'name', 'quantityOnHand', 'minSafeStock', 'location'],
-        users: ['name', 'role', 'photo'],
+        users: ['name', 'role'],
         attendance: ['userName', 'role', 'date', 'checkinTime', 'checkoutTime', 'status'],
         components: ['name', 'serialNumber', 'partNumber', 'installDate', 'installTach', 'lifeLimit', 'aircraftId']
       };
