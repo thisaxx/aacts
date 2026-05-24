@@ -18,9 +18,11 @@ async function initFirebase() {
     db_firestore.settings({ merge: true });
     await firebase.auth().signInAnonymously();
     _deviceId = firebase.auth().currentUser.uid;
-    firebase.auth().onAuthStateChanged(() => { updateSyncBadge(); processSyncQueue(); });
+    let _firebaseReady = false;
+    firebase.auth().onAuthStateChanged(() => { updateSyncBadge(); if (_firebaseReady) processSyncQueue(); });
     initFCM();
     await processSyncQueue();
+    _firebaseReady = true;
     startPolling();
     scheduleCleanup();
   } catch (e) {
@@ -59,16 +61,18 @@ const FIRESTORE_COLLECTIONS = [
 let _pollInterval;
 let _pollCount = 0;
 let _syncChannel;
-try { _syncChannel = new BroadcastChannel('aac-sync'); _syncChannel.onmessage = () => { pullAllCollections(); }; } catch (e) { /* no BroadcastChannel support */ }
+try { _syncChannel = new BroadcastChannel('aac-sync'); _syncChannel.onmessage = () => { pullAllCollections(true); }; } catch (e) { /* no BroadcastChannel support */ }
 
 function startPolling() {
   pullAllCollections();
   _pollInterval = setInterval(pullAllCollections, 60000);
 }
 
-async function pullAllCollections() {
+async function pullAllCollections(fromBroadcast) {
   if (!db_firestore || !navigator.onLine) return;
-  const lastSync = parseInt(localStorage.getItem('aac_last_sync') || '0');
+  let lastSync = parseInt(localStorage.getItem('aac_last_sync') || '0');
+  // Broadcast-triggered pulls: use a 60s lookback so cross-tab writes aren't missed
+  if (fromBroadcast && lastSync > 0) lastSync = Date.now() - 60000;
   _pollCount++;
   const isFullSync = lastSync === 0 || _pollCount % 10 === 0;
   // Capture wall-clock time BEFORE query to avoid write-gap window
@@ -177,7 +181,15 @@ async function processSyncQueue() {
       await DB.del('sync_queue', entry.id);
       // Notify other tabs to pull latest
       try { _syncChannel.postMessage('sync'); } catch (e) { /* no channel */ }
-    } catch (e) { break; } // still offline, stop processing
+    } catch (e) {
+      // Increment retry count; discard after 5 failures to prevent buildup
+      const retries = (entry.retries || 0) + 1;
+      if (retries >= 5) {
+        await DB.del('sync_queue', entry.id).catch(() => {});
+      } else {
+        await DB.put('sync_queue', { ...entry, retries }).catch(() => {});
+      }
+    }
   }
   updateSyncBadge();
 }
