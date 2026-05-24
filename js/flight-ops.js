@@ -135,8 +135,10 @@ function flightOpsView() {
           <input type="date" id="flight-date" required>
         </div>
         <div class="form-group">
-          <label for="pilot-name">Pilot <span class="text-muted small">(optional)</span></label>
-          <input type="text" id="pilot-name" placeholder="e.g. John Smith">
+          <label for="pilot-name">Pilot</label>
+          <select id="pilot-name" class="form-input">
+            <option value="">Select pilot...</option>
+          </select>
         </div>
         <div class="form-group">
           <label for="takeoff-time">Departure Time</label>
@@ -273,6 +275,19 @@ function flightOpsView() {
     });
 
     document.getElementById('flight-date').valueAsDate = new Date();
+
+    // Populate pilot dropdown from aac_users
+    const pilotSel = document.getElementById('pilot-name');
+    if (pilotSel) {
+      let users = [];
+      try { users = JSON.parse(localStorage.getItem('aac_users')) || []; } catch(e) {}
+      users.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.name;
+        opt.textContent = u.name;
+        pilotSel.appendChild(opt);
+      });
+    }
 
     renderAircraftStatus();
     renderIntervalBars();
@@ -825,6 +840,7 @@ async function deleteFlight(flightId) {
   renderIntervalBars();
 }
 
+let _flightPageSize = 20;
 async function renderRecentFlights() {
   const flights = await getFlights();
   const el = document.getElementById('recent-flights');
@@ -832,7 +848,8 @@ async function renderRecentFlights() {
     el.innerHTML = emptyState('&#9992;', 'No sorties recorded yet');
     return;
   }
-  el.innerHTML = flights.slice(0, 20).map(f => {
+  const show = flights.slice(0, _flightPageSize);
+  el.innerHTML = show.map(f => {
     const isDeparted = f.status === 'departed';
     return `
     <div class="flight-row">
@@ -864,6 +881,18 @@ async function renderRecentFlights() {
       onSwipeRight: () => { if (delBtn) delBtn.click(); }
     });
   });
+  // Load more button
+  if (_flightPageSize < flights.length) {
+    const more = document.createElement('button');
+    more.className = 'btn btn-ghost btn-block';
+    more.textContent = `+ Load ${Math.min(20, flights.length - _flightPageSize)} more (${flights.length - _flightPageSize} remaining)`;
+    more.style.cssText = 'margin-top:8px;font-size:11px';
+    more.addEventListener('click', () => {
+      _flightPageSize += 20;
+      renderRecentFlights();
+    });
+    el.appendChild(more);
+  }
 }
 
 async function editFlight(flightId) {

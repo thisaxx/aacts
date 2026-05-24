@@ -1,11 +1,14 @@
 const DB_NAME = 'aac';
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 
 function denyGuest() {
   if (localStorage.getItem('aac_user_role') === 'guest') {
     return true;
   }
   return false;
+}
+function hasRole(...roles) {
+  return roles.includes(localStorage.getItem('aac_user_role'));
 }
 
 function openDB() {
@@ -57,6 +60,9 @@ function openDB() {
       }
       if (!db.objectStoreNames.contains('certificates')) {
         db.createObjectStore('certificates', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('activity_log')) {
+        db.createObjectStore('activity_log', { keyPath: 'id' });
       }
     };
     req.onsuccess = () => resolve(req.result);

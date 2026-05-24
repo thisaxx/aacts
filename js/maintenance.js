@@ -63,6 +63,12 @@ function maintenanceView() {
         <button class="btn btn-secondary" id="cancel-task-btn">Cancel</button>
       </div>
 
+      <div style="display:flex;gap:8px;margin:8px 0">
+        <input type="search" id="task-search" class="form-input" placeholder="Search tasks..." style="flex:1;font-size:12px;padding:8px">
+        <select id="task-filter-assign" class="form-input" style="flex-shrink:0;font-size:12px;max-width:120px">
+          <option value="">All assignees</option>
+        </select>
+      </div>
       <div class="card">
         <div class="card-header">
           <h3>Open Work Orders</h3>
@@ -115,6 +121,7 @@ function maintenanceView() {
     if (!container) return;
     let users = [];
     try { users = JSON.parse(localStorage.getItem('aac_users')) || []; } catch(e) {}
+    const filterSel = document.getElementById('task-filter-assign');
     users.forEach(u => {
       const label = document.createElement('label');
       label.style.cssText = 'display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;cursor:pointer';
@@ -125,8 +132,21 @@ function maintenanceView() {
       label.appendChild(cb);
       label.append(u.name);
       container.appendChild(label);
+      // populate filter dropdown
+      if (filterSel) {
+        const opt = document.createElement('option');
+        opt.value = u.name;
+        opt.textContent = u.name;
+        filterSel.appendChild(opt);
+      }
     });
   })();
+
+  // Search/filter listeners
+  const searchInput = document.getElementById('task-search');
+  const filterSel = document.getElementById('task-filter-assign');
+  if (searchInput) searchInput.addEventListener('input', renderTasks);
+  if (filterSel) filterSel.addEventListener('change', renderTasks);
 
   renderTasks();
 }
@@ -169,9 +189,17 @@ async function onNewTask() {
 
 async function renderTasks() {
   const tasks = await getMaintenanceTasks();
-  const open = tasks.filter(t => t.status === 'open');
-  const rectified = tasks.filter(t => t.status === 'rectified');
-  const released = tasks.filter(t => t.status === 'released');
+  const q = (document.getElementById('task-search')?.value || '').toLowerCase();
+  const assignFilter = document.getElementById('task-filter-assign')?.value || '';
+  const matches = t => {
+    if (q && !t.description.toLowerCase().includes(q) && !(t.assignedTo || []).some(a => a.toLowerCase().includes(q))) return false;
+    if (assignFilter && !(t.assignedTo || []).includes(assignFilter)) return false;
+    return true;
+  };
+  const filtered = tasks.filter(matches);
+  const open = filtered.filter(t => t.status === 'open');
+  const rectified = filtered.filter(t => t.status === 'rectified');
+  const released = filtered.filter(t => t.status === 'released');
 
   const openEl = document.getElementById('tasks-list');
   const completedEl = document.getElementById('completed-tasks');
@@ -222,6 +250,17 @@ async function renderTasks() {
         attachCommentHandler('task', id, container);
       }
     });
+  });
+  // Swipe on task cards
+  document.querySelectorAll('.task-card').forEach(card => {
+    const detailBtn = card.querySelector('.task-detail-btn');
+    const delBtn = card.querySelector('.del-task-btn');
+    if (typeof enableSwipe === 'function') {
+      enableSwipe(card, {
+        onSwipeLeft: () => { if (detailBtn) detailBtn.click(); },
+        onSwipeRight: () => { if (delBtn) delBtn.click(); }
+      });
+    }
   });
 }
 
@@ -329,9 +368,7 @@ async function onRelease(taskId) {
 
   const userRole = localStorage.getItem('aac_user_role');
   const isAfterFlight = task.type === 'after-flight';
-  const allowedRoles = isAfterFlight ? ['engineer', 'senior_technician', 'production_planner', 'admin'] : ['engineer', 'production_planner', 'admin'];
-
-  if (!allowedRoles.includes(userRole)) {
+  if (!hasRole(...(isAfterFlight ? ['engineer','senior_technician','production_planner','admin'] : ['engineer','production_planner','admin']))) {
     showToast(`Only ${isAfterFlight ? 'Senior Technician or Engineer' : 'Engineer or Production Planner'} can release to service (CRS)`, 'error');
     return;
   }

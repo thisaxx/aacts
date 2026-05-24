@@ -9,7 +9,8 @@ async function logHistory(type, description, relatedId, aircraftId) {
     userRole: localStorage.getItem('aac_user_role') || '',
     createdAt: new Date().toISOString()
   };
-  await DB.put('flights', entry); // temp store — reads merged from all sources instead
+  await DB.put('activity_log', entry).catch(() => {});
+  await DB.put('flights', entry).catch(() => {}); // backward compat
 }
 
 async function getAllHistory() {

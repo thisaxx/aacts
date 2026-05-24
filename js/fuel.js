@@ -1,3 +1,4 @@
+let _fuelLogPage = 20;
 const FUEL_TYPES = [
   { id: 'avgas', name: 'Avgas 100LL', quantityLiters: 1000, minSafeLevel: 200 },
   { id: 'mogas', name: 'Mogas', quantityLiters: 500, minSafeLevel: 200 },
@@ -249,17 +250,17 @@ async function renderFuelTrends() {
   if (!el) return;
   const flights = await DB.getAll('flights');
   const ac = await getAircraft();
-  const acFlights = flights.filter(f => f.aircraftId === ac.tailNumber && f.fuelUsed > 0)
+  const acFlights = flights.filter(f => f.aircraftId === ac.tailNumber && f.fuelConsumed > 0)
     .sort((a, b) => (a.flightDate || '').localeCompare(b.flightDate || ''));
   const recent = acFlights.slice(-20);
   if (recent.length < 2) {
     el.innerHTML = '<p class="text-muted small">Need at least 2 flights with fuel data to show trends</p>';
     return;
   }
-  const avg = recent.reduce((s, f) => s + f.fuelUsed, 0) / recent.length;
-  const max = Math.max(...recent.map(f => f.fuelUsed));
+  const avg = recent.reduce((s, f) => s + f.fuelConsumed, 0) / recent.length;
+  const max = Math.max(...recent.map(f => f.fuelConsumed));
   const avgConsumption = recent.reduce((s, f) => {
-    if (f.flownHours > 0) return s + f.fuelUsed / f.flownHours;
+    if (f.flownHours > 0) return s + f.fuelConsumed / f.flownHours;
     return s;
   }, 0) / recent.filter(f => f.flownHours > 0).length;
   el.innerHTML = `
@@ -280,14 +281,14 @@ async function renderFuelTrends() {
       </div>
       <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Recent fuel usage per flight (last ${Math.min(20, recent.length)} flights):</div>
       ${recent.map(f => {
-        const pct = max > 0 ? (f.fuelUsed / max) * 100 : 0;
+        const pct = max > 0 ? (f.fuelConsumed / max) * 100 : 0;
         return `
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
             <div style="width:60px;flex-shrink:0;font-size:10px;color:var(--text-muted);font-family:var(--mono)">${f.flightDate ? f.flightDate.slice(5) : '—'}</div>
             <div style="flex:1;height:16px;background:var(--surface);border-radius:4px;overflow:hidden">
-              <div style="height:100%;width:${pct}%;background:${f.fuelUsed > avg * 1.2 ? 'var(--gold)' : 'var(--text)'};border-radius:4px;min-width:2px"></div>
+              <div style="height:100%;width:${pct}%;background:${f.fuelConsumed > avg * 1.2 ? 'var(--gold)' : 'var(--text)'};border-radius:4px;min-width:2px"></div>
             </div>
-            <div style="width:40px;text-align:right;font-size:11px;font-family:var(--mono)">${f.fuelUsed.toFixed(1)}</div>
+            <div style="width:40px;text-align:right;font-size:11px;font-family:var(--mono)">${f.fuelConsumed.toFixed(1)}</div>
           </div>`;
       }).join('')}
     </div>`;
@@ -315,7 +316,8 @@ async function renderFuelLogs() {
     el.innerHTML = emptyState('&#9981;', 'No refueling records yet');
     return;
   }
-  el.innerHTML = logs.slice(0, 20).map(l => `
+  const show = logs.slice(0, _fuelLogPage);
+  el.innerHTML = show.map(l => `
     <div class="flight-row">
       <div>
         <div class="flight-pilot">${escHtml(l.source)}</div>
@@ -331,6 +333,14 @@ async function renderFuelLogs() {
   el.querySelectorAll('.del-fuel-btn').forEach(btn => {
     btn.addEventListener('click', () => deleteFuelLog(btn.dataset.id, btn.dataset.type, btn.dataset.fuel, parseFloat(btn.dataset.liters)));
   });
+  if (_fuelLogPage < logs.length) {
+    const more = document.createElement('button');
+    more.className = 'btn btn-ghost btn-block';
+    more.textContent = `+ Load ${Math.min(20, logs.length - _fuelLogPage)} more (${logs.length - _fuelLogPage} remaining)`;
+    more.style.cssText = 'margin-top:8px;font-size:11px';
+    more.addEventListener('click', () => { _fuelLogPage += 20; renderFuelLogs(); });
+    el.appendChild(more);
+  }
 }
 
 

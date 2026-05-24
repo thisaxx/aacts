@@ -226,8 +226,7 @@ async function renderDefects() {
   document.querySelectorAll('.del-defect-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       if (typeof denyGuest === 'function' && denyGuest()) return;
-      const role = localStorage.getItem('aac_user_role');
-      if (role !== 'engineer' && role !== 'admin' && role !== 'production_planner') {
+      if (!hasRole('engineer','admin','production_planner')) {
         showToast('Only Engineer or Admin can delete defects');
         return;
       }
@@ -239,6 +238,17 @@ async function renderDefects() {
       showToast('Defect deleted');
       renderDefects();
     });
+  });
+  // Swipe on defect cards
+  document.querySelectorAll('.defect-card').forEach(card => {
+    const resolveBtn = card.querySelector('.resolve-defect-btn');
+    const delBtn = card.querySelector('.del-defect-btn');
+    if (typeof enableSwipe === 'function') {
+      enableSwipe(card, {
+        onSwipeLeft: () => { if (resolveBtn) resolveBtn.click(); },
+        onSwipeRight: () => { if (delBtn) delBtn.click(); }
+      });
+    }
   });
 }
 
@@ -278,8 +288,7 @@ function defectCard(defect) {
 
 async function resolveDefect(defectId) {
   if (typeof denyGuest === 'function' && denyGuest()) return;
-  const role = localStorage.getItem('aac_user_role');
-  if (role !== 'engineer' && role !== 'senior_technician' && role !== 'production_planner' && role !== 'admin') {
+  if (!hasRole('engineer','senior_technician','production_planner','admin')) {
     showToast('Only Engineer or Senior Technician can resolve defects');
     return;
   }

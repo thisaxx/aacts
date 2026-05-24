@@ -146,54 +146,63 @@ async function logActivity(type, description, relatedId) {
     performedBy: localStorage.getItem('aac_user') || 'Unknown',
     createdAt: new Date().toISOString()
   };
-  await DB.put('flights', entry);
+  await DB.put('activity_log', entry).catch(() => {});
+  await DB.put('flights', entry).catch(() => {}); // backward compat
 }
 
 const INSPECTION_TEMPLATES = [
-  { type: 'inspection_50hr', label: '50-hour inspection due', interval: (ac) => ac.oilInterval || 50, getElapsed: (ac) => (ac.totalTachTime || 0) - (ac.lastOilChangeTach || 0) },
-  { type: 'inspection_100hr', label: '100-hour inspection due', interval: (ac) => ac.structInterval || 100, getElapsed: (ac) => (ac.totalTachTime || 0) - (ac.last100hrTach || 0) },
-  { type: 'inspection_engine_TBO', label: 'Engine TBO due', interval: (ac) => ac.engineTBO || 2000, getElapsed: (ac) => ac.engineETSO || 0 },
-  { type: 'inspection_prop_TBO', label: 'Propeller TBO due', interval: (ac) => ac.propellerTBO || 2000, getElapsed: (ac) => ac.propellerPTSO || 0 },
+  { type: 'inspection_50hr', label: '50-hour inspection', interval: (ac) => ac.oilInterval || 50, getElapsed: (ac) => (ac.totalTachTime || 0) - (ac.lastOilChangeTach || 0), leadHr: 5 },
+  { type: 'inspection_100hr', label: '100-hour inspection', interval: (ac) => ac.structInterval || 100, getElapsed: (ac) => (ac.totalTachTime || 0) - (ac.last100hrTach || 0), leadHr: 5 },
+  { type: 'inspection_engine_TBO', label: 'Engine TBO', interval: (ac) => ac.engineTBO || 2000, getElapsed: (ac) => ac.engineETSO || 0, leadHr: 50 },
+  { type: 'inspection_prop_TBO', label: 'Propeller TBO', interval: (ac) => ac.propellerTBO || 2000, getElapsed: (ac) => ac.propellerPTSO || 0, leadHr: 50 },
 ];
 
 async function checkAndCreateInspectionTasks(ac) {
   if (!ac) return;
-  const tasks = await DB.getAll('maintenance_tasks');
-  const acTasks = tasks.filter(t => t.aircraftId === ac.tailNumber);
+  try {
+    const tasks = await DB.getAll('maintenance_tasks');
+    const acTasks = tasks.filter(t => t.aircraftId === ac.tailNumber);
 
-  for (const tmpl of INSPECTION_TEMPLATES) {
-    const elapsed = tmpl.getElapsed(ac);
-    const interval = tmpl.interval(ac);
-    if (elapsed >= interval) {
-      const hasOpen = acTasks.some(t => t.type === tmpl.type && t.status === 'open');
-      if (!hasOpen) {
-        const task = {
-          id: 'mnt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
-          aircraftId: ac.tailNumber,
-          description: tmpl.label,
-          type: tmpl.type,
-          priority: 'high',
-          assignedTo: [],
-          status: 'open',
-          technicianNotes: '',
-          rectifiedBy: '',
-          rectifiedAt: '',
-          releasedBy: '',
-          releasedAt: '',
-          createdAt: new Date().toISOString()
-        };
-        await DB.put('maintenance_tasks', task);
-        await queueSync('maintenance_tasks', 'create', task);
-        showToast('⚠ ' + tmpl.label.replace(' due', '') + ' task auto-created');
+    for (const tmpl of INSPECTION_TEMPLATES) {
+      const elapsed = tmpl.getElapsed(ac);
+      const interval = tmpl.interval(ac);
+      const threshold = interval - (tmpl.leadHr || 0);
+      if (elapsed >= threshold) {
+        const hasOpen = acTasks.some(t => t.type === tmpl.type && t.status === 'open');
+        if (!hasOpen) {
+          const hrsDesc = elapsed > interval ? `${elapsed.toFixed(1)} hrs (overdue by ${(elapsed - interval).toFixed(1)})` : `${elapsed.toFixed(1)} hrs since last (${(interval - elapsed).toFixed(1)} hrs remaining)`;
+          const task = {
+            id: 'mnt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+            aircraftId: ac.tailNumber,
+            description: `${tmpl.label} — ${hrsDesc}`,
+            type: tmpl.type,
+            priority: 'high',
+            assignedTo: [],
+            status: 'open',
+            technicianNotes: '',
+            rectifiedBy: '',
+            rectifiedAt: '',
+            releasedBy: '',
+            releasedAt: '',
+            createdAt: new Date().toISOString()
+          };
+          await DB.put('maintenance_tasks', task);
+          await queueSync('maintenance_tasks', 'create', task);
+          createNotification('task', 'Inspection Due', `${tmpl.label} task auto-created for ${ac.tailNumber}`, 'maintenance');
+        }
       }
     }
-  }
+  } catch(e) { /* not critical */ }
 }
 
 async function getActivityFeed(limit = 50) {
-  const all = await DB.getAll('flights');
-  return all.filter(e => e.id && e.id.startsWith('act_'))
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  const [fromActivity, fromFlights] = await Promise.all([
+    DB.getAll('activity_log').catch(() => []),
+    DB.getAll('flights').catch(() => [])
+  ]);
+  const merged = [...fromActivity, ...fromFlights.filter(e => e.id && e.id.startsWith('act_'))];
+  return merged
+    .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
     .slice(0, limit);
 }
 
@@ -563,7 +572,7 @@ async function dashboardView() {
 
   // Build alerts list
   const alerts = [];
-  if (!crsIssuedToday && (userRole === 'engineer' || userRole === 'production_planner' || userRole === 'admin')) alerts.push('No daily CRS issued');
+  if (!crsIssuedToday && hasRole('engineer','production_planner','admin')) alerts.push('No daily CRS issued');
   if (afterFlightPending) alerts.push('After-flight inspection pending');
   if (lowFuels > 0 || mixLow) alerts.push(`Fuel low: ${lowFuels} stock${mixLow ? ', Mix below 50L' : ''}`);
   const inspectionOverdue = minRemaining <= 0;
@@ -611,7 +620,7 @@ async function dashboardView() {
       <div class="dash-alerts">
         ${alerts.map(a => `<div class="dash-alert">&#9888; ${a}</div>`).join('')}
         ${ac.groundedAfterInspection ? `<div class="dash-alert" style="border-color:var(--danger)">&#128308; Aircraft grounded — daily CRS required before next flight</div>` : ''}
-        ${(!crsIssuedToday || ac.groundedAfterInspection) && (userRole === 'engineer' || userRole === 'admin') ? `
+        ${(!crsIssuedToday || ac.groundedAfterInspection) && hasRole('engineer','admin') ? `
         <button class="btn btn-primary btn-block" id="issue-daily-crs-btn" style="margin-top:8px">${ac.groundedAfterInspection ? '&#9989; Issue Daily CRS for Airworthiness' : 'Issue Daily CRS'}</button>` : ''}
         ${inspectionOverdue ? `<button class="btn btn-primary btn-block" id="perform-inspection-btn" style="margin-top:8px">&#9881; Perform Inspection Sign-off</button>` : ''}
       </div>` : ''}
@@ -771,7 +780,7 @@ async function dashboardView() {
   crsBtn.addEventListener('click', async () => {
       if (typeof denyGuest === 'function' && denyGuest()) return;
       const role = localStorage.getItem('aac_user_role');
-      if (role !== 'engineer' && role !== 'admin') { showToast('Only Engineer or Admin can issue CRS', 'error'); return; }
+      if (!hasRole('engineer','admin')) { showToast('Only Engineer or Admin can issue CRS', 'error'); return; }
       const ac = await getAircraft();
       const hoursSinceOil = (ac.totalTachTime || 0) - (ac.lastOilChangeTach || 0);
       const oilDue = hoursSinceOil >= (ac.oilInterval || 50);
@@ -1050,59 +1059,6 @@ async function addCalToolDialog() {
     showToast('Tool added');
     renderCalibrationTools();
   }
-}
-
-/* ── Recurring Task Scheduler ── */
-async function checkAndCreateInspectionTasks(ac) {
-  if (!ac) return;
-  try {
-    const allTasks = await DB.getAll('maintenance_tasks');
-    const existing = allTasks.filter(t => t.aircraftId === ac.tailNumber && t.status === 'open');
-    const tach = ac.totalTachTime || 0;
-    const oilSince = tach - (ac.lastOilChangeTach || 0);
-    const structSince = tach - (ac.last100hrTach || 0);
-    const oilInterval = ac.oilInterval || 50;
-    const structInterval = ac.structInterval || 100;
-
-    // Auto-create 50hr inspection task
-    if (oilSince >= oilInterval - 5 && !existing.some(t => t.type === 'inspection_50hr')) {
-      const task = {
-        id: 'mnt_' + Date.now() + '_50hr',
-        aircraftId: ac.tailNumber,
-        description: `50hr inspection due — ${oilSince.toFixed(1)} hrs since last change (interval ${oilInterval}h)`,
-        priority: 'high',
-        assignedTo: [],
-        type: 'inspection_50hr',
-        status: 'open',
-        technicianNotes: '',
-        rectifiedBy: '', rectifiedAt: '',
-        releasedBy: '', releasedAt: '',
-        createdAt: new Date().toISOString()
-      };
-      await DB.put('maintenance_tasks', task);
-      await queueSync('maintenance_tasks', 'create', task);
-      createNotification('task', 'Inspection Due', `50hr inspection auto-created for ${ac.tailNumber}`, 'maintenance');
-    }
-    // Auto-create 100hr inspection task
-    if (structSince >= structInterval - 5 && !existing.some(t => t.type === 'inspection_100hr')) {
-      const task = {
-        id: 'mnt_' + Date.now() + '_100hr',
-        aircraftId: ac.tailNumber,
-        description: `100hr inspection due — ${structSince.toFixed(1)} hrs since last check (interval ${structInterval}h)`,
-        priority: 'high',
-        assignedTo: [],
-        type: 'inspection_100hr',
-        status: 'open',
-        technicianNotes: '',
-        rectifiedBy: '', rectifiedAt: '',
-        releasedBy: '', releasedAt: '',
-        createdAt: new Date().toISOString()
-      };
-      await DB.put('maintenance_tasks', task);
-      await queueSync('maintenance_tasks', 'create', task);
-      createNotification('task', 'Inspection Due', `100hr inspection auto-created for ${ac.tailNumber}`, 'maintenance');
-    }
-  } catch(e) { /* not critical */ }
 }
 
 /* ── Swipe gesture helpers ── */
@@ -1495,8 +1451,7 @@ async function renderLiveFeed() {
 }
 
 function showAircraftSheet() {
-  const role = localStorage.getItem('aac_user_role');
-  const canEdit = role === 'engineer' || role === 'production_planner' || role === 'admin';
+  const canEdit = hasRole('engineer','production_planner','admin');
   showBottomSheet(`
     <div class="card-header"><h3>Fleet Manager</h3></div>
     <div id="ac-list-sheet"></div>
@@ -1764,8 +1719,7 @@ async function generateDailyTechLog() {
 async function renderACListSheet() {
   const all = await getAllAircraft();
   const current = getCurrentAircraftKey();
-  const role = localStorage.getItem('aac_user_role');
-  const canEdit = role === 'engineer' || role === 'production_planner' || role === 'admin';
+  const canEdit = hasRole('engineer','production_planner','admin');
   const el = document.getElementById('ac-list-sheet');
   if (!el) return;
   if (all.length === 0) {
@@ -2012,7 +1966,7 @@ function showEditAircraftForm(ac) {
 }
 
 async function clearAllData() {
-  const stores = ['flights','aircraft','defects','fuel_logs','fuel_stock','maintenance_tasks','parts','sync_queue','users','attendance','notifications','comments','components','calibration_tools','certificates'];
+  const stores = ['flights','aircraft','defects','fuel_logs','fuel_stock','maintenance_tasks','parts','sync_queue','users','attendance','notifications','comments','components','calibration_tools','certificates','activity_log'];
   const db = await openDB();
   for (const s of stores) {
     await new Promise((res, rej) => {
