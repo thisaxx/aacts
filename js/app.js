@@ -1238,7 +1238,6 @@ function showAircraftSheet() {
     document.getElementById('new-ac-tail').value = '';
     document.getElementById('new-ac-type').value = '';
     renderACListSheet();
-    populateACSelector();
   });
 
   document.getElementById('close-ac-btn').addEventListener('click', () => window.__sheetClose(null));
@@ -1430,16 +1429,6 @@ async function renderACListSheet() {
     btn.addEventListener('click', async () => {
       const tail = btn.dataset.tail;
       await switchAircraft(tail);
-      populateACSelector();
-      window.__sheetClose(true);
-      navigate(document.querySelector('.nav-link.active')?.dataset?.view || 'dashboard');
-    });
-  });
-  el.querySelectorAll('.set-default-ac-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const tail = btn.dataset.tail;
-      setDefaultAircraftKey(tail);
-      showToast(`${tail} set as default aircraft`);
       renderACListSheet();
     });
   });
@@ -1456,9 +1445,6 @@ async function renderACListSheet() {
       if (getCurrentAircraftKey() === tail) {
         const remaining = await getAllAircraft();
         if (remaining.length > 0) await switchAircraft(remaining[0].tailNumber);
-      }
-      showToast(`Deleted ${tail}`);
-      populateACSelector();
       renderACListSheet();
     });
   });
@@ -1564,7 +1550,6 @@ function showEditAircraftForm(ac) {
       if (getCurrentAircraftKey() === ac.tailNumber && tail !== ac.tailNumber) {
         setCurrentAircraftKey(tail);
       }
-      populateACSelector();
       showToast('Aircraft updated');
       window.__sheetClose(true);
       showAircraftSheet();
@@ -1605,16 +1590,6 @@ async function clearAllData() {
   setTimeout(() => location.reload(), 800);
 }
 window.clearAllData = clearAllData;
-
-async function populateACSelector() {
-  const sel = document.getElementById('ac-selector');
-  if (!sel) return;
-  const all = await getAllAircraft();
-  const current = getCurrentAircraftKey();
-  sel.innerHTML = all.map(ac =>
-    `<option value="${escHtml(ac.tailNumber)}" ${ac.tailNumber === current ? 'selected' : ''}>${escHtml(ac.tailNumber)}</option>`
-  ).join('');
-}
 
 function showLoginGate() {
   const app = document.getElementById('app');
@@ -1813,11 +1788,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
     reader.readAsDataURL(file);
     this.value = '';
-  });
-
-  document.getElementById('ac-selector').addEventListener('change', async function() {
-    await switchAircraft(this.value);
-    navigate(document.querySelector('.nav-link.active')?.dataset?.view || 'dashboard');
   });
 
   document.getElementById('hamburger-btn').addEventListener('click', openSidebar);
