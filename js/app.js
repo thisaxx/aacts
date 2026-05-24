@@ -537,17 +537,14 @@ async function dashboardView() {
     if (mixStock) { mixQty = mixStock.quantityLiters; mixLow = mixQty < 50; }
   } catch(e) {}
 
-  // Month stats
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-  const monthFlights = flights.filter(f => f.flightDate >= monthStart);
-  const monthHours = monthFlights.reduce((s, f) => s + f.flownHours, 0);
-  const openDefects = defects.filter(d => d.status === 'open').length;
+  // Today stats
+  const today = new Date().toISOString().slice(0, 10);
+  const todayFlights = flights.filter(f => f.flightDate === today);
+  const todayHours = todayFlights.reduce((s, f) => s + f.flownHours, 0);
 
   // After-flight inspection pending
   const afterFlightPending = tasks.filter(t => t.type === 'after-flight' && t.status === 'open').length > 0;
   // Daily CRS check
-  const today = new Date().toISOString().slice(0, 10);
   const crsIssuedToday = ac.dailyCrsDate === today;
 
   // Check if aircraft is airborne (departed but no arrival)
@@ -600,19 +597,19 @@ async function dashboardView() {
       <div class="dashboard-grid">
         <div class="stat-card">
           <div class="stat-value">${flights.length}</div>
-          <div class="stat-label">Flights</div>
+          <div class="stat-label">Total Flights</div>
         </div>
         <div class="stat-card">
           <div class="stat-value">${totalHours.toFixed(1)}</div>
           <div class="stat-label">Total Hours</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value">${monthFlights.length}</div>
-          <div class="stat-label">This Month</div>
+          <div class="stat-value">${todayHours.toFixed(1)}</div>
+          <div class="stat-label">Today's Hours</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value ${openDefects > 0 ? 'text-red' : 'text-green'}">${openDefects}</div>
-            <div class="stat-label">Open Defects</div>
+          <div class="stat-value">${(ac.currentHobbs || 0).toFixed(1)}</div>
+          <div class="stat-label">Hobbs</div>
         </div>
       </div>
 
@@ -661,13 +658,6 @@ async function dashboardView() {
           <div class="dw-info">
             <div class="dw-value ${mixLow || lowFuels > 0 ? 'text-red' : 'text-green'}">${lowFuels > 0 || mixLow ? 'Low' : 'OK'}</div>
             <div class="dw-label">Fuel Status</div>
-          </div>
-        </div>
-        <div class="dash-widget">
-          <div class="dw-icon">&#9888;</div>
-          <div class="dw-info">
-            <div class="dw-value ${groundingDefects > 0 ? 'text-red' : openDefects > 0 ? 'text-orange' : 'text-green'}">${openDefects}</div>
-            <div class="dw-label">Open Defects</div>
           </div>
         </div>
       </div>
@@ -1506,6 +1496,7 @@ function showAircraftSheet() {
       tailNumber: tail,
       type,
       totalTachTime: 0,
+      currentHobbs: 0,
       lastOilChangeTach: 0,
       last100hrTach: 0,
       oilInterval: 50,
@@ -1633,83 +1624,152 @@ async function generateDailyTechLog() {
   const flights = await DB.getAll('flights');
   const tasks = await DB.getAll('maintenance_tasks');
   const defects = await DB.getAll('defects');
-  const allHistory = await getAllHistory();
+  const parts = await DB.getAll('parts');
+  const fuelStocks = await DB.getAll('fuel_stock');
 
   const todayFlights = flights.filter(f => f.flightDate === today && f.aircraftId === ac.tailNumber);
   const todayTasks = tasks.filter(t => t.createdAt?.slice(0, 10) === today && t.aircraftId === ac.tailNumber);
-  const todayDefects = defects.filter(d => d.createdAt?.slice(0, 10) === today && d.aircraftId === ac.tailNumber);
+  const todayDefects = defects.filter(d => (d.createdAt?.slice(0, 10) === today || d.updatedAt?.slice(0, 10) === today) && d.aircraftId === ac.tailNumber);
+  const openDefects = defects.filter(d => d.status === 'open' && d.aircraftId === ac.tailNumber);
+  const todayHours = todayFlights.reduce((s, f) => s + (f.flownHours || 0), 0);
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageW = 196;
+  const left = 14;
+  const right = 196;
+  const col2 = 100;
 
-  doc.setFontSize(18);
-  doc.text('Daily Tech Log', 14, 20);
+  function hdr(text, y) { doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.text(text, left, y); doc.setFont('helvetica', 'normal'); return y + 7; }
+  function row(label, val, y) { doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.text(label, left, y); doc.setFont('helvetica', 'normal'); doc.text(String(val), col2, y); return y + 5; }
+
+  // ── Header ──
+  doc.setFontSize(20); doc.setFont('helvetica', 'bold');
+  doc.text('DAILY TECH LOG', left, 20);
+  doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+  doc.text(`AAC Technical Services — Ratmalana`, left, 27);
+  doc.setDrawColor(0); doc.setLineWidth(0.8);
+  doc.line(left, 31, right, 31);
+
+  let y = 40;
   doc.setFontSize(10);
-  doc.text(`Aircraft: ${ac.tailNumber} (${ac.type || 'Cessna 152'})`, 14, 28);
-  doc.text(`Date: ${today}`, 14, 34);
-  doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 40);
-  doc.setDrawColor(150);
-  doc.line(14, 44, 196, 44);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Aircraft: ${ac.tailNumber}`, left, y); doc.setFont('helvetica', 'normal');
+  doc.text(`Date: ${today}`, col2, y); y += 5;
+  doc.text(`Type: ${ac.type || 'Cessna 152'}`, left, y);
+  doc.text(`Generated: ${new Date().toLocaleString()}`, col2, y); y += 5;
+  doc.setDrawColor(180); doc.setLineWidth(0.3);
+  doc.line(left, y + 2, right, y + 2); y += 6;
 
-  let y = 50;
-  doc.setFontSize(12);
-  doc.text('Flight Summary', 14, y); y += 8;
-  doc.setFontSize(9);
-  if (todayFlights.length === 0) {
-    doc.text('No flights recorded today.', 14, y); y += 6;
-  } else {
-    for (const f of todayFlights) {
-      doc.text(`${f.pilotName || 'Unknown'} | ${f.takeoffTime || '--'} - ${f.landingTime || '--'} | ${(f.flownHours || 0).toFixed(2)} hrs`, 14, y);
-      y += 5;
-      if (f.route) { doc.text(`  Route: ${f.route}`, 14, y); y += 5; }
-      if (f.remarks) { doc.text(`  Remarks: ${f.remarks}`, 14, y); y += 5; }
-    }
-  }
-
-  y += 4;
-  doc.setFontSize(12);
-  doc.text('Maintenance / Work Orders', 14, y); y += 8;
-  doc.setFontSize(9);
-  if (todayTasks.length === 0) {
-    doc.text('No work orders today.', 14, y); y += 6;
-  } else {
-    for (const t of todayTasks) {
-      doc.text(`[${t.status}] ${t.description}`, 14, y); y += 5;
-      if (t.rectifiedBy) doc.text(`  Rectified by: ${t.rectifiedBy}`, 14, y); y += 5;
-      if (t.releasedBy) doc.text(`  Released by: ${t.releasedBy}`, 14, y); y += 5;
-    }
-  }
-
-  y += 4;
-  doc.setFontSize(12);
-  doc.text('Defect Report', 14, y); y += 8;
-  doc.setFontSize(9);
-  if (todayDefects.length === 0) {
-    doc.text('No defects recorded today.', 14, y); y += 6;
-  } else {
-    for (const d of todayDefects) {
-      doc.text(`[${d.urgency}] ${d.description} - ${d.status}`, 14, y); y += 5;
-    }
-  }
-
-  y += 4;
-  doc.setFontSize(12);
-  doc.text('Aircraft Status', 14, y); y += 8;
-  doc.setFontSize(9);
-  doc.text(`Tach: ${ac.totalTachTime || 0} hrs`, 14, y); y += 5;
+  // ── Aircraft Status ──
+  y = hdr('Aircraft Status', y);
   const hoursSinceOil = (ac.totalTachTime || 0) - (ac.lastOilChangeTach || 0);
   const hoursSince100hr = (ac.totalTachTime || 0) - (ac.last100hrTach || 0);
-  doc.text(`50hr: ${Math.max(0, (ac.oilInterval || 50) - hoursSinceOil).toFixed(1)} hrs remaining`, 14, y); y += 5;
-  doc.text(`100hr: ${Math.max(0, (ac.structInterval || 100) - hoursSince100hr).toFixed(1)} hrs remaining`, 14, y); y += 5;
-  doc.text(`Engine TSO: ${(ac.engineETSO || 0).toFixed(1)} hrs`, 14, y); y += 5;
-  doc.text(`Prop TSO: ${(ac.propellerPTSO || 0).toFixed(1)} hrs`, 14, y); y += 5;
+  const isAirworthy = ac.dailyCrsDate === today && !ac.groundedAfterInspection;
+  y = row('Status:', isAirworthy ? 'AIRWORTHY' : 'GROUNDED — CRS PENDING', y);
+  y = row('Tach Time:', (ac.totalTachTime || 0).toFixed(1) + ' hrs', y);
+  y = row('Hobbs:', (ac.currentHobbs || 0).toFixed(1) + ' hrs', y);
+  y = row('50hr Inspection Remaining:', Math.max(0, (ac.oilInterval || 50) - hoursSinceOil).toFixed(1) + ' hrs', y);
+  y = row('100hr Inspection Remaining:', Math.max(0, (ac.structInterval || 100) - hoursSince100hr).toFixed(1) + ' hrs', y);
+  y = row('Engine TSO:', (ac.engineETSO || 0).toFixed(1) + ' / ' + (ac.engineTBO || 2000) + ' hrs', y);
+  y = row('Prop TSO:', (ac.propellerPTSO || 0).toFixed(1) + ' / ' + (ac.propellerTBO || 2000) + ' hrs', y);
+  y = row('Daily CRS:', ac.dailyCrsDate === today ? 'Issued by ' + (ac.dailyCrsBy || '—') : 'NOT ISSUED', y);
+  y += 2; doc.line(left, y, right, y); y += 5;
 
-  doc.line(14, y + 4, 196, y + 4);
-  y += 10;
+  // ── Flight Summary ──
+  y = hdr('Flight Summary', y);
+  y = row('Total Today:', todayFlights.length + ' flights / ' + todayHours.toFixed(1) + ' hrs', y);
+  y += 2;
+
+  if (todayFlights.length > 0) {
+    // Table header
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+    doc.setTextColor(100);
+    doc.text('Pilot', left, y); doc.text('Dep', left + 50, y); doc.text('Arr', left + 80, y);
+    doc.text('Hrs', left + 105, y); doc.text('Route', left + 125, y); doc.text('Fuel Used', left + 165, y);
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(0);
+    doc.setDrawColor(180); doc.line(left, y + 1, right, y + 1); y += 4;
+
+    for (const f of todayFlights) {
+      const fuelUsed = ((f.fuelBeforeLeft || 0) + (f.fuelBeforeRight || 0)) - ((f.fuelAfterLeft || 0) + (f.fuelAfterRight || 0));
+      doc.text((f.pilotName || '—').slice(0, 14), left, y);
+      doc.text(f.takeoffTime || '--', left + 50, y);
+      doc.text(f.landingTime || '--', left + 80, y);
+      doc.text((f.flownHours || 0).toFixed(1), left + 105, y);
+      doc.text((f.route || '—').slice(0, 12), left + 125, y);
+      doc.text(fuelUsed.toFixed(1) + ' gal', left + 165, y);
+      y += 4;
+      if (f.remarks) { doc.setFontSize(7); doc.setTextColor(120); doc.text('    Remarks: ' + f.remarks, left, y); doc.setTextColor(0); doc.setFontSize(8); y += 3; }
+    }
+  } else {
+    doc.setFontSize(8); doc.setTextColor(120); doc.text('No flights recorded today.', left, y); doc.setTextColor(0); y += 4;
+  }
+  y += 2; doc.setDrawColor(180); doc.line(left, y, right, y); y += 5;
+
+  // ── Open Defects ──
+  y = hdr('Open Defects', y);
+  if (openDefects.length > 0) {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(100);
+    doc.text('Urgency', left, y); doc.text('Description', left + 35, y); doc.text('Status', left + 155, y);
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(0);
+    doc.setDrawColor(180); doc.line(left, y + 1, right, y + 1); y += 4;
+    for (const d of openDefects) {
+      doc.text(d.urgency || '—', left, y);
+      doc.text((d.description || '—').slice(0, 42), left + 35, y);
+      doc.text(d.status || '—', left + 155, y);
+      y += 4;
+    }
+  } else {
+    doc.setFontSize(8); doc.setTextColor(120); doc.text('No open defects.', left, y); doc.setTextColor(0); y += 4;
+  }
+  y += 2; doc.line(left, y, right, y); y += 5;
+
+  // ── Maintenance ──
+  y = hdr('Maintenance / Work Orders', y);
+  if (todayTasks.length > 0) {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(100);
+    doc.text('Status', left, y); doc.text('Description', left + 30, y); doc.text('Rectified By', left + 130, y);
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(0);
+    doc.setDrawColor(180); doc.line(left, y + 1, right, y + 1); y += 4;
+    for (const t of todayTasks) {
+      doc.text((t.status || '—').slice(0, 10), left, y);
+      doc.text((t.description || '—').slice(0, 38), left + 30, y);
+      doc.text((t.rectifiedBy || t.releasedBy || '—').slice(0, 16), left + 130, y);
+      y += 4;
+    }
+  } else {
+    doc.setFontSize(8); doc.setTextColor(120); doc.text('No work orders today.', left, y); doc.setTextColor(0); y += 4;
+  }
+  y += 2; doc.line(left, y, right, y); y += 5;
+
+  // ── Fuel Status ──
+  y = hdr('Fuel Status', y);
+  for (const fs of fuelStocks) {
+    if (fs.aircraftId && fs.aircraftId !== ac.tailNumber) continue;
+    const pct = fs.capacity > 0 ? ((fs.quantityLiters / fs.capacity) * 100).toFixed(0) : '—';
+    y = row((fs.name || fs.id || 'Fuel').charAt(0).toUpperCase() + (fs.name || fs.id || 'Fuel').slice(1) + ':', fs.quantityLiters.toFixed(1) + 'L / ' + (fs.capacity || '—') + 'L (' + pct + '%)', y);
+  }
+  if (fuelStocks.length === 0) { doc.setFontSize(8); doc.setTextColor(120); doc.text('No fuel data.', left, y); doc.setTextColor(0); y += 4; }
+  y += 2; doc.line(left, y, right, y); y += 5;
+
+  // ── Low Stock Parts ──
+  const lowParts = parts.filter(p => p.quantityOnHand <= p.minSafeStock);
+  if (lowParts.length > 0) {
+    y = hdr('Low Stock Alerts', y);
+    for (const p of lowParts) {
+      y = row(p.partNumber || p.name || 'Part' + ':', p.quantityOnHand + ' remaining (min ' + p.minSafeStock + ')', y);
+    }
+    y += 2; doc.line(left, y, right, y); y += 5;
+  }
+
+  // ── CRS / Sign-off ──
+  y = hdr('Certificate of Release to Service', y);
   doc.setFontSize(9);
-  doc.text('Maintenance Release / CRS:', 14, y); y += 6;
-  doc.line(14, y, 100, y); y += 8;
-  doc.text('Signature & Date', 14, y);
+  doc.text('I hereby certify that the above aircraft has been inspected and is', left, y); y += 4;
+  doc.text('serviceable in accordance with current maintenance procedures.', left, y); y += 6;
+  doc.setDrawColor(0); doc.setLineWidth(0.5);
+  doc.line(left, y, left + 80, y); y += 7;
+  doc.text('Engineer Signature & Date', left, y);
 
   doc.save(`tech-log-${ac.tailNumber}-${today}.pdf`);
   showToast('Daily tech log PDF generated');

@@ -4,6 +4,7 @@ const DEFAULT_AIRCRAFT = {
   tailNumber: 'C-152-001',
   type: 'Cessna 152',
   totalTachTime: 0,
+  currentHobbs: 0,
   lastOilChangeTach: 0,
   last100hrTach: 0,
   oilInterval: 50,
@@ -630,6 +631,7 @@ async function onUpdateMeters() {
   const newHobbs = parseFloat(document.getElementById('eod-hobbs').value) || 0;
   if (newTach <= 0) { showToast('Enter current tach reading', 'error'); return; }
   ac.totalTachTime = newTach;
+  ac.currentHobbs = newHobbs;
   await DB.put('aircraft', ac);
   await queueSync('aircraft', 'update', ac);
   if (typeof checkAndCreateInspectionTasks === 'function') checkAndCreateInspectionTasks(ac);
