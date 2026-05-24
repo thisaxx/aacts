@@ -885,8 +885,6 @@ function updateSidebarUser() {
     avatar.textContent = name ? name[0].toUpperCase() : '?';
     avatar.style.background = '';
   }
-  const isPrivileged = role === 'engineer' || role === 'admin' || role === 'production_planner';
-  document.getElementById('sidebar-reset').style.display = isPrivileged ? '' : 'none';
   applyRoleVisibility();
 }
 
@@ -1738,6 +1736,15 @@ function settingsView() {
         </div>
       </div>
 
+      ${role === 'admin' ? `
+      <div class="card" style="border-color:var(--danger)">
+        <div class="card-header"><h3 style="color:var(--danger)">Danger Zone</h3></div>
+        <div style="padding:12px 16px">
+          <p class="text-muted small" style="margin-bottom:8px">Factory reset deletes ALL data — aircraft, flights, defects, parts, fuel, users, and attendance. This cannot be undone.</p>
+          <button class="btn btn-danger btn-block" id="settings-factory-reset">&#128260; Factory Reset All Data</button>
+        </div>
+      </div>` : ''}
+
       <div class="card">
         <div class="card-header"><h3>About</h3></div>
         <div style="padding:12px 16px">
@@ -1782,6 +1789,17 @@ function settingsView() {
     document.getElementById('sidebar-theme-toggle').innerHTML = isLight ? '&#127769;' : '&#127774;';
     showToast(isLight ? 'Dark mode' : 'Light mode');
   });
+
+  const resetBtn = document.getElementById('settings-factory-reset');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', async () => {
+      if (typeof denyGuest === 'function' && denyGuest()) return;
+      const role = localStorage.getItem('aac_user_role');
+      if (role !== 'admin') { showToast('Only Admin can reset all data', 'error'); return; }
+      const confirmed = await showConfirmDialog('Factory Reset', 'This will delete ALL data including aircraft, sorties, defects, parts, and fuel. Are you sure?');
+      if (confirmed) await clearAllData();
+    });
+  }
 }
 
 function showLoginGate() {
@@ -1978,15 +1996,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     e.preventDefault();
     closeSidebar();
     showAircraftSheet();
-  });
-  document.getElementById('sidebar-reset').addEventListener('click', async e => {
-    e.preventDefault();
-    closeSidebar();
-    if (typeof denyGuest === 'function' && denyGuest()) return;
-    const role = localStorage.getItem('aac_user_role');
-    if (role !== 'admin') { showToast('Only Admin can reset all data', 'error'); return; }
-    const confirmed = await showConfirmDialog('Factory Reset', 'This will delete ALL data including aircraft, sorties, defects, parts, and fuel. Are you sure?');
-    if (confirmed) await clearAllData();
   });
   function toggleTheme() {
     const html = document.documentElement;
