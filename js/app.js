@@ -443,6 +443,7 @@ function startFlightBarProgress(flight) {
   const etaMs = (eh * 60 + em) * 60 * 1000;
   let totalDuration = etaMs - depMs;
   if (totalDuration <= 0) totalDuration += 24 * 60 * 60 * 1000;
+  const arrivalBtn = document.getElementById(`fsb-arrival-btn-${flight.id}`);
   function tick() {
     const now = new Date();
     const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -456,6 +457,8 @@ function startFlightBarProgress(flight) {
       planeEl.style.left = `calc(${pct}% - 10px)`;
       planeEl.style.opacity = '1';
     }
+    // Show arrival button when ETA is reached
+    if (arrivalBtn && pct >= 100) arrivalBtn.style.display = 'block';
   }
   tick();
   const interval = setInterval(tick, 2000);
@@ -489,6 +492,7 @@ function renderFlightStatusBar(flight) {
           <span class="flight-status-bar-text">Airborne &middot; ${escHtml(flight.pilotName)} &middot; Dep ${escHtml(flight.takeoffTime)} ${etaDisplay}</span>
         </div>
         ${progressHtml}
+        <button class="btn btn-sm btn-primary" id="fsb-arrival-btn-${escHtml(flight.id)}" style="display:none;margin-top:6px;width:100%" onclick="navigate('flight-ops')">&#128644; Record Arrival</button>
       </div>
     </div>`;
 }

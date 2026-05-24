@@ -304,6 +304,12 @@ function flightOpsView() {
     renderIntervalBars();
     renderRecentFlights();
     renderDepartedList();
+
+    // Auto-show arrival form for the most recent departed flight
+    DB.getAll('flights').then(allFlights => {
+      const departed = allFlights.filter(f => f.aircraftId === ac.tailNumber && f.status === 'departed').sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      if (departed.length > 0) showArrivalForm(departed[0].id);
+    });
     });
   });
 }
@@ -318,6 +324,7 @@ async function renderDepartedList() {
 
   if (departed.length === 0) {
     el.innerHTML = '<p class="text-muted small">No flights awaiting arrival data</p>';
+    document.getElementById('arrival-card')?.classList.add('hidden');
     return;
   }
   el.innerHTML = departed.map(f => `
@@ -351,6 +358,7 @@ async function renderDepartedList() {
       renderRecentFlights();
     });
   });
+
 }
 
 async function showArrivalForm(flightId) {
