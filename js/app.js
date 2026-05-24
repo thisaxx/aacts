@@ -772,7 +772,6 @@ function navigate(view) {
     case 'profile': profileView(); break;
     case 'notifications': notificationsView(); break;
     case 'activity': activityFeedView(); break;
-    case 'library': libraryView(); break;
   }
   return false;
 }
