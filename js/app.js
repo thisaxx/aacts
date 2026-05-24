@@ -1823,7 +1823,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     navigator.serviceWorker.register('sw.js');
   }
 
-  await initFirebase();
+  initFirebase().catch(() => {});
 
   if (typeof restoreArrivalReminders === 'function') restoreArrivalReminders();
   if (typeof restoreFlightProgressBars === 'function') restoreFlightProgressBars();
