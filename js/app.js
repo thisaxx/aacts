@@ -205,10 +205,19 @@ async function renderActivityFeed() {
 
 async function getCrewStatusBoard() {
   const users = await DB.getAll('users');
+  // Deduplicate by name (keep the one with photo if available)
+  const seen = new Map();
+  for (const u of users) {
+    const existing = seen.get(u.name);
+    if (!existing || (u.photo && !existing.photo)) {
+      seen.set(u.name, u);
+    }
+  }
+  const unique = [...seen.values()];
   const attendance = await DB.getAll('attendance');
   const today = new Date().toISOString().slice(0, 10);
   const activeAttendance = attendance.filter(a => a.date === today && (a.status === 'approved' || a.status === 'pending'));
-  return users.map(u => {
+  return unique.map(u => {
     const att = activeAttendance.find(a => a.userName === u.name);
     return { user: u, attendance: att || null };
   });
@@ -1009,11 +1018,22 @@ function profileView() {
         await queueSync('users', 'update', existing);
       }
     } else {
-      const id = 'user_' + Date.now();
-      localStorage.setItem('aac_user_id', id);
-      const u = { id, name: n, role: r, photo: newPhoto, createdAt: new Date().toISOString() };
-      await DB.put('users', u);
-      await queueSync('users', 'create', u);
+      // Find existing user by name to avoid duplicates
+      const all = await DB.getAll('users');
+      const match = all.find(u => u.name === n);
+      if (match) {
+        localStorage.setItem('aac_user_id', match.id);
+        match.role = r;
+        match.photo = newPhoto;
+        await DB.put('users', match);
+        await queueSync('users', 'update', match);
+      } else {
+        const id = 'user_' + Date.now();
+        localStorage.setItem('aac_user_id', id);
+        const u = { id, name: n, role: r, photo: newPhoto, createdAt: new Date().toISOString() };
+        await DB.put('users', u);
+        await queueSync('users', 'create', u);
+      }
     }
     updateSidebarUser();
     showToast('Profile saved');
