@@ -246,6 +246,7 @@ async function fetchWeather() {
     const conditions = wmoCodes[wcode] || cc.weatherDesc?.[0]?.value || '—';
     const result = {
       icao,
+      conditionCode: cc.weatherCode || '',
       location: data.nearest_area?.[0]?.areaName?.[0]?.value || icao,
       raw: '',
       temp: cc.temp_C || '—',
@@ -265,9 +266,16 @@ async function fetchWeather() {
   }
 }
 
+function weatherIcon(wcode) {
+  const map = { 113:'☀️',116:'⛅',119:'☁️',122:'☁️',143:'🌫️',176:'🌦️',179:'🌨️',182:'🌧️',185:'🌧️',200:'⛈️',227:'🌨️',230:'🌨️',248:'🌫️',260:'🌫️',263:'🌦️',266:'🌦️',281:'🌧️',284:'🌧️',293:'🌦️',296:'🌧️',299:'🌧️',302:'🌧️',305:'🌧️',308:'🌧️',311:'🌧️',314:'🌧️',317:'🌦️',320:'🌧️',323:'🌨️',326:'🌨️',329:'🌨️',332:'🌨️',335:'🌨️',338:'❄️',350:'🧊',353:'🌦️',356:'🌧️',359:'🌧️',362:'🌧️',365:'🌧️',368:'🌨️',371:'🌨️',374:'🌧️',377:'🌧️',386:'⛈️',389:'⛈️',392:'⛈️',395:'⛈️' };
+  return map[wcode] || '🌤️';
+}
+
 function renderWeatherCard(weather) {
   if (!weather) return '<div class="card"><div class="card-header"><h3>Weather</h3></div><div style="padding:12px 16px"><p class="text-muted small">Weather data unavailable</p></div></div>';
   const timeStr = weather.time || '';
+  const wcode = parseInt(weather.conditionCode, 10);
+  const icon = weatherIcon(wcode);
   return `
     <div class="card">
       <div class="card-header">
@@ -276,6 +284,10 @@ function renderWeatherCard(weather) {
       </div>
       <div style="padding:8px 16px">
         <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <div style="flex:0 0 100%;text-align:center;padding:8px 0">
+            <span style="font-size:48px;line-height:1">${icon}</span>
+            <div style="margin-top:2px;font-size:13px;font-weight:600">${weather.conditions}</div>
+          </div>
           <div style="flex:1;text-align:center;padding:8px;background:var(--surface);border-radius:8px">
             <div style="font-size:22px;font-weight:700">${weather.temp}&deg;C</div>
             <div class="text-muted small">Temp</div>
@@ -287,10 +299,6 @@ function renderWeatherCard(weather) {
           <div style="flex:1;text-align:center;padding:8px;background:var(--surface);border-radius:8px">
             <div style="font-size:22px;font-weight:700">${weather.humidity || '—'}%</div>
             <div class="text-muted small">Humidity</div>
-          </div>
-          <div style="flex:1;text-align:center;padding:8px;background:var(--surface);border-radius:8px">
-            <div style="font-size:18px;font-weight:700">${weather.conditions}</div>
-            <div class="text-muted small">Conditions</div>
           </div>
         </div>
         ${weather.visibility ? `<div style="margin-top:6px;font-size:11px;color:var(--text-muted);text-align:center">Visibility: ${weather.visibility} km</div>` : ''}
