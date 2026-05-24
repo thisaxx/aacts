@@ -789,9 +789,15 @@ function navigate(view) {
   const link = document.querySelector(`.nav-link[data-view="${view}"]`);
   if (link) link.classList.add('active');
   closeSidebar();
+  // Clear live feed timer when navigating away
+  if (window._liveFeedTimer && view !== 'live-feed') {
+    clearInterval(window._liveFeedTimer);
+    window._liveFeedTimer = null;
+  }
 
   switch (view) {
     case 'dashboard': dashboardView(); break;
+    case 'live-feed': liveFeedView(); break;
     case 'flight-ops': flightOpsView(); break;
     case 'defects': defectsView(); break;
     case 'maintenance': maintenanceView(); break;
@@ -1023,6 +1029,119 @@ function profileView() {
     document.getElementById('hamburger-btn').style.display = 'none';
     showLoginGate();
   });
+}
+
+/* ── Live Feed ── */
+function liveFeedView() {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="page">
+      <div class="page-header">
+        <h2>Live Feed</h2>
+        <div class="subtitle">Real-time crew &amp; fleet status</div>
+      </div>
+      <div id="live-feed-content">
+        <div class="skeleton skeleton-block"></div>
+        <div class="skeleton skeleton-block"></div>
+      </div>
+    </div>
+  `;
+  renderLiveFeed();
+  if (window._liveFeedTimer) clearInterval(window._liveFeedTimer);
+  window._liveFeedTimer = setInterval(renderLiveFeed, 15000);
+}
+
+async function renderLiveFeed() {
+  const el = document.getElementById('live-feed-content');
+  if (!el) return;
+  const flights = await DB.getAll('flights');
+  const attendance = await DB.getAll('attendance');
+  const users = await DB.getAll('users');
+  const defects = await DB.getAll('defects');
+  const tasks = await DB.getAll('maintenance_tasks');
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Airborne
+  const airborne = flights.filter(f => f.status === 'departed');
+  // Crew on duty (approved sign-ins today)
+  const todayAttendance = attendance.filter(a => a.date === today && a.status === 'approved');
+  const onDuty = todayAttendance.map(a => {
+    const u = users.find(u => u.name === a.userName);
+    return { ...a, photo: u?.photo || '' };
+  });
+  // Recent activity
+  const allActs = [];
+  flights.filter(f => f.status === 'completed' && f.flightDate === today).forEach(f => {
+    allActs.push({ time: f.landingTime || f.createdAt, icon: '&#9992;', text: `${f.pilotName} landed (${(f.flownHours*60).toFixed(0)}m)`, type: 'flight' });
+  });
+  defects.filter(d => (d.createdAt || '').slice(0,10) === today).forEach(d => {
+    allActs.push({ time: d.createdAt, icon: d.urgency === 'grounding' ? '&#9888;' : '&#9888;', text: `${d.description} [${d.urgency}]`, type: 'defect' });
+  });
+  tasks.filter(t => (t.createdAt || '').slice(0,10) === today && t.status === 'released').forEach(t => {
+    allActs.push({ time: t.releasedAt || t.createdAt, icon: '&#9989;', text: `CRS: ${t.description}`, type: 'crs' });
+  });
+  allActs.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
+  const recent = allActs.slice(0, 20);
+
+  let html = '';
+
+  // Airborne section
+  if (airborne.length > 0) {
+    html += `<div class="card" style="border-color:rgba(59,130,246,0.3)">
+      <div class="card-header"><h3>&#9992; Airborne</h3></div>`;
+    for (const f of airborne) {
+      const ac = await DB.get('aircraft', f.aircraftId);
+      const etaStr = f.eta ? `ETA ${f.eta}` : '';
+      html += `<div class="flight-row">
+        <div style="flex:1;min-width:0">
+          <div class="flight-pilot" style="color:#3b82f6">${escHtml(f.aircraftId)} &middot; ${escHtml(f.pilotName)}</div>
+          <div class="flight-date">Dep ${f.takeoffTime} ${etaStr}</div>
+        </div>
+        <span style="width:8px;height:8px;border-radius:50%;background:#3b82f6;animation:dotPulse 1s infinite"></span>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+
+  // Crew on duty
+  html += `<div class="card">
+    <div class="card-header"><h3>&#10003; On Duty (${onDuty.length})</h3></div>`;
+  if (onDuty.length === 0) {
+    html += `<p class="text-muted small">No crew signed in today</p>`;
+  } else {
+    for (const c of onDuty) {
+      html += `<div class="crew-row" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="width:32px;height:32px;border-radius:50%;overflow:hidden;background:var(--surface);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid var(--text)">
+          ${c.photo ? `<img src="${c.photo}" style="width:100%;height:100%;object-fit:cover">` : c.userName[0].toUpperCase()}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:var(--mono);font-size:12px;font-weight:600">${escHtml(c.userName)}</div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted)">In: ${c.checkinTime || '—'}</div>
+        </div>
+      </div>`;
+    }
+  }
+  html += `</div>`;
+
+  // Recent activity
+  html += `<div class="card">
+    <div class="card-header"><h3>&#128197; Today's Activity</h3></div>`;
+  if (recent.length === 0) {
+    html += `<p class="text-muted small">No activity today</p>`;
+  } else {
+    for (const a of recent) {
+      const color = a.type === 'flight' ? 'var(--text)' : a.type === 'defect' ? 'var(--red)' : 'var(--gold)';
+      html += `<div class="flight-row">
+        <div style="flex:1;min-width:0">
+          <div class="flight-pilot" style="font-size:11px"><span style="color:${color}">${a.icon}</span> ${escHtml(a.text)}</div>
+          <div class="flight-date">${a.time ? new Date(a.time).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : ''}</div>
+        </div>
+      </div>`;
+    }
+  }
+  html += `</div>`;
+
+  el.innerHTML = html;
 }
 
 function showAircraftSheet() {
