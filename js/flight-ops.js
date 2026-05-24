@@ -753,6 +753,7 @@ async function showEndOfFlyingSheet() {
 
 async function renderAircraftStatus() {
   const ac = await getAircraft();
+  if (!ac) return;
   const tach = ac.totalTachTime;
   const hoursSinceOil = tach - ac.lastOilChangeTach;
   const hoursSince100hr = tach - ac.last100hrTach;
@@ -781,6 +782,7 @@ async function renderAircraftStatus() {
 
 async function renderIntervalBars() {
   const ac = await getAircraft();
+  if (!ac) return;
   const tach = ac.totalTachTime;
   const hoursSinceOil = tach - ac.lastOilChangeTach;
   const hoursSince100hr = tach - ac.last100hrTach;

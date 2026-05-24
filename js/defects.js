@@ -217,7 +217,7 @@ async function renderDefects() {
       const wasHidden = container.style.display === 'none';
       container.style.display = wasHidden ? 'block' : 'none';
       if (wasHidden) {
-        renderComments('defect', id, container);
+        await renderComments('defect', id, container);
         container.innerHTML += commentInputHTML();
         attachCommentHandler('defect', id, container);
       }

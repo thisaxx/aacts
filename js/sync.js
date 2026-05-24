@@ -18,6 +18,7 @@ async function initFirebase() {
     db_firestore.settings({ merge: true });
     await firebase.auth().signInAnonymously();
     _deviceId = firebase.auth().currentUser.uid;
+    firebase.auth().onAuthStateChanged(() => { updateSyncBadge(); processSyncQueue(); });
     initFCM();
     await processSyncQueue();
     startPolling();
@@ -180,8 +181,6 @@ async function processSyncQueue() {
   }
   updateSyncBadge();
 }
-
-firebase.auth().onAuthStateChanged(() => { updateSyncBadge(); processSyncQueue(); });
 
 window.addEventListener('online', () => {
   updateSyncBadge();

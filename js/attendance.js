@@ -106,7 +106,7 @@ async function renderAttendance(viewDate) {
         <button class="btn btn-sm btn-danger att-del-btn" data-id="${active.id}" style="margin-top:6px">Delete Record</button>`}
       `;
       if (!active.checkoutTime) {
-        document.getElementById('att-checkout-time-input').valueAsDate = new Date();
+        document.getElementById('att-checkout-time-input').value = new Date().toTimeString().slice(0, 5);
         document.getElementById('att-now-checkout-btn').addEventListener('click', () => {
           const now = new Date();
           document.getElementById('att-checkout-time-input').value = now.toTimeString().slice(0, 5);
@@ -137,7 +137,7 @@ async function renderAttendance(viewDate) {
         </div>
         <button class="btn btn-primary btn-block" id="att-checkin-btn">Sign In</button>
       `;
-      document.getElementById('att-checkin-time-input').valueAsDate = new Date();
+      document.getElementById('att-checkin-time-input').value = new Date().toTimeString().slice(0, 5);
       document.getElementById('att-now-checkin-btn').addEventListener('click', () => {
         const now = new Date();
         document.getElementById('att-checkin-time-input').value = now.toTimeString().slice(0, 5);

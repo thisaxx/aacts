@@ -245,7 +245,7 @@ async function renderTasks() {
       const wasHidden = container.style.display === 'none';
       container.style.display = wasHidden ? 'block' : 'none';
       if (wasHidden) {
-        renderComments('task', id, container);
+        await renderComments('task', id, container);
         container.innerHTML += commentInputHTML();
         attachCommentHandler('task', id, container);
       }

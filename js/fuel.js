@@ -259,10 +259,11 @@ async function renderFuelTrends() {
   }
   const avg = recent.reduce((s, f) => s + f.fuelConsumed, 0) / recent.length;
   const max = Math.max(...recent.map(f => f.fuelConsumed));
-  const avgConsumption = recent.reduce((s, f) => {
+  const flownCount = recent.filter(f => f.flownHours > 0).length;
+  const avgConsumption = flownCount > 0 ? recent.reduce((s, f) => {
     if (f.flownHours > 0) return s + f.fuelConsumed / f.flownHours;
     return s;
-  }, 0) / recent.filter(f => f.flownHours > 0).length;
+  }, 0) / flownCount : 0;
   el.innerHTML = `
     <div style="padding:8px 0">
       <div style="display:flex;gap:16px;margin-bottom:12px">

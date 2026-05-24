@@ -219,16 +219,16 @@ async function renderInventory() {
   }
 }
 
-function logFuelEvent(fuelType, liters, source) {
-  return DB.put('fuel_logs', {
+async function logFuelEvent(fuelType, liters, source) {
+  const entry = {
     id: 'fuel_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
     aircraftId: getCurrentAircraftKey(),
-    fuelType,
-    liters,
-    source,
+    fuelType, liters, source,
     date: new Date().toISOString().slice(0, 10),
     createdAt: new Date().toISOString()
-  });
+  };
+  await DB.put('fuel_logs', entry);
+  await queueSync('fuel_logs', 'create', entry);
 }
 
 function showFuelAddSheet(fuelId, fuelName) {

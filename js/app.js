@@ -44,8 +44,11 @@ function initPullToRefresh() {
     if (window.__sheetOpen || document.getElementById('app').scrollTop > 0) return;
     const dy = e.touches[0].clientY - _pullStartY;
     const ind = document.getElementById('pull-indicator');
-    if (dy > 40) {
-      ind.textContent = dy > _pullThreshold ? '&#8593; Release to refresh' : '&#8593; Pull to refresh';
+    if (dy > _pullThreshold) {
+      ind.textContent = '\u2191 Release to refresh';
+      ind.classList.add('visible');
+    } else if (dy > 0) {
+      ind.textContent = '\u2191 Pull to refresh';
       ind.classList.add('visible');
     } else {
       ind.classList.remove('visible');
@@ -54,7 +57,7 @@ function initPullToRefresh() {
   app.addEventListener('touchend', async () => {
     const ind = document.getElementById('pull-indicator');
     if (ind.classList.contains('visible') && ind.textContent.includes('Release')) {
-      ind.textContent = '&#8635; Refreshing...';
+      ind.textContent = '\u21BB Refreshing...';
       await refreshCurrentView();
     }
     ind.classList.remove('visible');
@@ -100,18 +103,17 @@ async function getComments(parentType, parentId) {
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
-function renderComments(parentType, parentId, containerEl) {
-  getComments(parentType, parentId).then(comments => {
-    containerEl.innerHTML = comments.map(c => `
-      <div style="padding:8px 0;border-bottom:1px solid var(--glass-border)">
-        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted)">
-          <strong>${escHtml(c.author)}</strong>
-          <span>${new Date(c.createdAt).toLocaleString()}</span>
-        </div>
-        <div style="font-size:13px;margin-top:2px">${escHtml(c.text)}</div>
+async function renderComments(parentType, parentId, containerEl) {
+  const comments = await getComments(parentType, parentId);
+  containerEl.innerHTML = comments.map(c => `
+    <div style="padding:8px 0;border-bottom:1px solid var(--glass-border)">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted)">
+        <strong>${escHtml(c.author)}</strong>
+        <span>${new Date(c.createdAt).toLocaleString()}</span>
       </div>
-    `).join('') || '<div style="font-size:12px;color:var(--text-muted);padding:8px 0">No comments yet</div>';
-  });
+      <div style="font-size:13px;margin-top:2px">${escHtml(c.text)}</div>
+    </div>
+  `).join('') || '<div style="font-size:12px;color:var(--text-muted);padding:8px 0">No comments yet</div>';
 }
 
 function commentInputHTML() {
@@ -129,12 +131,12 @@ function attachCommentHandler(parentType, parentId, containerEl) {
   if (!input || !btn) return;
   const post = async () => {
     if (!input.value.trim()) return;
-    await addComment(parentType, parentId, input.value);
+    await addComment(parentType, parentId, input.value).catch(() => {});
     input.value = '';
-    renderComments(parentType, parentId, containerEl);
+    await renderComments(parentType, parentId, containerEl).catch(() => {});
   };
-  btn.addEventListener('click', post);
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') post(); });
+  btn.addEventListener('click', () => { post().catch(() => {}); });
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') post().catch(() => {}); });
 }
 
 async function logActivity(type, description, relatedId) {
@@ -385,11 +387,13 @@ function showBottomSheet(html) {
       overlay.classList.add('open');
       sheet.classList.add('open');
     });
+    window.__sheetOpen = true;
 
     let resolved = false;
     const close = (result) => {
       if (resolved) return;
       resolved = true;
+      window.__sheetOpen = false;
       overlay.classList.remove('open');
       sheet.classList.remove('open');
       setTimeout(() => { overlay.remove(); resolve(result); }, 400);
@@ -422,7 +426,8 @@ function toggleSwitchHTML(id, label, on = false) {
 }
 
 function initToggles() {
-  document.querySelectorAll('.toggle-wrap').forEach(el => {
+  document.querySelectorAll('.toggle-wrap:not([data-toggles-initialized])').forEach(el => {
+    el.setAttribute('data-toggles-initialized', '1');
     const track = el.querySelector('.toggle-track');
     el.addEventListener('click', () => {
       track.classList.toggle('on');
@@ -782,7 +787,7 @@ async function dashboardView() {
 
       // Oil check step before issuing CRS
       const oilCheckConfirm = await new Promise(resolve => {
-        showBottomSheet(`
+        const sheetPromise = showBottomSheet(`
           <div class="card-header"><h3>&#128167; Pre-Flight Oil Check — ${escHtml(ac.tailNumber)}</h3></div>
           <p class="text-muted small" style="margin-bottom:12px">Oil change due every ${ac.oilInterval || 50} tach hrs. Current: ${hoursSinceOil.toFixed(1)} hrs since last change.${oilDue ? ' <strong class="text-red">Oil change overdue.</strong>' : ''}</p>
           <div class="form-group">
@@ -832,6 +837,8 @@ async function dashboardView() {
           window.__sheetClose(true);
           resolve(true);
         });
+        // Resolve outer promise if sheet is dismissed via overlay
+        sheetPromise.then(() => resolve(true));
       });
       if (!oilCheckConfirm) return;
 

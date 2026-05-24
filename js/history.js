@@ -91,6 +91,7 @@ function calendarView() {
 
     let html = '';
     const insp = getInspectionStatus(ac);
+    if (!ac) { results.innerHTML = '<p class="text-muted small">No aircraft configured</p>'; return; }
     html += `<div class="card"><div class="card-header"><h3>Inspections on ${dateStr}</h3></div>`;
     if (dateStr === new Date().toISOString().slice(0, 10) || (calFrom && calTo)) {
       html += `<div class="interval-item"><div class="interval-label"><span class="label">50hr Inspection</span><span class="interval-value ${insp.oilClass}">${insp.oilRemaining.toFixed(1)}h left</span></div><div class="progress-bar"><div class="progress-fill ${insp.oilFill}" style="width:${insp.oilPct}%"></div></div></div>`;
@@ -147,6 +148,7 @@ function calendarView() {
 }
 
 function getInspectionStatus(ac) {
+  if (!ac) return { oilRemaining: 0, structRemaining: 0, oilClass: 'text-muted', structClass: 'text-muted', oilFill: '', structFill: '', oilPct: 0, structPct: 0 };
   const tach = ac.totalTachTime || 0;
   const hoursSinceOil = tach - (ac.lastOilChangeTach || 0);
   const hoursSince100hr = tach - (ac.last100hrTach || 0);
