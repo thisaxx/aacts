@@ -215,6 +215,10 @@ async function getCrewStatusBoard() {
     const user = match || { name: su.name, role: su.role, photo: '' };
     const att = activeAttendance.find(a => a.userName === su.name);
     return { user, attendance: att || null };
+  }).sort((a, b) => {
+    const aApproved = a.attendance?.status === 'approved' ? 0 : a.attendance?.status === 'pending' ? 1 : 2;
+    const bApproved = b.attendance?.status === 'approved' ? 0 : b.attendance?.status === 'pending' ? 1 : 2;
+    return aApproved - bApproved;
   });
 }
 
