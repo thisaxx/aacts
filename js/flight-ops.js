@@ -276,22 +276,25 @@ function flightOpsView() {
 
     document.getElementById('flight-date').valueAsDate = new Date();
 
-    // Populate pilot dropdown from aac_pilots with aac_users fallback
+    // Populate pilot dropdown from aac_pilots
     const pilotSel = document.getElementById('pilot-name');
     if (pilotSel) {
       let pilots = [];
       try { pilots = JSON.parse(localStorage.getItem('aac_pilots')) || []; } catch(e) {}
-      if (!pilots.length) {
-        let users = [];
-        try { users = JSON.parse(localStorage.getItem('aac_users')) || []; } catch(e) {}
-        pilots = users.filter(u => u.role !== 'guest').map(u => u.name);
-      }
-      pilots.forEach(name => {
+      if (pilots.length) {
+        pilots.forEach(name => {
+          const opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          pilotSel.appendChild(opt);
+        });
+      } else {
         const opt = document.createElement('option');
-        opt.value = name;
-        opt.textContent = name;
+        opt.value = '';
+        opt.textContent = '— No pilots — Add in Settings > Pilot Management';
+        opt.disabled = true;
         pilotSel.appendChild(opt);
-      });
+      }
     }
 
     renderAircraftStatus();
@@ -913,7 +916,7 @@ async function editFlight(flightId) {
       <label>Pilot Name</label>
       <select id="edit-flight-pilot" class="form-input">
         <option value="">— Select pilot —</option>
-        ${(() => { try { let pilots = JSON.parse(localStorage.getItem('aac_pilots') || '[]'); if (!pilots.length) { const users = JSON.parse(localStorage.getItem('aac_users') || '[]'); pilots = users.filter(u => u.role !== 'guest').map(u => u.name); } const exists = pilots.includes(flight.pilotName); return pilots.map(n => `<option value="${escHtml(n)}"${n === flight.pilotName ? ' selected' : ''}>${escHtml(n)}</option>`).join('') + (!exists && flight.pilotName ? `<option value="${escHtml(flight.pilotName)}" selected>${escHtml(flight.pilotName)}</option>` : ''); } catch(e) { return ''; } })()}
+        ${(() => { try { const pilots = JSON.parse(localStorage.getItem('aac_pilots') || '[]'); const exists = pilots.includes(flight.pilotName); if (!pilots.length && !exists) return '<option value="" disabled>— No pilots — Add in Settings > Pilot Management</option>'; return pilots.map(n => `<option value="${escHtml(n)}"${n === flight.pilotName ? ' selected' : ''}>${escHtml(n)}</option>`).join('') + (!exists && flight.pilotName ? `<option value="${escHtml(flight.pilotName)}" selected>${escHtml(flight.pilotName)}</option>` : ''); } catch(e) { return ''; } })()}
       </select>
     </div>
     <div class="row">

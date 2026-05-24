@@ -2126,7 +2126,7 @@ function settingsView() {
       <div class="card">
         <div class="card-header"><h3>Pilot Management</h3></div>
         <div style="padding:12px 16px" id="pilot-management">
-          <p class="text-muted small" style="margin-bottom:8px">Manage the pilot list used in flight logging.</p>
+          <p class="text-muted small" style="margin-bottom:8px">Manage the pilot list used in flight logging. These are separate from login users — only names added here appear in the pilot dropdown.</p>
           <div id="pilot-list"></div>
           <div style="display:flex;gap:6px;margin-top:8px">
             <input type="text" id="new-pilot-name" class="form-input" placeholder="Enter pilot name" style="flex:1">
@@ -2406,14 +2406,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     localStorage.setItem('aac_users', JSON.stringify(defaultUsers));
   }
 
-  // Seed pilot list (separate from login users)
+  // Seed pilot list (separate from login users) — empty by default
   if (!localStorage.getItem('aac_pilots')) {
-    const defaultPilots = [
-      'Pasan Anishka', 'Buddika Chandrarathna', 'Thisanga',
-      'Chandrakeerthi', 'Deshan', 'Shalana', 'Rehan',
-      'Binada', 'Bihandu', 'Ginod', 'Kalum', 'Rajapaksha'
-    ];
-    localStorage.setItem('aac_pilots', JSON.stringify(defaultPilots));
+    localStorage.setItem('aac_pilots', JSON.stringify([]));
   }
 
   // Sync login users into DB so crew board shows everyone
