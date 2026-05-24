@@ -353,6 +353,7 @@ function initToggles() {
 function startFlightBarProgress(flight) {
   if (!flight.eta || !flight.takeoffTime) return;
   const fillEl = document.getElementById(`fsb-fill-${flight.id}`);
+  const planeEl = document.getElementById(`fsb-plane-${flight.id}`);
   if (!fillEl) return;
   const [dh, dm] = flight.takeoffTime.split(':').map(Number);
   const [eh, em] = flight.eta.split(':').map(Number);
@@ -373,6 +374,10 @@ function startFlightBarProgress(flight) {
       : pct < 80
       ? 'linear-gradient(90deg, #f59e0b, #f97316)'
       : 'linear-gradient(90deg, #ef4444, #dc2626)';
+    if (planeEl) {
+      planeEl.style.left = `calc(${pct}% - 10px)`;
+      planeEl.style.opacity = '1';
+    }
   }
   tick();
   const interval = setInterval(tick, 2000);
@@ -385,10 +390,21 @@ function renderFlightStatusBar(flight) {
   const etaDisplay = flight.eta ? `&middot; ETA <strong>${escHtml(flight.eta)}</strong>` : '';
   const hasProgress = flight.eta && flight.takeoffTime;
   const progressHtml = hasProgress
-    ? `<div class="flight-status-bar-progress"><div class="flight-status-bar-fill" id="fsb-fill-${escHtml(flight.id)}"></div></div>`
-    : `<div class="flight-status-bar-progress"><div class="flight-status-bar-track"></div></div>`;
+    ? `<div class="flight-status-bar-progress">
+         <div class="flight-status-bar-track">
+           <div class="fsb-dot-grid"></div>
+         </div>
+         <div class="flight-status-bar-fill" id="fsb-fill-${escHtml(flight.id)}"></div>
+         <div class="fsb-plane" id="fsb-plane-${escHtml(flight.id)}">&#9992;</div>
+       </div>`
+    : `<div class="flight-status-bar-progress">
+         <div class="flight-status-bar-track">
+           <div class="fsb-dot-grid"></div>
+         </div>
+       </div>`;
   return `
     <div class="flight-status-bar" id="fsb-${escHtml(flight.id)}">
+      <div class="flight-status-bar-glow"></div>
       <div class="flight-status-bar-inner">
         <div class="flight-status-bar-row">
           <span class="flight-status-bar-icon">&#9992;</span>
