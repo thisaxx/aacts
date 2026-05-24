@@ -222,90 +222,6 @@ async function getCrewStatusBoard() {
   });
 }
 
-async function fetchWeather() {
-  const icao = localStorage.getItem('aac_weather_icao') || 'VCCG';
-  const cached = localStorage.getItem('aac_weather_cache');
-  if (cached) {
-    try {
-      const parsed = JSON.parse(cached);
-      if (parsed.conditionCode && Date.now() - parsed.ts < 30 * 60 * 1000) return parsed;
-    } catch(e) {}
-  }
-  if (!navigator.onLine) {
-    if (cached) try { return JSON.parse(cached); } catch(e) {}
-    return null;
-  }
-  try {
-    const res = await fetch(`https://wttr.in/${icao}?format=j1`);
-    if (!res.ok) throw new Error('Weather fetch failed');
-    const data = await res.json();
-    const cc = data?.current_condition?.[0];
-    if (!cc) throw new Error('No weather data');
-    const wmoCodes = { 0:'Clear',1:'Mainly clear',2:'Partly cloudy',3:'Overcast',45:'Foggy',48:'Foggy',51:'Light drizzle',53:'Drizzle',55:'Heavy drizzle',56:'Freezing drizzle',57:'Freezing drizzle',61:'Light rain',63:'Rain',65:'Heavy rain',66:'Freezing rain',67:'Freezing rain',71:'Light snow',73:'Snow',75:'Heavy snow',77:'Snow grains',80:'Light showers',81:'Showers',82:'Heavy showers',85:'Light snow showers',86:'Snow showers',95:'Thunderstorm',96:'Thunderstorm',99:'Thunderstorm' };
-    const wcode = parseInt(cc.weatherCode, 10);
-    const conditions = wmoCodes[wcode] || cc.weatherDesc?.[0]?.value || '—';
-    const result = {
-      icao,
-      conditionCode: cc.weatherCode || '',
-      location: data.nearest_area?.[0]?.areaName?.[0]?.value || icao,
-      raw: '',
-      temp: cc.temp_C || '—',
-      windDir: cc.winddir16Point || '—',
-      windSpeed: cc.windspeedKmph || '—',
-      visibility: cc.visibility || '—',
-      conditions,
-      humidity: cc.humidity || '—',
-      time: cc.observation_time || '',
-      ts: Date.now()
-    };
-    localStorage.setItem('aac_weather_cache', JSON.stringify(result));
-    return result;
-  } catch (e) {
-    if (cached) try { return JSON.parse(cached); } catch(e) {}
-    return null;
-  }
-}
-
-function weatherIcon(wcode) {
-  const map = { 113:'☀️',116:'⛅',119:'☁️',122:'☁️',143:'🌫️',176:'🌦️',179:'🌨️',182:'🌧️',185:'🌧️',200:'⛈️',227:'🌨️',230:'🌨️',248:'🌫️',260:'🌫️',263:'🌦️',266:'🌦️',281:'🌧️',284:'🌧️',293:'🌦️',296:'🌧️',299:'🌧️',302:'🌧️',305:'🌧️',308:'🌧️',311:'🌧️',314:'🌧️',317:'🌦️',320:'🌧️',323:'🌨️',326:'🌨️',329:'🌨️',332:'🌨️',335:'🌨️',338:'❄️',350:'🧊',353:'🌦️',356:'🌧️',359:'🌧️',362:'🌧️',365:'🌧️',368:'🌨️',371:'🌨️',374:'🌧️',377:'🌧️',386:'⛈️',389:'⛈️',392:'⛈️',395:'⛈️' };
-  return map[wcode] || '🌤️';
-}
-
-function renderWeatherCard(weather) {
-  if (!weather) return '<div class="card"><div class="card-header"><h3>Weather</h3></div><div style="padding:12px 16px"><p class="text-muted small">Weather data unavailable</p></div></div>';
-  const timeStr = weather.time || '';
-  const wcode = parseInt(weather.conditionCode, 10);
-  const icon = weatherIcon(wcode);
-  return `
-    <div class="card">
-      <div class="card-header">
-        <h3>&#9925; ${weather.icao} — ${weather.location || weather.icao}</h3>
-        <span class="text-muted small">${timeStr}</span>
-      </div>
-      <div style="padding:8px 16px">
-        <div style="display:flex;gap:12px;flex-wrap:wrap">
-          <div style="flex:0 0 100%;text-align:center;padding:8px 0">
-            <span style="font-size:48px;line-height:1">${icon}</span>
-            <div style="margin-top:2px;font-size:13px;font-weight:600">${weather.conditions}</div>
-          </div>
-          <div style="flex:1;text-align:center;padding:8px;background:var(--surface);border-radius:8px">
-            <div style="font-size:22px;font-weight:700">${weather.temp}&deg;C</div>
-            <div class="text-muted small">Temp</div>
-          </div>
-          <div style="flex:1;text-align:center;padding:8px;background:var(--surface);border-radius:8px">
-            <div style="font-size:22px;font-weight:700">${weather.windSpeed}${weather.windDir !== '—' ? ` ${weather.windDir}` : ''}</div>
-            <div class="text-muted small">Wind (km/h)</div>
-          </div>
-          <div style="flex:1;text-align:center;padding:8px;background:var(--surface);border-radius:8px">
-            <div style="font-size:22px;font-weight:700">${weather.humidity || '—'}%</div>
-            <div class="text-muted small">Humidity</div>
-          </div>
-        </div>
-        ${weather.visibility ? `<div style="margin-top:6px;font-size:11px;color:var(--text-muted);text-align:center">Visibility: ${weather.visibility} km</div>` : ''}
-      </div>
-    </div>`;
-}
-
 function compressImage(dataUrl, maxW = 800, maxH = 600, quality = 0.7) {
   return new Promise(resolve => {
     const img = new Image();
@@ -544,14 +460,6 @@ async function dashboardView() {
   const fuelStocks = await getFuelStock();
   const userRole = localStorage.getItem('aac_user_role');
 
-  const cached = localStorage.getItem('aac_weather_cache');
-  let weather = cached ? JSON.parse(cached) : null;
-  fetchWeather().then(fresh => {
-    if (fresh) {
-      document.getElementById('weather-card')?.replaceWith(renderWeatherCard(fresh));
-    }
-  }).catch(() => {});
-
   const tach = ac.totalTachTime;
   const hoursSinceOil = tach - ac.lastOilChangeTach;
   const hoursSince100hr = tach - ac.last100hrTach;
@@ -657,8 +565,6 @@ async function dashboardView() {
         <button class="btn btn-primary btn-block" id="issue-daily-crs-btn" style="margin-top:8px">${ac.groundedAfterInspection ? '&#9989; Issue Daily CRS for Airworthiness' : 'Issue Daily CRS'}</button>` : ''}
         ${inspectionOverdue ? `<button class="btn btn-primary btn-block" id="perform-inspection-btn" style="margin-top:8px">&#9881; Perform Inspection Sign-off</button>` : ''}
       </div>` : ''}
-
-      <div id="weather-card">${renderWeatherCard(weather)}</div>
 
       <div class="dashboard-widgets">
         <div class="dash-widget">
