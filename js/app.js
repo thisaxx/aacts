@@ -147,7 +147,6 @@ async function logActivity(type, description, relatedId) {
     createdAt: new Date().toISOString()
   };
   await DB.put('activity_log', entry).catch(() => {});
-  await DB.put('flights', entry).catch(() => {}); // backward compat
 }
 
 const INSPECTION_TEMPLATES = [
@@ -313,6 +312,7 @@ function emptyState(icon, msg) {
 
 function showConfirmDialog(title, message) {
   return new Promise(resolve => {
+    const _id = 'd' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
     const overlay = document.createElement('div');
     overlay.className = 'dialog-overlay';
     overlay.innerHTML = `
@@ -320,18 +320,18 @@ function showConfirmDialog(title, message) {
         <h3>${escHtml(title)}</h3>
         <p>${escHtml(message)}</p>
         <div class="dialog-actions">
-          <button class="btn btn-secondary" id="dialog-no">No</button>
-          <button class="btn btn-primary" id="dialog-yes">Yes</button>
+          <button class="btn btn-secondary" id="${_id}-no">No</button>
+          <button class="btn btn-primary" id="${_id}-yes">Yes</button>
         </div>
       </div>
     `;
     document.body.appendChild(overlay);
     requestAnimationFrame(() => overlay.classList.add('open'));
-    document.getElementById('dialog-yes').onclick = () => {
+    document.getElementById(_id + '-yes').onclick = () => {
       overlay.classList.remove('open');
       setTimeout(() => { overlay.remove(); resolve(true); }, 300);
     };
-    document.getElementById('dialog-no').onclick = () => {
+    document.getElementById(_id + '-no').onclick = () => {
       overlay.classList.remove('open');
       setTimeout(() => { overlay.remove(); resolve(false); }, 300);
     };
@@ -340,27 +340,28 @@ function showConfirmDialog(title, message) {
 
 function showPromptDialog(title, message) {
   return new Promise(resolve => {
+    const _id = 'p' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
     const overlay = document.createElement('div');
     overlay.className = 'dialog-overlay';
     overlay.innerHTML = `
       <div class="dialog">
         <h3>${escHtml(title)}</h3>
         <p>${escHtml(message)}</p>
-        <textarea id="dialog-input" rows="4" style="width:100%;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,0.06);background:rgba(0,0,0,0.4);color:#fff;font-size:15px;font-family:inherit;margin:12px 0;outline:none"></textarea>
+        <textarea id="${_id}-input" rows="4" style="width:100%;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,0.06);background:rgba(0,0,0,0.4);color:#fff;font-size:15px;font-family:inherit;margin:12px 0;outline:none"></textarea>
         <div class="dialog-actions">
-          <button class="btn btn-secondary" id="dialog-cancel">Cancel</button>
-          <button class="btn btn-primary" id="dialog-ok">OK</button>
+          <button class="btn btn-secondary" id="${_id}-cancel">Cancel</button>
+          <button class="btn btn-primary" id="${_id}-ok">OK</button>
         </div>
       </div>
     `;
     document.body.appendChild(overlay);
     requestAnimationFrame(() => overlay.classList.add('open'));
-    document.getElementById('dialog-ok').onclick = () => {
-      const val = document.getElementById('dialog-input').value;
+    document.getElementById(_id + '-ok').onclick = () => {
+      const val = document.getElementById(_id + '-input').value;
       overlay.classList.remove('open');
       setTimeout(() => { overlay.remove(); resolve(val); }, 300);
     };
-    document.getElementById('dialog-cancel').onclick = () => {
+    document.getElementById(_id + '-cancel').onclick = () => {
       overlay.classList.remove('open');
       setTimeout(() => { overlay.remove(); resolve(null); }, 300);
     };
@@ -2531,6 +2532,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   await initFirebase();
+
+  // One-time cleanup: remove stale activity entries mistakenly written to flights store
+  try {
+    const allFlights = await DB.getAll('flights');
+    for (const f of allFlights) {
+      if (!f.aircraftId && f.id && f.id.startsWith('act_')) {
+        await DB.del('flights', f.id);
+      }
+    }
+  } catch (e) { /* skip */ }
 
   if (typeof restoreArrivalReminders === 'function') restoreArrivalReminders();
   if (typeof restoreFlightProgressBars === 'function') restoreFlightProgressBars();

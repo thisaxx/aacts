@@ -10,7 +10,6 @@ async function logHistory(type, description, relatedId, aircraftId) {
     createdAt: new Date().toISOString()
   };
   await DB.put('activity_log', entry).catch(() => {});
-  await DB.put('flights', entry).catch(() => {}); // backward compat
 }
 
 async function getAllHistory() {

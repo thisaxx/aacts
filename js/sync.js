@@ -18,9 +18,9 @@ async function initFirebase() {
     db_firestore.settings({ merge: true });
     await firebase.auth().signInAnonymously();
     _deviceId = firebase.auth().currentUser.uid;
-    startPolling();
     initFCM();
-    processSyncQueue();
+    await processSyncQueue();
+    startPolling();
     scheduleCleanup();
   } catch (e) {
     console.warn('Firebase init failed — offline-only mode', e);
@@ -91,7 +91,7 @@ async function pullAllCollections() {
       }
       // Detect deletions on every poll (not just full sync)
       for (const [id, local] of localMap) {
-        if (!remoteIds.has(id) && local._deviceId !== _deviceId) {
+        if (!remoteIds.has(id) && local._deviceId && local._deviceId !== _deviceId) {
           await DB.del(name, id);
         }
       }
@@ -114,6 +114,10 @@ async function queueSync(collection, action, data) {
   if (!FIRESTORE_COLLECTIONS.includes(collection)) { updateSyncBadge(); return; }
   data._deviceId = _deviceId;
   data._updatedAt = Date.now();
+  // Persist _deviceId and _updatedAt locally so refresh doesn't delete them
+  if (action !== 'delete') {
+    await DB.put(collection, data).catch(() => {});
+  }
   // Strip heavy photo data before cloud sync
   const toSync = JSON.parse(JSON.stringify(data));
   if (toSync.photoData) delete toSync.photoData;

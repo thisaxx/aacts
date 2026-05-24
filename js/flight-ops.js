@@ -88,9 +88,9 @@ async function getFlights() {
 }
 
 function timeToMin(id) {
-  const v = document.getElementById(id).value;
-  if (!v) return 0;
-  const [h, m] = v.split(':').map(Number);
+  const el = document.getElementById(id);
+  if (!el || !el.value) return 0;
+  const [h, m] = el.value.split(':').map(Number);
   return h * 60 + m;
 }
 
