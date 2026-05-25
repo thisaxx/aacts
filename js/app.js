@@ -1094,7 +1094,7 @@ function navigate(view) {
   }
 
   switch (view) {
-    case 'dashboard': dashboardView(); break;
+    case 'dashboard': { const r = dashboardView(); if (r && typeof r.catch === 'function') r.catch(() => {}); } break;
     case 'live-feed': liveFeedView(); break;
     case 'flight-ops': flightOpsView(); break;
     case 'defects': defectsView(); break;
@@ -1106,7 +1106,7 @@ function navigate(view) {
     case 'profile': profileView(); break;
     case 'notifications': notificationsView(); break;
     case 'activity': activityFeedView(); break;
-    case 'reports': reportsView(); break;
+    case 'reports': { const r = reportsView(); if (r && typeof r.catch === 'function') r.catch(() => {}); } break;
     case 'settings': settingsView(); break;
   }
   // Show FAB only on flight-ops view
@@ -2502,14 +2502,17 @@ function showLoginGate() {
     }
     localStorage.setItem('aac_user', escHtml(name));
     localStorage.setItem('aac_user_role', role);
-    // Restore profile photo from DB
-    const allUsers = await DB.getAll('users');
-    const match = allUsers.find(u => u.name === name);
-    if (match && match.photo) {
-      localStorage.setItem('aac_user_photo', match.photo);
-    } else {
-      localStorage.removeItem('aac_user_photo');
-    }
+    // Show loading state immediately — no await before this
+    app.innerHTML = '<div class="page" style="display:flex;align-items:center;justify-content:center;min-height:60vh"><div style="text-align:center"><div class="spinner" style="width:32px;height:32px;border:3px solid var(--glass-border);border-top:3px solid var(--text);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px"></div><p class="text-muted">Signing in...</p></div></div>';
+    // Restore profile photo from DB (fire-and-forget, non-blocking)
+    DB.getAll('users').then(allUsers => {
+      const match = allUsers.find(u => u.name === name);
+      if (match && match.photo) {
+        localStorage.setItem('aac_user_photo', match.photo);
+      } else {
+        localStorage.removeItem('aac_user_photo');
+      }
+    }).catch(() => {});
     if (sidebar) sidebar.style.display = '';
     if (overlay) overlay.style.display = '';
     document.getElementById('hamburger-btn').style.display = '';
@@ -2539,7 +2542,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     Notification.requestPermission(); // fire-and-forget
   }
 
-  await initFirebase();
+  // Fire-and-forget: don't block the app on Firebase init (anonymous auth can hang when offline)
+  const _fbInit = initFirebase().catch(() => {});
 
   // One-time cleanup: remove stale activity entries mistakenly written to flights store
   try {
@@ -2629,6 +2633,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const defaultAC = { ...DEFAULT_AIRCRAFT, photoData: null, createdAt: new Date().toISOString() };
       await DB.put('aircraft', defaultAC);
       setCurrentAircraftKey(defaultAC.tailNumber);
+      try { await populateACSelector(); } catch (e) { /* ok */ }
     }
   } catch (e) { /* skip */ }
 

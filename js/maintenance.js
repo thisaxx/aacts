@@ -238,7 +238,7 @@ async function renderTasks() {
     btn.addEventListener('click', () => editTask(btn.dataset.id));
   });
   document.querySelectorAll('.task-comments-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const id = btn.dataset.id;
       const container = document.getElementById('task-comments-' + id);
       if (!container) return;

@@ -115,13 +115,17 @@ function getDocId(collection, data) {
 }
 
 async function queueSync(collection, action, data) {
-  if (!db_firestore) { updateSyncBadge(); return; }
   if (!FIRESTORE_COLLECTIONS.includes(collection)) { updateSyncBadge(); return; }
   data._deviceId = _deviceId;
   data._updatedAt = Date.now();
   // Persist _deviceId and _updatedAt locally so refresh doesn't delete them
   if (action !== 'delete') {
     await DB.put(collection, data).catch(() => {});
+  }
+  if (!db_firestore) {
+    await DB.put('sync_queue', { collection, action, data: JSON.parse(JSON.stringify(data)), createdAt: Date.now() }).catch(() => {});
+    updateSyncBadge();
+    return;
   }
   // Strip heavy photo data before cloud sync
   const toSync = JSON.parse(JSON.stringify(data));

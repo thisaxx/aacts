@@ -210,7 +210,7 @@ async function renderDefects() {
     btn.addEventListener('click', () => resolveDefect(btn.dataset.id));
   });
   document.querySelectorAll('.defect-comments-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const id = btn.dataset.id;
       const container = document.getElementById('defect-comments-' + id);
       if (!container) return;
