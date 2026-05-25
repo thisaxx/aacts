@@ -9,7 +9,11 @@ const firebaseConfig = {
 };
 
 let db_firestore;
-let _deviceId;
+let _deviceId = localStorage.getItem('aac_device_id');
+if (!_deviceId) {
+  _deviceId = 'device_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+  try { localStorage.setItem('aac_device_id', _deviceId); } catch (e) {}
+}
 
 async function initFirebase() {
   try {
@@ -17,7 +21,6 @@ async function initFirebase() {
     db_firestore = firebase.firestore();
     db_firestore.settings({ merge: true });
     await firebase.auth().signInAnonymously();
-    _deviceId = firebase.auth().currentUser.uid;
     let _firebaseReady = false;
     firebase.auth().onAuthStateChanged(() => { updateSyncBadge(); if (_firebaseReady) processSyncQueue(); });
     initFCM();
@@ -40,7 +43,8 @@ async function initFCM() {
       if (permission === 'granted') {
         const token = await messaging.getToken({ vapidKey: 'BPDOB1rrNFE1rDZF1kssXN6m3stPy6e69cpC7nFhkXrVq6vFw8kQRh3amP6nfw43X4T9qN4N-s6NoFzQrUYYN1o', serviceWorkerRegistration: reg });
         if (token) {
-          await db_firestore.collection('fcm_tokens').doc(_deviceId).set({ token, _deviceId, _updatedAt: Date.now() }, { merge: true });
+          const uid = firebase.auth().currentUser ? firebase.auth().currentUser.uid : _deviceId;
+          await db_firestore.collection('fcm_tokens').doc(uid).set({ token, _deviceId, _updatedAt: Date.now() }, { merge: true });
         }
         messaging.onMessage(payload => {
           if (payload.notification) {
@@ -94,10 +98,13 @@ async function pullAllCollections(fromBroadcast) {
           await DB.put(name, data);
         }
       }
-      // Detect deletions on every poll (not just full sync)
-      for (const [id, local] of localMap) {
-        if (!remoteIds.has(id) && local._deviceId && local._deviceId !== _deviceId) {
-          await DB.del(name, id);
+      // Detect deletions only on full sync (all remote docs available for comparison)
+      // Incremental syncs may miss docs updated before lastSync, so don't delete on those
+      if (isFullSync) {
+        for (const [id, local] of localMap) {
+          if (!remoteIds.has(id) && local._deviceId && local._deviceId !== _deviceId) {
+            await DB.del(name, id);
+          }
         }
       }
       return true;
@@ -180,10 +187,18 @@ async function processSyncQueue() {
         toSync._updatedAt = Date.now();
         toSync._deviceId = _deviceId;
         if (toSync.photoData) delete toSync.photoData;
+        const docId = getDocId(collection, data);
         if (action === 'delete') {
-          await db_firestore.collection(collection).doc(getDocId(collection, data)).delete();
+          await db_firestore.collection(collection).doc(docId).delete();
         } else {
-          await db_firestore.collection(collection).doc(getDocId(collection, data)).set(toSync, { merge: true });
+          await db_firestore.collection(collection).doc(docId).set(toSync, { merge: true });
+          // Sync succeeded — update local record with correct _deviceId and _updatedAt
+          const local = await DB.get(collection, docId);
+          if (local) {
+            local._deviceId = _deviceId;
+            local._updatedAt = toSync._updatedAt;
+            await DB.put(collection, local).catch(() => {});
+          }
         }
         await DB.del('sync_queue', entry.id);
         // Notify other tabs to pull latest
