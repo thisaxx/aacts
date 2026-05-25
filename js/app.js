@@ -1496,6 +1496,8 @@ function showAircraftSheet() {
     form.style.display = form.style.display === 'none' ? 'block' : 'none';
   });
 
+  document.getElementById('close-ac-btn')?.addEventListener('click', () => { if (typeof window.__sheetClose === 'function') window.__sheetClose(true); });
+
   document.getElementById('add-ac-btn')?.addEventListener('click', async () => {
     if (typeof denyGuest === 'function' && denyGuest()) return;
     const tail = document.getElementById('new-ac-tail').value.trim().toUpperCase();
@@ -1528,6 +1530,8 @@ function showAircraftSheet() {
     document.getElementById('new-ac-type').value = '';
     renderACListSheet();
     populateACSelector();
+    // Refresh the current view so dashboard shows the newly added aircraft
+    navigate(document.querySelector('.nav-link.active')?.dataset?.view || 'dashboard');
   });
 
 }
@@ -1917,6 +1921,7 @@ async function renderACListSheet() {
       showToast(`Deleted ${tail}`);
       populateACSelector();
       renderACListSheet();
+      navigate(document.querySelector('.nav-link.active')?.dataset?.view || 'dashboard');
     });
   });
 }
@@ -2025,6 +2030,7 @@ function showEditAircraftForm(ac) {
       showToast('Aircraft updated');
       window.__sheetClose(true);
       showAircraftSheet();
+      navigate(document.querySelector('.nav-link.active')?.dataset?.view || 'dashboard');
     });
     document.getElementById('cancel-edit-ac-btn').addEventListener('click', () => {
       window.__sheetClose(true);
