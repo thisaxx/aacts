@@ -79,8 +79,8 @@ async function dbGetAll(storeName) {
     const tx = db.transaction(storeName, 'readonly');
     const store = tx.objectStore(storeName);
     const req = store.getAll();
-    req.onsuccess = () => { resolve(req.result || []); db.close(); };
-    req.onerror = () => { reject(req.error); db.close(); };
+    tx.oncomplete = () => { db.close(); resolve(req.result || []); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
   });
 }
 
@@ -90,8 +90,8 @@ async function dbGet(storeName, key) {
     const tx = db.transaction(storeName, 'readonly');
     const store = tx.objectStore(storeName);
     const req = store.get(key);
-    req.onsuccess = () => { resolve(req.result || null); db.close(); };
-    req.onerror = () => { reject(req.error); db.close(); };
+    tx.oncomplete = () => { db.close(); resolve(req.result || null); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
   });
 }
 
@@ -101,8 +101,8 @@ async function dbPut(storeName, value) {
     const tx = db.transaction(storeName, 'readwrite');
     const store = tx.objectStore(storeName);
     const req = store.put(value);
-    req.onsuccess = () => { resolve(req.result); db.close(); };
-    req.onerror = () => { reject(req.error); db.close(); };
+    tx.oncomplete = () => { db.close(); resolve(req.result); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
   });
 }
 
@@ -112,8 +112,8 @@ async function dbDelete(storeName, key) {
     const tx = db.transaction(storeName, 'readwrite');
     const store = tx.objectStore(storeName);
     const req = store.delete(key);
-    req.onsuccess = () => { resolve(); db.close(); };
-    req.onerror = () => { reject(req.error); db.close(); };
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
   });
 }
 
