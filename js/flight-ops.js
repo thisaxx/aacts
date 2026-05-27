@@ -216,6 +216,10 @@ function flightOpsView() {
           <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-muted);padding:0 2px 14px;border-bottom:1px solid var(--glass-border);margin-bottom:14px">
             <span>Duration: <strong id="calc-duration" style="color:var(--gold)">—</strong></span>
           </div>
+          <div class="form-group">
+            <label for="arrival-hobbs">Hobbs End Reading</label>
+            ${stepperHTML('arrival-hobbs', 0, 0, 99999, 0.1, true)}
+          </div>
           <div class="card-header"><h3>Post-flight Fuel</h3></div>
           <div class="row">
             <div class="form-group">
@@ -310,14 +314,15 @@ function flightOpsView() {
 
     document.getElementById('flight-date').valueAsDate = new Date();
 
-    // Populate pilot dropdowns from aac_pilots
+    // Populate PIC and Trainee dropdowns from separate lists
     const pilots = (() => { try { return JSON.parse(localStorage.getItem('aac_pilots')) || []; } catch(e) { return []; } })();
-    function populatePilotDropdown(selId, placeholder) {
+    const trainees = (() => { try { return JSON.parse(localStorage.getItem('aac_trainees')) || []; } catch(e) { return []; } })();
+    function populateDropdown(selId, placeholder, list, emptyLabel) {
       const sel = document.getElementById(selId);
       if (!sel) return;
       sel.innerHTML = '<option value="">' + placeholder + '</option>';
-      if (pilots.length) {
-        pilots.forEach(name => {
+      if (list.length) {
+        list.forEach(name => {
           const opt = document.createElement('option');
           opt.value = name;
           opt.textContent = name;
@@ -326,13 +331,13 @@ function flightOpsView() {
       } else {
         const opt = document.createElement('option');
         opt.value = '';
-        opt.textContent = '— No pilots — Add in Settings > Pilot Management';
+        opt.textContent = emptyLabel;
         opt.disabled = true;
         sel.appendChild(opt);
       }
     }
-    populatePilotDropdown('pilot-name', 'Select PIC...');
-    populatePilotDropdown('trainee-name', 'None');
+    populateDropdown('pilot-name', 'Select PIC...', pilots, '— No PICs — Add in Settings > PIC Management');
+    populateDropdown('trainee-name', 'None', trainees, '— No trainees — Add in Settings > Trainee Management');
     // Prevent PIC and Trainee from being the same
     function excludeSelected(changeId, otherId) {
       const changeEl = document.getElementById(changeId);
@@ -439,6 +444,13 @@ async function showArrivalForm(flightId) {
   document.getElementById('refuel-fields').classList.add('hidden');
   const sv = document.getElementById('refuel-amount');
   if (sv) sv.value = '0';
+  // Pre-fill hobbs from aircraft current reading
+  try {
+    const ac = await getAircraft();
+    const hobbsInput = document.getElementById('arrival-hobbs');
+    if (hobbsInput) hobbsInput.value = String(ac.currentHobbs || 0);
+    if (typeof initSteppers === 'function') initSteppers();
+  } catch(e) {}
 }
 
 function updateArrivalCalc() {
@@ -615,6 +627,8 @@ async function onArrivalSubmit(e) {
   }
   const duration = durationMin / 60;
 
+  const hobbsEnd = parseFloat(document.getElementById('arrival-hobbs')?.value) || 0;
+
   const fuelAfterLeft = fuelVal('fuel-after-left');
   const fuelAfterRight = fuelVal('fuel-after-right');
   const fuelConsumed = Math.max(0, (flight.fuelBeforeLeft + flight.fuelBeforeRight) - (fuelAfterLeft + fuelAfterRight));
@@ -631,6 +645,7 @@ async function onArrivalSubmit(e) {
 
   flight.landingTime = landingTime;
   flight.flownHours = duration;
+  flight.hobbsEnd = hobbsEnd;
   flight.fuelAfterLeft = fuelAfterLeft;
   flight.fuelAfterRight = fuelAfterRight;
   flight.fuelConsumed = fuelConsumed;
@@ -648,6 +663,7 @@ async function onArrivalSubmit(e) {
   ac.engineETSO = (ac.engineETSO || 0) + duration;
   ac.propellerPTSO = (ac.propellerPTSO || 0) + duration;
   ac.totalTachTime = (ac.totalTachTime || 0) + duration;
+  if (hobbsEnd > 0) ac.currentHobbs = hobbsEnd;
   await DB.put('aircraft', ac);
   await queueSync('aircraft', 'update', ac);
   if (typeof checkAndCreateInspectionTasks === 'function') checkAndCreateInspectionTasks(ac);
@@ -695,6 +711,7 @@ async function onArrivalSubmit(e) {
   document.getElementById('calc-duration').textContent = '—';
   document.getElementById('calc-consumed').textContent = '—';
   document.getElementById('calc-rate').textContent = '—';
+  document.getElementById('arrival-hobbs').value = '0';
 
   renderAircraftStatus();
   renderIntervalBars();
@@ -1005,14 +1022,14 @@ async function editFlight(flightId) {
       <label>Pilot in Command (PIC)</label>
       <select id="edit-flight-pic" class="form-input">
         <option value="">— Select PIC —</option>
-        ${(() => { try { const pilots = JSON.parse(localStorage.getItem('aac_pilots') || '[]'); const exists = pilots.includes(flight.pilotName); if (!pilots.length && !exists) return '<option value="" disabled>— No pilots — Add in Settings > Pilot Management</option>'; return pilots.map(n => `<option value="${escHtml(n)}"${!flight.solo && n === flight.pilotName ? ' selected' : ''}>${escHtml(n)}</option>`).join('') + (!exists && !flight.solo && flight.pilotName ? `<option value="${escHtml(flight.pilotName)}" selected>${escHtml(flight.pilotName)}</option>` : ''); } catch(e) { return ''; } })()}
+        ${(() => { try { const pilots = JSON.parse(localStorage.getItem('aac_pilots') || '[]'); const exists = pilots.includes(flight.pilotName); if (!pilots.length && !exists) return '<option value="" disabled>— No PICs — Add in Settings > PIC Management</option>'; return pilots.map(n => `<option value="${escHtml(n)}"${!flight.solo && n === flight.pilotName ? ' selected' : ''}>${escHtml(n)}</option>`).join('') + (!exists && !flight.solo && flight.pilotName ? `<option value="${escHtml(flight.pilotName)}" selected>${escHtml(flight.pilotName)}</option>` : ''); } catch(e) { return ''; } })()}
       </select>
     </div>
     <div class="form-group" id="edit-trainee-group" ${flight.solo ? '' : 'style="display:none"'}>
       <label>Trainee / Second Pilot</label>
       <select id="edit-flight-trainee" class="form-input">
         <option value="">None</option>
-        ${(() => { try { const pilots = JSON.parse(localStorage.getItem('aac_pilots') || '[]'); return pilots.map(n => `<option value="${escHtml(n)}"${flight.solo && n === flight.pilotName ? ' selected' : ''}${!flight.solo && n === flight.traineeName ? ' selected' : ''}>${escHtml(n)}</option>`).join(''); } catch(e) { return ''; } })()}
+        ${(() => { try { const trainees = JSON.parse(localStorage.getItem('aac_trainees') || '[]'); return trainees.map(n => `<option value="${escHtml(n)}"${flight.solo && n === flight.pilotName ? ' selected' : ''}${!flight.solo && n === flight.traineeName ? ' selected' : ''}>${escHtml(n)}</option>`).join(''); } catch(e) { return ''; } })()}
       </select>
     </div>
     <div class="row">

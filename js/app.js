@@ -490,16 +490,21 @@ function renderFlightStatusBar(flight) {
            <div class="fsb-dot-grid"></div>
          </div>
        </div>`;
+  const crewLabel = flight.solo
+    ? `<span class="badge badge-open" style="font-size:9px">SOLO</span> <strong>${escHtml(flight.pilotName)}</strong>`
+    : flight.traineeName
+      ? `<strong>${escHtml(flight.pilotName)}</strong> <span class="badge" style="font-size:9px;background:var(--surface);color:var(--text-muted)">+${escHtml(flight.traineeName)}</span>`
+      : `<strong>${escHtml(flight.pilotName)}</strong>`;
+  const tailDisplay = flight.aircraftId ? `<span class="fsb-tail">${escHtml(flight.aircraftId)}</span>` : '';
   return `
     <div class="flight-status-bar" id="fsb-${escHtml(flight.id)}">
       <div class="flight-status-bar-glow"></div>
       <div class="flight-status-bar-inner">
-        <div class="flight-status-bar-row">
-          <span class="flight-status-bar-icon">&#9992;</span>
-          <span class="flight-status-bar-text">Airborne &middot; ${escHtml(flight.pilotName)} &middot; Dep ${escHtml(flight.takeoffTime)} ${etaDisplay}</span>
+        <div class="fsb-top-row">
+          <span class="fsb-headline">${tailDisplay} ${crewLabel} &middot; Dep ${escHtml(flight.takeoffTime)} ${etaDisplay}</span>
         </div>
         ${progressHtml}
-        <button class="btn btn-sm btn-primary" id="fsb-arrival-btn-${escHtml(flight.id)}" style="display:none;margin-top:6px;width:100%" onclick="navigate('flight-ops')">&#128644; Record Arrival</button>
+        <button class="btn btn-sm btn-primary" id="fsb-arrival-btn-${escHtml(flight.id)}" style="display:none;margin-top:8px;width:100%" onclick="navigate('flight-ops')">&#128644; Record Arrival</button>
       </div>
     </div>`;
 }
@@ -743,7 +748,7 @@ async function dashboardView() {
             flights.slice(0, 5).map(f => `
               <div class="flight-row">
                 <div style="flex:1;min-width:0">
-                  <div class="flight-pilot">${escHtml(f.pilotName)}${f.status === 'departed' ? ' <span class="badge badge-rectified" style="font-size:9px">DEP</span>' : ''}</div>
+                  <div class="flight-pilot">${escHtml(f.pilotName)}${f.solo ? ' <span class="badge badge-open" style="font-size:9px">SOLO</span>' : ''}${f.traineeName ? ' <span class="badge" style="font-size:9px;background:var(--surface);color:var(--text-muted)">+'+escHtml(f.traineeName)+'</span>' : ''}${f.status === 'departed' ? ' <span class="badge badge-rectified" style="font-size:9px">DEP</span>' : ''}</div>
                   <div class="flight-date">${f.flightDate}${f.takeoffTime ? ` &middot; ${f.takeoffTime}${f.landingTime ? '-' + f.landingTime : '...'}` : ''}</div>
                 </div>
                 <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
@@ -1404,7 +1409,8 @@ async function renderLiveFeed() {
   // Recent activity
   const allActs = [];
   flights.filter(f => f.status === 'completed' && f.flightDate === today).forEach(f => {
-    allActs.push({ time: f.landingTime || f.createdAt, icon: '&#9992;', text: `${f.pilotName} landed (${(f.flownHours*60).toFixed(0)}m)`, type: 'flight' });
+    const timeStr = f.landingTime ? `${f.flightDate}T${f.landingTime}` : f.createdAt;
+    allActs.push({ time: timeStr, icon: '&#9992;', text: `${f.pilotName} landed (${(f.flownHours*60).toFixed(0)}m)`, type: 'flight' });
   });
   defects.filter(d => (d.createdAt || '').slice(0,10) === today).forEach(d => {
     allActs.push({ time: d.createdAt, icon: d.urgency === 'grounding' ? '&#9888;' : '&#9888;', text: `${d.description} [${d.urgency}]`, type: 'defect' });
@@ -2222,13 +2228,25 @@ function settingsView() {
       </div>
 
       <div class="card">
-        <div class="card-header"><h3>Pilot Management</h3></div>
+        <div class="card-header"><h3>PIC Management</h3></div>
         <div style="padding:12px 16px" id="pilot-management">
-          <p class="text-muted small" style="margin-bottom:8px">Manage the pilot list used in flight logging. These are separate from login users — only names added here appear in the pilot dropdown.</p>
+          <p class="text-muted small" style="margin-bottom:8px">Manage the PIC (Pilot In Command) list. Only names added here appear in the PIC dropdown on the departure form.</p>
           <div id="pilot-list"></div>
           <div style="display:flex;gap:6px;margin-top:8px">
-            <input type="text" id="new-pilot-name" class="form-input" placeholder="Enter pilot name" style="flex:1">
+            <input type="text" id="new-pilot-name" class="form-input" placeholder="Enter PIC name" style="flex:1">
             <button class="btn btn-primary" id="add-pilot-btn">Add</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3>Trainee Management</h3></div>
+        <div style="padding:12px 16px" id="trainee-management">
+          <p class="text-muted small" style="margin-bottom:8px">Manage the trainee/student list. Only names added here appear in the Trainee dropdown on the departure form.</p>
+          <div id="trainee-list"></div>
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <input type="text" id="new-trainee-name" class="form-input" placeholder="Enter trainee name" style="flex:1">
+            <button class="btn btn-primary" id="add-trainee-btn">Add</button>
           </div>
         </div>
       </div>
@@ -2333,6 +2351,12 @@ function settingsView() {
     if (e.key === 'Enter') addPilot();
   });
 
+  renderTraineeList();
+  document.getElementById('add-trainee-btn').addEventListener('click', addTrainee);
+  document.getElementById('new-trainee-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addTrainee();
+  });
+
   const addUserBtn = document.getElementById('add-user-btn');
   if (addUserBtn) {
     renderUserList();
@@ -2417,6 +2441,15 @@ async function addLoginUser() {
 function getPilots() {
   try { return JSON.parse(localStorage.getItem('aac_pilots')) || []; } catch(e) { return []; }
 }
+function savePilots(list) {
+  localStorage.setItem('aac_pilots', JSON.stringify(list));
+}
+function getTrainees() {
+  try { return JSON.parse(localStorage.getItem('aac_trainees')) || []; } catch(e) { return []; }
+}
+function saveTrainees(list) {
+  localStorage.setItem('aac_trainees', JSON.stringify(list));
+}
 
 function savePilots(list) {
   localStorage.setItem('aac_pilots', JSON.stringify(list));
@@ -2466,6 +2499,49 @@ function addPilot() {
   input.value = '';
   renderPilotList();
   showToast(`Pilot "${name}" added`);
+}
+
+function renderTraineeList() {
+  const el = document.getElementById('trainee-list');
+  if (!el) return;
+  const trainees = getTrainees();
+  if (trainees.length === 0) {
+    el.innerHTML = '<div class="text-muted small" style="padding:4px 0">No trainees added yet.</div>';
+    return;
+  }
+  el.innerHTML = trainees.map((p, i) =>
+    `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:13px">${escHtml(p)}</span>
+      <button class="btn btn-small btn-danger" data-index="${i}" style="padding:2px 8px;font-size:11px">×</button>
+    </div>`
+  ).join('');
+  el.querySelectorAll('[data-index]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const trainees = getTrainees();
+      const idx = parseInt(btn.dataset.index);
+      const name = trainees[idx];
+      trainees.splice(idx, 1);
+      saveTrainees(trainees);
+      DB.del('pilots', 'trainee_' + name).catch(() => {});
+      if (typeof queueSync === 'function') queueSync('pilots', 'delete', { id: 'trainee_' + name });
+      renderTraineeList();
+    });
+  });
+}
+function addTrainee() {
+  const input = document.getElementById('new-trainee-name');
+  const name = input.value.trim();
+  if (!name) { showToast('Enter a trainee name', 'error'); return; }
+  const trainees = getTrainees();
+  if (trainees.includes(name)) { showToast('Trainee already exists', 'error'); return; }
+  trainees.push(name);
+  saveTrainees(trainees);
+  const doc = { id: 'trainee_' + name, name };
+  DB.put('pilots', doc).catch(() => {});
+  if (typeof queueSync === 'function') queueSync('pilots', 'create', doc);
+  input.value = '';
+  renderTraineeList();
+  showToast(`Trainee "${name}" added`);
 }
 
 function showLoginGate() {
@@ -2597,9 +2673,17 @@ async function initAppData() {
   try {
     const syncedPilots = await DB.getAll('pilots');
     if (syncedPilots && syncedPilots.length > 0) {
+      const picNames = [], traineeNames = [];
+      syncedPilots.forEach(p => {
+        if (p.id && p.id.startsWith('trainee_')) traineeNames.push(p.name);
+        else picNames.push(p.name);
+      });
       const localPilots = JSON.parse(localStorage.getItem('aac_pilots') || '[]');
-      const merged = [...new Set([...localPilots, ...syncedPilots.map(p => p.name)])];
+      const merged = [...new Set([...localPilots, ...picNames])];
       localStorage.setItem('aac_pilots', JSON.stringify(merged));
+      const localTrainees = JSON.parse(localStorage.getItem('aac_trainees') || '[]');
+      const mergedT = [...new Set([...localTrainees, ...traineeNames])];
+      localStorage.setItem('aac_trainees', JSON.stringify(mergedT));
     }
   } catch(e) {}
 
@@ -2625,6 +2709,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (isLight) {
     document.documentElement.setAttribute('data-theme', 'light');
   }
+  // Update theme-color meta
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  if (metaTheme) metaTheme.content = isLight ? '#f2f2f6' : '#000000';
   // Set sidebar theme toggle icon
   const themeToggle = document.getElementById('sidebar-theme-toggle');
   if (themeToggle) themeToggle.innerHTML = isLight ? '&#127774;' : '&#127769;';
@@ -2701,6 +2788,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!localStorage.getItem('aac_pilots')) {
     localStorage.setItem('aac_pilots', JSON.stringify([]));
   }
+  if (!localStorage.getItem('aac_trainees')) {
+    localStorage.setItem('aac_trainees', JSON.stringify([]));
+  }
 
   document.getElementById('ac-photo-input').addEventListener('change', async function() {
     const file = this.files[0];
@@ -2743,14 +2833,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   function toggleTheme() {
     const html = document.documentElement;
     const isLight = html.getAttribute('data-theme') === 'light';
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
     if (isLight) {
       html.removeAttribute('data-theme');
       localStorage.setItem('aac_theme', 'dark');
       document.getElementById('sidebar-theme-toggle').innerHTML = '&#127769;';
+      if (metaTheme) metaTheme.content = '#000000';
     } else {
       html.setAttribute('data-theme', 'light');
       localStorage.setItem('aac_theme', 'light');
       document.getElementById('sidebar-theme-toggle').innerHTML = '&#127774;';
+      if (metaTheme) metaTheme.content = '#f2f2f6';
     }
     showToast(isLight ? 'Dark mode' : 'Light mode');
   }
@@ -3008,7 +3101,7 @@ async function showExportSheet() {
       // Per-collection field whitelists for clean export
       const exportFields = {
         aircraft: ['tailNumber', 'type', 'totalTachTime', 'currentHobbs', 'engineETSO', 'propellerPTSO', 'engineTBO', 'propellerTBO', 'oilInterval', 'structInterval', 'lastOilChangeTach', 'last100hrTach', 'dailyCrsDate', 'dailyCrsBy'],
-        flights: ['flightDate', 'pilotName', 'takeoffTime', 'landingTime', 'flownHours', 'tachStart', 'tachEnd', 'route', 'remarks', 'fuelBeforeLeft', 'fuelBeforeRight', 'fuelAfterLeft', 'fuelAfterRight', 'fuelConsumed', 'status', 'aircraftId'],
+        flights: ['flightDate', 'pilotName', 'takeoffTime', 'landingTime', 'flownHours', 'hobbsEnd', 'tachStart', 'tachEnd', 'route', 'remarks', 'fuelBeforeLeft', 'fuelBeforeRight', 'fuelAfterLeft', 'fuelAfterRight', 'fuelConsumed', 'status', 'aircraftId'],
         defects: ['description', 'urgency', 'status', 'createdAt', 'resolvedAt', 'resolvedBy', 'resolution', 'aircraftId'],
         maintenance_tasks: ['description', 'type', 'priority', 'status', 'assignedTo', 'technicianNotes', 'rectifiedBy', 'rectifiedAt', 'releasedBy', 'releasedAt', 'createdAt', 'aircraftId'],
         fuel_stock: ['name', 'quantityLiters', 'capacity', 'minSafeLevel', 'fuelType'],
