@@ -306,6 +306,14 @@ function escHtml(str) {
   return d.innerHTML;
 }
 
+function formatDuration(hours) {
+  const totalMin = Math.round(hours * 60);
+  if (totalMin < 60) return totalMin + 'm';
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return h + 'h ' + (m > 0 ? m + 'm' : '');
+}
+
 function emptyState(icon, msg) {
   return `<div style="text-align:center;padding:24px 12px;font-family:var(--mono)">
     <div style="font-size:28px;margin-bottom:8px;opacity:0.4">${icon}</div>
@@ -752,7 +760,7 @@ async function dashboardView() {
                   <div class="flight-date">${f.flightDate}${f.takeoffTime ? ` &middot; ${f.takeoffTime}${f.landingTime ? '-' + f.landingTime : '...'}` : ''}</div>
                 </div>
                 <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
-                  ${f.status !== 'departed' ? `<div class="flight-hours">${(f.flownHours * 60).toFixed(0)}m</div>` : '<div class="flight-hours" style="opacity:0.4">—</div>'}
+                  ${f.status !== 'departed' ? `<div class="flight-hours">${formatDuration(f.flownHours)}</div>` : '<div class="flight-hours" style="opacity:0.4">—</div>'}
                 </div>
               </div>
             `).join('')
@@ -1410,7 +1418,7 @@ async function renderLiveFeed() {
   const allActs = [];
   flights.filter(f => f.status === 'completed' && f.flightDate === today).forEach(f => {
     const timeStr = f.landingTime ? `${f.flightDate}T${f.landingTime}` : f.createdAt;
-    allActs.push({ time: timeStr, icon: '&#9992;', text: `${f.pilotName} landed (${(f.flownHours*60).toFixed(0)}m)`, type: 'flight' });
+    allActs.push({ time: timeStr, icon: '&#9992;', text: `${f.pilotName} landed (${formatDuration(f.flownHours)})`, type: 'flight' });
   });
   defects.filter(d => (d.createdAt || '').slice(0,10) === today).forEach(d => {
     allActs.push({ time: d.createdAt, icon: d.urgency === 'grounding' ? '&#9888;' : '&#9888;', text: `${d.description} [${d.urgency}]`, type: 'defect' });
