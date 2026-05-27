@@ -65,12 +65,38 @@ const FIRESTORE_COLLECTIONS = [
 
 let _pollInterval;
 let _pollCount = 0;
+let _realtimeUnsubs = [];
 let _syncChannel;
 try { _syncChannel = new BroadcastChannel('aac-sync'); _syncChannel.onmessage = () => { pullAllCollections(true); }; } catch (e) { /* no BroadcastChannel support */ }
 
 function startPolling() {
-  pullAllCollections();
-  _pollInterval = setInterval(pullAllCollections, 15000);
+  startRealtimeSync();
+  _pollInterval = setInterval(pullAllCollections, 300000);
+}
+
+function startRealtimeSync() {
+  if (!db_firestore) return;
+  for (const name of FIRESTORE_COLLECTIONS) {
+    const unsub = db_firestore.collection(name).onSnapshot(snap => {
+      for (const change of snap.docChanges()) {
+        const data = change.doc.data();
+        if (change.type === 'removed' || data._deleted) {
+          DB.del(name, change.doc.id).catch(() => {});
+          continue;
+        }
+        DB.get(name, change.doc.id).then(local => {
+          if (!local || (data._updatedAt && (!local._updatedAt || data._updatedAt >= local._updatedAt))) {
+            if (local && !data.photoData && local.photoData) data.photoData = local.photoData;
+            DB.put(name, data).catch(() => {});
+          }
+        });
+      }
+      if (!snap.metadata.hasPendingWrites && typeof onRemoteUpdate === 'function') onRemoteUpdate();
+    }, err => {
+      console.warn('Realtime sync error for', name, err);
+    });
+    _realtimeUnsubs.push(unsub);
+  }
 }
 
 async function pullAllCollections(fromBroadcast) {
