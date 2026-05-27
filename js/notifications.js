@@ -1,4 +1,12 @@
 let _notifPopups = {};
+function dismissNotifPopup(popup) {
+  if (!popup || popup._dismissed) return;
+  popup._dismissed = true;
+  popup.style.transition = 'transform 0.25s ease, opacity 0.2s ease';
+  popup.style.transform = 'translateY(-80px)';
+  popup.style.opacity = '0';
+  setTimeout(() => { if (popup.parentNode) popup.parentNode.removeChild(popup); }, 300);
+}
 async function showNotifPopup(notif) {
   if (_notifPopups[notif.id]) return;
   _notifPopups[notif.id] = true;
@@ -15,21 +23,42 @@ async function showNotifPopup(notif) {
     </div>
     <button class="notif-popup-close">&times;</button>
   `;
-  popup.querySelector('.notif-popup-close').addEventListener('click', () => {
-    popup.classList.remove('show');
-    setTimeout(() => popup.remove(), 300);
+  // Swipe up to dismiss
+  let _touchStartY = 0;
+  popup.addEventListener('touchstart', e => {
+    _touchStartY = e.touches[0].clientY;
+    popup.style.transition = 'none';
+  }, { passive: true });
+  popup.addEventListener('touchmove', e => {
+    const dy = e.touches[0].clientY - _touchStartY;
+    if (dy < 0) {
+      popup.style.transform = 'translateY(' + dy + 'px)';
+      popup.style.opacity = Math.max(0, 1 + dy / 120);
+    }
+  }, { passive: true });
+  popup.addEventListener('touchend', e => {
+    const dy = e.changedTouches[0].clientY - _touchStartY;
+    if (dy < -50) {
+      dismissNotifPopup(popup);
+    } else {
+      popup.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+      popup.style.transform = '';
+      popup.style.opacity = '';
+    }
+  }, { passive: true });
+  // Close button
+  popup.querySelector('.notif-popup-close').addEventListener('click', (e) => {
+    e.stopPropagation();
+    dismissNotifPopup(popup);
   });
+  // Tap body to navigate
   popup.addEventListener('click', (e) => {
     if (e.target.closest('.notif-popup-close')) return;
-    popup.classList.remove('show');
-    setTimeout(() => popup.remove(), 300);
+    dismissNotifPopup(popup);
     if (notif.link) navigate(notif.link);
   });
   document.body.appendChild(popup);
-  setTimeout(() => {
-    popup.classList.remove('show');
-    setTimeout(() => popup.remove(), 300);
-  }, 6000);
+  setTimeout(() => dismissNotifPopup(popup), 6000);
 }
 
 async function createNotification(type, title, message, link) {
