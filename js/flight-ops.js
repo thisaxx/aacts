@@ -388,7 +388,7 @@ async function renderDepartedList() {
     <div class="flight-row departed-item" data-id="${f.id}" style="cursor:pointer;border-left:3px solid var(--gold);padding-left:10px;margin-bottom:6px">
       <div style="flex:1;min-width:0">
         <div class="flight-pilot">${escHtml(f.pilotName)}${f.solo ? ' <span class="badge badge-open" style="font-size:9px">SOLO</span>' : ''}${f.traineeName ? ' <span class="badge" style="font-size:9px;background:var(--surface);color:var(--text-muted)">+'+escHtml(f.traineeName)+'</span>' : ''} &middot; ${f.flightDate}</div>
-        <div class="flight-date">Departed ${f.takeoffTime}${f.eta ? ` &middot; ETA ${f.eta}` : ''} &middot; Pre-flight: ${((f.fuelBeforeLeft||0)+(f.fuelBeforeRight||0)).toFixed(1)} gal</div>
+        <div class="flight-date">Departed ${f.takeoffTime}${f.eta ? ` &middot; ETA ${f.eta}` : ''} &middot; Pre-flight: ${((f.fuelBeforeLeft||0)+(f.fuelBeforeRight||0)).toFixed(2)} gal</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
         <span class="badge badge-rectified" style="font-size:9px">DEPARTED</span>
@@ -460,9 +460,9 @@ function updateArrivalCalc() {
     const consumed = Math.max(0, (beforeLeft + beforeRight) - (afterLeft + afterRight));
     const durationH = (l - t) / 60;
 
-    document.getElementById('calc-consumed').textContent = consumed > 0 ? consumed.toFixed(1) + ' gal' : '—';
+    document.getElementById('calc-consumed').textContent = consumed > 0 ? consumed.toFixed(2) + ' gal' : '—';
     document.getElementById('calc-rate').textContent = (consumed > 0 && durationH > 0)
-      ? (consumed / durationH).toFixed(1) + ' gal/hr'
+      ? (consumed / durationH).toFixed(2) + ' gal/hr'
       : '—';
   });
 }
@@ -677,7 +677,7 @@ async function onArrivalSubmit(e) {
       createdAt: new Date().toISOString()
     });
     await queueSync('fuel_logs', 'create', { flightId: flight.id, fuelType, liters: refuelLiters, source: refuelSrc });
-    showToast(`Sortie completed & ${refuelAmt.toFixed(1)} gal deducted from stock`);
+    showToast(`Sortie completed & ${refuelAmt.toFixed(2)} gal deducted from stock`);
   } else {
     showToast('Sortie completed');
   }
@@ -806,7 +806,7 @@ async function showEndOfFlyingSheet() {
       id: 'insp_' + Date.now(),
       type: 'after-flight',
       aircraftId: ac2.tailNumber,
-      description: `After-flight inspection for end of flying day — ${today}${duration > 0 ? ` (${duration.toFixed(1)} tach hrs)` : ''}`,
+      description: `After-flight inspection for end of flying day — ${today}${duration > 0 ? ` (${duration.toFixed(2)} tach hrs)` : ''}`,
       priority: 'medium',
       status: 'open',
       notes: '',
@@ -822,7 +822,7 @@ async function showEndOfFlyingSheet() {
     window.__sheetClose(true);
     showToast('After-flight inspection created — rectify to ground aircraft');
     createNotification('inspection', 'After-Flight Inspection Created', `End-of-day inspection due for ${ac2.tailNumber} — rectify to ground aircraft`, 'maintenance');
-    logActivity('after_flight_created', `End-of-day after-flight inspection created for ${ac2.tailNumber} (tach: ${newTach.toFixed(1)})`, inspTask.id);
+    logActivity('after_flight_created', `End-of-day after-flight inspection created for ${ac2.tailNumber} (tach: ${newTach.toFixed(2)})`, inspTask.id);
     notifyDataChange();
   });
   document.getElementById('eof-cancel-btn').addEventListener('click', () => {
@@ -849,10 +849,10 @@ async function renderAircraftStatus() {
     statusText = `GROUNDED: ${ac.tailNumber} - Inspection overdue`;
   } else if (minRemaining <= 5) {
     statusClass = 'orange';
-    statusText = `CAUTION: ${ac.tailNumber} - ${minRemaining.toFixed(1)} hrs until next inspection`;
+    statusText = `CAUTION: ${ac.tailNumber} - ${minRemaining.toFixed(2)} hrs until next inspection`;
   } else {
     statusClass = 'green';
-    statusText = `SAFE: ${ac.tailNumber} - ${minRemaining.toFixed(1)} hrs until next inspection`;
+    statusText = `SAFE: ${ac.tailNumber} - ${minRemaining.toFixed(2)} hrs until next inspection`;
   }
 
   dot.className = 'status-dot ' + statusClass;
@@ -874,7 +874,7 @@ async function renderIntervalBars() {
       <div class="interval-label">
         <span class="label">50hr Inspection</span>
         <span class="interval-value ${hoursSinceOil >= ac.oilInterval ? 'text-red' : hoursSinceOil >= ac.oilInterval - 5 ? 'text-orange' : 'text-green'}">
-          ${oilRemaining.toFixed(1)}h left
+          ${oilRemaining.toFixed(2)}h left
         </span>
       </div>
       <div class="progress-bar">
@@ -886,7 +886,7 @@ async function renderIntervalBars() {
       <div class="interval-label">
         <span class="label">100hr Inspection</span>
         <span class="interval-value ${hoursSince100hr >= ac.structInterval ? 'text-red' : hoursSince100hr >= ac.structInterval - 5 ? 'text-orange' : 'text-green'}">
-          ${structRemaining.toFixed(1)}h left
+          ${structRemaining.toFixed(2)}h left
         </span>
       </div>
       <div class="progress-bar">
@@ -947,7 +947,7 @@ async function renderRecentFlights() {
       <div style="flex:1;min-width:0">
         <div class="flight-pilot">${escHtml(f.pilotName)}${f.solo ? ' <span class="badge badge-open" style="font-size:9px">SOLO</span>' : ''}${f.traineeName ? ' <span class="badge" style="font-size:9px;background:var(--surface);color:var(--text-muted)">+'+escHtml(f.traineeName)+'</span>' : ''}${isDeparted ? ' <span class="badge badge-rectified" style="font-size:9px">DEP</span>' : ''}</div>
         <div class="flight-date">${f.flightDate}${f.takeoffTime ? ` &middot; ${f.takeoffTime}${f.landingTime ? '-' + f.landingTime : '...'}` : ''}</div>
-        ${f.fuelConsumed ? `<div class="flight-date">Fuel: ${f.fuelConsumed.toFixed(1)} gal${f.fuelConsumed > 0 && f.flownHours > 0 ? ` &middot; ${(f.fuelConsumed / f.flownHours).toFixed(1)} gal/hr` : ''}</div>` : ''}
+        ${f.fuelConsumed ? `<div class="flight-date">Fuel: ${f.fuelConsumed.toFixed(2)} gal${f.fuelConsumed > 0 && f.flownHours > 0 ? ` &middot; ${(f.fuelConsumed / f.flownHours).toFixed(2)} gal/hr` : ''}</div>` : ''}
       </div>
       <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
         ${!isDeparted ? `<div class="flight-hours">${(f.flownHours * 60).toFixed(0)}m</div>` : '<div class="flight-hours" style="opacity:0.4">—</div>'}

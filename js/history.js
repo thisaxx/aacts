@@ -95,8 +95,8 @@ function calendarView() {
     if (!ac) { results.innerHTML = '<p class="text-muted small">No aircraft configured</p>'; return; }
     html += `<div class="card"><div class="card-header"><h3>Inspections on ${dateStr}</h3></div>`;
     if (dateStr === new Date().toISOString().slice(0, 10) || (calFrom && calTo)) {
-      html += `<div class="interval-item"><div class="interval-label"><span class="label">50hr Inspection</span><span class="interval-value ${insp.oilClass}">${insp.oilRemaining.toFixed(1)}h left</span></div><div class="progress-bar"><div class="progress-fill ${insp.oilFill}" style="width:${insp.oilPct}%"></div></div></div>`;
-      html += `<div class="interval-item"><div class="interval-label"><span class="label">100hr Inspection</span><span class="interval-value ${insp.structClass}">${insp.structRemaining.toFixed(1)}h left</span></div><div class="progress-bar"><div class="progress-fill ${insp.structFill}" style="width:${insp.structPct}%"></div></div></div>`;
+      html += `<div class="interval-item"><div class="interval-label"><span class="label">50hr Inspection</span><span class="interval-value ${insp.oilClass}">${insp.oilRemaining.toFixed(2)}h left</span></div><div class="progress-bar"><div class="progress-fill ${insp.oilFill}" style="width:${insp.oilPct}%"></div></div></div>`;
+      html += `<div class="interval-item"><div class="interval-label"><span class="label">100hr Inspection</span><span class="interval-value ${insp.structClass}">${insp.structRemaining.toFixed(2)}h left</span></div><div class="progress-bar"><div class="progress-fill ${insp.structFill}" style="width:${insp.structPct}%"></div></div></div>`;
     } else {
       html += `<p class="text-muted small">No inspection data for this date</p>`;
     }
@@ -171,6 +171,6 @@ function checkInspectionNotifications() {
     const insp = getInspectionStatus(ac);
     if (insp.oilRemaining <= 0) showToast('⚠ 50hr inspection overdue', 'error');
     if (insp.structRemaining <= 0) showToast('⚠ 100hr inspection overdue', 'error');
-    else if (insp.structRemaining <= 5) showToast(`🔧 Structural inspection due in ${insp.structRemaining.toFixed(1)}h`, 'warning');
+    else if (insp.structRemaining <= 5) showToast(`🔧 Structural inspection due in ${insp.structRemaining.toFixed(2)}h`, 'warning');
   });
 }

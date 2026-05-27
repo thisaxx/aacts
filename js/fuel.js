@@ -232,7 +232,7 @@ async function updateFuelStockQty(id, qty) {
   await queueSync('fuel_stock', 'update', stock);
   // Log the adjustment
   if (diff !== 0) {
-    const reason = await showPromptDialog('Stock Adjustment', `Reason for ${diff > 0 ? 'adding' : 'removing'} ${Math.abs(diff).toFixed(1)}L ${stock.name}?`);
+    const reason = await showPromptDialog('Stock Adjustment', `Reason for ${diff > 0 ? 'adding' : 'removing'} ${Math.abs(diff).toFixed(2)}L ${stock.name}?`);
     if (reason) {
       await DB.put('fuel_logs', {
         id: 'fuellog_' + Date.now(),
@@ -274,11 +274,11 @@ async function renderFuelTrends() {
     <div style="padding:8px 0">
       <div style="display:flex;gap:16px;margin-bottom:12px">
         <div style="flex:1;text-align:center">
-          <div style="font-size:20px;font-weight:700">${avg.toFixed(1)}</div>
+          <div style="font-size:20px;font-weight:700">${avg.toFixed(2)}</div>
           <div class="text-muted small">Avg gal/flight</div>
         </div>
         <div style="flex:1;text-align:center">
-          <div style="font-size:20px;font-weight:700">${avgRate.toFixed(1)}</div>
+          <div style="font-size:20px;font-weight:700">${avgRate.toFixed(2)}</div>
           <div class="text-muted small">Avg gal/hr</div>
         </div>
         <div style="flex:1;text-align:center">
@@ -355,9 +355,9 @@ async function renderFuelTrends() {
         tooltip: {
           callbacks: {
             label: function(ctx) {
-              if (ctx.datasetIndex === 0) return `Fuel: ${ctx.parsed.y.toFixed(1)} gal`;
-              if (ctx.datasetIndex === 1) return `Rate: ${ctx.parsed.y.toFixed(1)} gal/hr`;
-              return `Avg: ${avgRate.toFixed(1)} gal/hr`;
+              if (ctx.datasetIndex === 0) return `Fuel: ${ctx.parsed.y.toFixed(2)} gal`;
+              if (ctx.datasetIndex === 1) return `Rate: ${ctx.parsed.y.toFixed(2)} gal/hr`;
+              return `Avg: ${avgRate.toFixed(2)} gal/hr`;
             }
           }
         }

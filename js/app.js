@@ -171,7 +171,7 @@ async function checkAndCreateInspectionTasks(ac) {
       if (elapsed >= threshold) {
         const hasOpen = acTasks.some(t => t.type === tmpl.type && t.status === 'open');
         if (!hasOpen) {
-          const hrsDesc = elapsed > interval ? `${elapsed.toFixed(1)} hrs (overdue by ${(elapsed - interval).toFixed(1)})` : `${elapsed.toFixed(1)} hrs since last (${(interval - elapsed).toFixed(1)} hrs remaining)`;
+          const hrsDesc = elapsed > interval ? `${elapsed.toFixed(2)} hrs (overdue by ${(elapsed - interval).toFixed(2)})` : `${elapsed.toFixed(2)} hrs since last (${(interval - elapsed).toFixed(2)} hrs remaining)`;
           const task = {
             id: 'mnt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
             aircraftId: ac.tailNumber,
@@ -611,15 +611,15 @@ async function dashboardView() {
           <div class="stat-label">Total Flights</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value">${totalHours.toFixed(1)}</div>
+          <div class="stat-value">${totalHours.toFixed(2)}</div>
           <div class="stat-label">Total Hours</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value">${todayHours.toFixed(1)}</div>
+          <div class="stat-value">${todayHours.toFixed(2)}</div>
           <div class="stat-label">Today's Hours</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value">${(ac.currentHobbs || 0).toFixed(1)}</div>
+          <div class="stat-value">${(ac.currentHobbs || 0).toFixed(2)}</div>
           <div class="stat-label">Hobbs</div>
         </div>
       </div>
@@ -637,14 +637,14 @@ async function dashboardView() {
         <div class="dash-widget">
           <div class="dw-icon">&#128197;</div>
           <div class="dw-info">
-            <div class="dw-value ${inspectionOverdue ? 'text-red' : oilRemaining <= 5 ? 'text-orange' : 'text-green'}">${oilRemaining.toFixed(1)}h</div>
+            <div class="dw-value ${inspectionOverdue ? 'text-red' : oilRemaining <= 5 ? 'text-orange' : 'text-green'}">${oilRemaining.toFixed(2)}h</div>
             <div class="dw-label">50hr Inspection Left</div>
           </div>
         </div>
         <div class="dash-widget">
           <div class="dw-icon">&#128197;</div>
           <div class="dw-info">
-            <div class="dw-value ${structRemaining <= 0 ? 'text-red' : structRemaining <= 5 ? 'text-orange' : 'text-green'}">${structRemaining.toFixed(1)}h</div>
+            <div class="dw-value ${structRemaining <= 0 ? 'text-red' : structRemaining <= 5 ? 'text-orange' : 'text-green'}">${structRemaining.toFixed(2)}h</div>
             <div class="dw-label">100hr Inspection Left</div>
           </div>
         </div>
@@ -682,7 +682,7 @@ async function dashboardView() {
             <div class="interval-label">
               <span class="label">50hr Inspection</span>
               <span class="interval-value ${hoursSinceOil >= ac.oilInterval ? 'text-red' : hoursSinceOil >= ac.oilInterval - 5 ? 'text-orange' : 'text-green'}">
-                ${oilRemaining.toFixed(1)}h left
+                ${oilRemaining.toFixed(2)}h left
               </span>
             </div>
             <div class="progress-bar">
@@ -694,7 +694,7 @@ async function dashboardView() {
             <div class="interval-label">
               <span class="label">100hr Inspection</span>
               <span class="interval-value ${hoursSince100hr >= ac.structInterval ? 'text-red' : hoursSince100hr >= ac.structInterval - 5 ? 'text-orange' : 'text-green'}">
-                ${structRemaining.toFixed(1)}h left
+                ${structRemaining.toFixed(2)}h left
               </span>
             </div>
             <div class="progress-bar">
@@ -714,7 +714,7 @@ async function dashboardView() {
               <div class="interval-item">
                 <div class="interval-label">
                   <span class="label">Engine TSO</span>
-                  <span class="interval-value ${etso >= eTBO ? 'text-red' : etso >= eTBO - 50 ? 'text-orange' : 'text-green'}">${etso.toFixed(1)}h / ${eTBO}h</span>
+                  <span class="interval-value ${etso >= eTBO ? 'text-red' : etso >= eTBO - 50 ? 'text-orange' : 'text-green'}">${etso.toFixed(2)}h / ${eTBO}h</span>
                 </div>
                 <div class="progress-bar">
                   <div class="progress-fill ${etso >= eTBO ? 'fill-red' : etso >= eTBO - 50 ? 'fill-orange' : 'fill-green'}" style="width:${ePct}%"></div>
@@ -723,7 +723,7 @@ async function dashboardView() {
               <div class="interval-item">
                 <div class="interval-label">
                   <span class="label">Propeller TSO</span>
-                  <span class="interval-value ${ptso >= pTBO ? 'text-red' : ptso >= pTBO - 50 ? 'text-orange' : 'text-green'}">${ptso.toFixed(1)}h / ${pTBO}h</span>
+                  <span class="interval-value ${ptso >= pTBO ? 'text-red' : ptso >= pTBO - 50 ? 'text-orange' : 'text-green'}">${ptso.toFixed(2)}h / ${pTBO}h</span>
                 </div>
                 <div class="progress-bar">
                   <div class="progress-fill ${ptso >= pTBO ? 'fill-red' : ptso >= pTBO - 50 ? 'fill-orange' : 'fill-green'}" style="width:${pPct}%"></div>
@@ -790,7 +790,7 @@ async function dashboardView() {
       const oilCheckConfirm = await new Promise(resolve => {
         const sheetPromise = showBottomSheet(`
           <div class="card-header"><h3>&#128167; Pre-Flight Oil Check — ${escHtml(ac.tailNumber)}</h3></div>
-          <p class="text-muted small" style="margin-bottom:12px">Oil change due every ${ac.oilInterval || 50} tach hrs. Current: ${hoursSinceOil.toFixed(1)} hrs since last change.${oilDue ? ' <strong class="text-red">Oil change overdue.</strong>' : ''}</p>
+          <p class="text-muted small" style="margin-bottom:12px">Oil change due every ${ac.oilInterval || 50} tach hrs. Current: ${hoursSinceOil.toFixed(2)} hrs since last change.${oilDue ? ' <strong class="text-red">Oil change overdue.</strong>' : ''}</p>
           <div class="form-group">
             <label>Oil Level</label>
             <select id="oil-level" class="form-input">
@@ -900,12 +900,12 @@ async function reportsView() {
     <div class="page">
       <div class="page-header">
         <h2>&#128200; Flight Reports</h2>
-        <div class="subtitle">${ac ? escHtml(ac.tailNumber) : 'N/A'} &middot; ${escHtml(String(thisYear))} total: ${yearHours.toFixed(1)}h</div>
+        <div class="subtitle">${ac ? escHtml(ac.tailNumber) : 'N/A'} &middot; ${escHtml(String(thisYear))} total: ${yearHours.toFixed(2)}h</div>
       </div>
       <div class="report-grid">`;
   const cards = [
     { icon: '&#9992;', label: `${flights.length} Flights` },
-    { icon: '&#9201;', label: `${flights.reduce((s,f) => s+(f.flownHours||0),0).toFixed(1)} Total Hrs` },
+    { icon: '&#9201;', label: `${flights.reduce((s,f) => s+(f.flownHours||0),0).toFixed(2)} Total Hrs` },
     { icon: '&#128101;', label: `${Object.keys(pilotTotals).length} Pilots` },
     { icon: '&#128197;', label: `${months.length} Months` }
   ];
@@ -920,7 +920,7 @@ async function reportsView() {
     html += `
       <div style="margin-bottom:8px">
         <div style="display:flex;justify-content:space-between;font-size:12px">
-          <span>${escHtml(pilot)}</span><span>${hrs.toFixed(1)}h</span>
+          <span>${escHtml(pilot)}</span><span>${hrs.toFixed(2)}h</span>
         </div>
         <div class="progress-bar" style="height:6px"><div class="progress-fill fill-green" style="width:${pct}%;height:6px"></div></div>
       </div>`;
@@ -932,7 +932,7 @@ async function reportsView() {
   months.forEach(m => {
     const d = monthly[m];
     html += `<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid var(--glass-border)">
-      <span>${m}</span><span>${d.hours.toFixed(1)}h (${d.count} flights)</span>
+      <span>${m}</span><span>${d.hours.toFixed(2)}h (${d.count} flights)</span>
     </div>`;
   });
   html += `</div></div>`;
@@ -1210,8 +1210,8 @@ async function updateSidebarInspections() {
     if (!ac) { el.innerHTML = '<div class="sidebar-insp-item"><span class="text-muted small">No aircraft</span></div>'; return; }
     const insp = getInspectionStatus(ac);
     el.innerHTML = `
-      <div class="sidebar-insp-item"><span>50hr Inspection</span><span class="${insp.oilClass}">${insp.oilRemaining.toFixed(1)}h</span></div>
-      <div class="sidebar-insp-item"><span>100hr Inspection</span><span class="${insp.structClass}">${insp.structRemaining.toFixed(1)}h</span></div>
+      <div class="sidebar-insp-item"><span>50hr Inspection</span><span class="${insp.oilClass}">${insp.oilRemaining.toFixed(2)}h</span></div>
+      <div class="sidebar-insp-item"><span>100hr Inspection</span><span class="${insp.structClass}">${insp.structRemaining.toFixed(2)}h</span></div>
     `;
   } catch (e) {}
 }
@@ -1576,8 +1576,8 @@ async function showComponentsSheet(ac) {
           <div style="flex:1;min-width:0">
             <strong>${escHtml(c.name)}</strong>
             <div class="flight-date">SN: ${escHtml(c.serialNumber || '—')} &middot; PN: ${escHtml(c.partNumber || '—')}</div>
-            <div class="flight-date">Installed: ${c.installDate || '—'} @ ${c.installTach ? c.installTach.toFixed(1) + 'h' : '—'} &middot; ${hoursOnComp.toFixed(1)}h used</div>
-            ${c.lifeLimit > 0 ? `<div class="progress-bar" style="margin-top:4px;height:6px"><div class="progress-fill ${overdue ? 'fill-red' : lifePct > 80 ? 'fill-orange' : 'fill-green'}" style="width:${Math.min(100, lifePct)}%"></div></div><div style="font-size:10px;color:${overdue ? 'var(--danger)' : 'var(--text-muted)'}">${overdue ? 'OVERDUE' : Math.max(0, c.lifeLimit - hoursOnComp).toFixed(1) + 'h remaining'}</div>` : ''}
+            <div class="flight-date">Installed: ${c.installDate || '—'} @ ${c.installTach ? c.installTach.toFixed(2) + 'h' : '—'} &middot; ${hoursOnComp.toFixed(2)}h used</div>
+            ${c.lifeLimit > 0 ? `<div class="progress-bar" style="margin-top:4px;height:6px"><div class="progress-fill ${overdue ? 'fill-red' : lifePct > 80 ? 'fill-orange' : 'fill-green'}" style="width:${Math.min(100, lifePct)}%"></div></div><div style="font-size:10px;color:${overdue ? 'var(--danger)' : 'var(--text-muted)'}">${overdue ? 'OVERDUE' : Math.max(0, c.lifeLimit - hoursOnComp).toFixed(2) + 'h remaining'}</div>` : ''}
           </div>
           <button class="btn btn-sm btn-danger del-comp-btn" data-id="${c.id}" style="margin-top:4px">&times;</button>
         </div>`;
@@ -1605,7 +1605,7 @@ async function showComponentsSheet(ac) {
       </div>
       <div class="form-group">
         <label>Install Tach (hrs)</label>
-        <input type="number" id="comp-install-tach" class="form-input" value="${(ac.totalTachTime || 0).toFixed(1)}" step="0.1">
+        <input type="number" id="comp-install-tach" class="form-input" value="${(ac.totalTachTime || 0).toFixed(2)}" step="0.1">
       </div>
     </div>
     <div class="form-group">
@@ -1703,18 +1703,18 @@ async function generateDailyTechLog() {
   const hoursSince100hr = (ac.totalTachTime || 0) - (ac.last100hrTach || 0);
   const isAirworthy = ac.dailyCrsDate === today && !ac.groundedAfterInspection;
   y = row('Status:', isAirworthy ? 'AIRWORTHY' : 'GROUNDED — CRS PENDING', y);
-  y = row('Tach Time:', (ac.totalTachTime || 0).toFixed(1) + ' hrs', y);
-  y = row('Hobbs:', (ac.currentHobbs || 0).toFixed(1) + ' hrs', y);
-  y = row('50hr Inspection Remaining:', Math.max(0, (ac.oilInterval || 50) - hoursSinceOil).toFixed(1) + ' hrs', y);
-  y = row('100hr Inspection Remaining:', Math.max(0, (ac.structInterval || 100) - hoursSince100hr).toFixed(1) + ' hrs', y);
-  y = row('Engine TSO:', (ac.engineETSO || 0).toFixed(1) + ' / ' + (ac.engineTBO || 2000) + ' hrs', y);
-  y = row('Prop TSO:', (ac.propellerPTSO || 0).toFixed(1) + ' / ' + (ac.propellerTBO || 2000) + ' hrs', y);
+  y = row('Tach Time:', (ac.totalTachTime || 0).toFixed(2) + ' hrs', y);
+  y = row('Hobbs:', (ac.currentHobbs || 0).toFixed(2) + ' hrs', y);
+  y = row('50hr Inspection Remaining:', Math.max(0, (ac.oilInterval || 50) - hoursSinceOil).toFixed(2) + ' hrs', y);
+  y = row('100hr Inspection Remaining:', Math.max(0, (ac.structInterval || 100) - hoursSince100hr).toFixed(2) + ' hrs', y);
+  y = row('Engine TSO:', (ac.engineETSO || 0).toFixed(2) + ' / ' + (ac.engineTBO || 2000) + ' hrs', y);
+  y = row('Prop TSO:', (ac.propellerPTSO || 0).toFixed(2) + ' / ' + (ac.propellerTBO || 2000) + ' hrs', y);
   y = row('Daily CRS:', ac.dailyCrsDate === today ? 'Issued by ' + (ac.dailyCrsBy || '—') : 'NOT ISSUED', y);
   y += 2; doc.line(left, y, right, y); y += 5;
 
   // ── Flight Summary ──
   y = hdr('Flight Summary', y);
-  y = row('Total Today:', todayFlights.length + ' flights / ' + todayHours.toFixed(1) + ' hrs', y);
+  y = row('Total Today:', todayFlights.length + ' flights / ' + todayHours.toFixed(2) + ' hrs', y);
   y += 2;
 
   if (todayFlights.length > 0) {
@@ -1731,9 +1731,9 @@ async function generateDailyTechLog() {
       doc.text((f.pilotName || '—').slice(0, 14), left, y);
       doc.text(f.takeoffTime || '--', left + 50, y);
       doc.text(f.landingTime || '--', left + 80, y);
-      doc.text((f.flownHours || 0).toFixed(1), left + 105, y);
+      doc.text((f.flownHours || 0).toFixed(2), left + 105, y);
       doc.text((f.route || '—').slice(0, 12), left + 125, y);
-      doc.text(fuelUsed.toFixed(1) + ' gal', left + 165, y);
+      doc.text(fuelUsed.toFixed(2) + ' gal', left + 165, y);
       y += 4;
       if (f.remarks) { doc.setFontSize(7); doc.setTextColor(120); doc.text('    Remarks: ' + f.remarks, left, y); doc.setTextColor(0); doc.setFontSize(8); y += 3; }
     }
@@ -1783,7 +1783,7 @@ async function generateDailyTechLog() {
   for (const fs of fuelStocks) {
     if (fs.aircraftId && fs.aircraftId !== ac.tailNumber) continue;
     const pct = fs.capacity > 0 ? ((fs.quantityLiters / fs.capacity) * 100).toFixed(0) : '—';
-    y = row((fs.name || fs.id || 'Fuel').charAt(0).toUpperCase() + (fs.name || fs.id || 'Fuel').slice(1) + ':', fs.quantityLiters.toFixed(1) + 'L / ' + (fs.capacity || '—') + 'L (' + pct + '%)', y);
+    y = row((fs.name || fs.id || 'Fuel').charAt(0).toUpperCase() + (fs.name || fs.id || 'Fuel').slice(1) + ':', fs.quantityLiters.toFixed(2) + 'L / ' + (fs.capacity || '—') + 'L (' + pct + '%)', y);
   }
   if (fuelStocks.length === 0) { doc.setFontSize(8); doc.setTextColor(120); doc.text('No fuel data.', left, y); doc.setTextColor(0); y += 4; }
   y += 2; doc.line(left, y, right, y); y += 5;
@@ -1842,8 +1842,8 @@ async function renderACListSheet() {
         </div>
         <div class="text-muted small">${escHtml(ac.type || 'Aircraft')}</div>
         ${ac.tailNumber === current ? `      <div class="ac-list-tso">
-          <span>Engine TSO: ${(ac.engineETSO || 0).toFixed(1)}h</span>
-          <span>Prop TSO: ${(ac.propellerPTSO || 0).toFixed(1)}h</span>
+          <span>Engine TSO: ${(ac.engineETSO || 0).toFixed(2)}h</span>
+          <span>Prop TSO: ${(ac.propellerPTSO || 0).toFixed(2)}h</span>
         </div>` : ''}
         ${canEdit ? `<div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">
           <button class="btn btn-ghost edit-ac-btn" data-tail="${ac.tailNumber}" style="font-size:9px;padding:4px 8px">Edit</button>
