@@ -25,6 +25,7 @@ async function getParts() {
 }
 
 function inventoryView() {
+  if (typeof denyGuest === 'function' && denyGuest()) return;
   const app = document.getElementById('app');
   app.innerHTML = `
     <div class="page">

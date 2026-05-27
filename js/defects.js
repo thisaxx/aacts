@@ -12,6 +12,7 @@ async function getOpenDefects() {
 }
 
 function defectsView() {
+  if (typeof denyGuest === 'function' && denyGuest()) return;
   const app = document.getElementById('app');
   app.innerHTML = `
     <div class="page">

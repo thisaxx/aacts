@@ -115,6 +115,7 @@ function timeToMin(id) {
 function fuelVal(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
 
 function flightOpsView() {
+  if (typeof denyGuest === 'function' && denyGuest()) return;
   const app = document.getElementById('app');
   getAircraft().then(ac => {
     if (!ac) {

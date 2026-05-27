@@ -27,6 +27,7 @@ async function getAllHistory() {
 }
 
 function calendarView() {
+  if (typeof denyGuest === 'function' && denyGuest()) return;
   const app = document.getElementById('app');
   const today = new Date().toISOString().slice(0, 10);
   app.innerHTML = `

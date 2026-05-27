@@ -208,6 +208,7 @@ async function getActivityFeed(limit = 50) {
 }
 
 function activityFeedView() {
+  if (typeof denyGuest === 'function' && denyGuest()) return;
   const app = document.getElementById('app');
   app.innerHTML = `
     <div class="page">
@@ -860,6 +861,7 @@ async function dashboardView() {
 
 /* ── Reports View ── */
 async function reportsView() {
+  if (typeof denyGuest === 'function' && denyGuest()) return;
   const app = document.getElementById('app');
   const ac = await getAircraft();
   const allFlights = await DB.getAll('flights');
@@ -1202,6 +1204,7 @@ async function updateSidebarInspections() {
 
 /* ── Profile View ── */
 function profileView() {
+  if (typeof denyGuest === 'function' && denyGuest()) return;
   const app = document.getElementById('app');
   const name = localStorage.getItem('aac_user') || '';
   const role = localStorage.getItem('aac_user_role') || '';
@@ -1347,6 +1350,7 @@ function profileView() {
 
 /* ── Live Feed ── */
 function liveFeedView() {
+  if (typeof denyGuest === 'function' && denyGuest()) return;
   const app = document.getElementById('app');
   app.innerHTML = `
     <div class="page">
@@ -1459,6 +1463,7 @@ async function renderLiveFeed() {
 }
 
 function showAircraftSheet() {
+  if (typeof denyGuest === 'function' && denyGuest()) return;
   const canEdit = hasRole('engineer','production_planner','admin');
   showBottomSheet(`
     <div class="card-header"><h3>Fleet Manager</h3></div>
@@ -2086,6 +2091,7 @@ async function populateACSelector() {
 }
 
 function settingsView() {
+  if (typeof denyGuest === 'function' && denyGuest()) return;
   const app = document.getElementById('app');
   const role = localStorage.getItem('aac_user_role');
   const name = localStorage.getItem('aac_user');
