@@ -70,7 +70,7 @@ try { _syncChannel = new BroadcastChannel('aac-sync'); _syncChannel.onmessage = 
 
 function startPolling() {
   pullAllCollections();
-  _pollInterval = setInterval(pullAllCollections, 60000);
+  _pollInterval = setInterval(pullAllCollections, 15000);
 }
 
 async function pullAllCollections(fromBroadcast) {
@@ -79,7 +79,7 @@ async function pullAllCollections(fromBroadcast) {
   // Broadcast-triggered pulls: use a 60s lookback so cross-tab writes aren't missed
   if (fromBroadcast && lastSync > 0) lastSync = Date.now() - 60000;
   _pollCount++;
-  const isFullSync = lastSync === 0 || _pollCount % 10 === 0;
+  const isFullSync = lastSync === 0 || _pollCount % 40 === 0;
   // Capture wall-clock time BEFORE query to avoid write-gap window
   const queryTime = Date.now();
   const hadRemote = await Promise.all(FIRESTORE_COLLECTIONS.map(async name => {
