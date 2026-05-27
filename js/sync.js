@@ -12,6 +12,7 @@ const FIRESTORE_COLLECTIONS = [
 let _pollInterval;
 let _pollCount = 0;
 let _syncChannel;
+let _realtimeListenersRegistered = false;
 try { _syncChannel = new BroadcastChannel('aac-sync'); _syncChannel.onmessage = () => { pullAllCollections(true); }; } catch (e) { /* no BroadcastChannel support */ }
 
 function startPolling() {
@@ -26,6 +27,7 @@ async function initSync() {
   try {
     await insforge.realtime.connect();
     startPolling();
+    processSyncQueue();
   } catch (e) {
     console.warn('InsForge sync init failed — offline-only mode', e);
     startPolling();
@@ -37,25 +39,26 @@ function startRealtimeSync() {
   if (typeof InsForge === 'undefined') return;
   const insforge = InsForge.insforge;
   if (!insforge.realtime.isConnected) return;
-  for (const name of FIRESTORE_COLLECTIONS) {
-    const channel = 'sync:' + name;
-    insforge.realtime.subscribe(channel).then(({ ok }) => {
-      if (!ok) return;
-      insforge.realtime.on('sync_insert', async (payload) => {
-        if (payload.collection !== name) return;
-        await pullDoc(name, payload.id);
-      });
-      insforge.realtime.on('sync_update', async (payload) => {
-        if (payload.collection !== name) return;
-        await pullDoc(name, payload.id);
-      });
-      insforge.realtime.on('sync_delete', async (payload) => {
-        if (payload.collection !== name) return;
-        await DB.del(name, payload.id).catch(() => {});
-        if (typeof onRemoteUpdate === 'function') onRemoteUpdate();
-      });
-    }).catch(() => {});
+  if (!_realtimeListenersRegistered) {
+    _realtimeListenersRegistered = true;
+    insforge.realtime.on('sync_insert', handleSyncEvent);
+    insforge.realtime.on('sync_update', handleSyncEvent);
+    insforge.realtime.on('sync_delete', handleSyncDelete);
   }
+  for (const name of FIRESTORE_COLLECTIONS) {
+    insforge.realtime.subscribe('sync:' + name).catch(() => {});
+  }
+}
+
+async function handleSyncEvent(payload) {
+  if (!payload || !payload.collection || !FIRESTORE_COLLECTIONS.includes(payload.collection)) return;
+  await pullDoc(payload.collection, payload.id);
+}
+
+async function handleSyncDelete(payload) {
+  if (!payload || !payload.collection || !FIRESTORE_COLLECTIONS.includes(payload.collection)) return;
+  await DB.del(payload.collection, payload.id).catch(() => {});
+  if (typeof onRemoteUpdate === 'function') onRemoteUpdate();
 }
 
 async function pullDoc(collection, docId) {
@@ -71,10 +74,11 @@ async function pullDoc(collection, docId) {
     if (data._deleted) {
       await DB.del(collection, docId).catch(() => {});
     } else {
-      const docData = data.data;
+      const docData = data.data || {};
       docData._updatedAt = data._updated_at;
       docData._deviceId = data._device_id;
-      if (collection === 'aircraft') docData.tailNumber = docData.tailNumber || data.id;
+      if (collection === 'aircraft' && !docData.tailNumber) docData.tailNumber = data.id;
+      if (collection === 'parts' && !docData.partNumber) docData.partNumber = data.id;
       const local = await DB.get(collection, docId).catch(() => null);
       if (local && !docData.photoData && local.photoData) docData.photoData = local.photoData;
       await DB.put(collection, docData).catch(() => {});
@@ -97,10 +101,7 @@ async function pullAllCollections(fromBroadcast) {
       const { data, error } = await query;
       if (error) continue;
       const localDocs = await DB.getAll(name);
-      const localMap = new Map(localDocs.map(d => {
-        const id = getDocId(name, d);
-        return [id, d];
-      }));
+      const localMap = new Map(localDocs.map(d => [getDocId(name, d), d]));
       const remoteIds = new Set();
       for (const doc of data || []) {
         remoteIds.add(doc.id);
@@ -113,8 +114,8 @@ async function pullAllCollections(fromBroadcast) {
           const docData = doc.data || {};
           docData._updatedAt = doc._updated_at;
           docData._deviceId = doc._device_id;
-          if (name === 'aircraft') docData.tailNumber = docData.tailNumber || doc.id;
-          if (name === 'parts') docData.partNumber = docData.partNumber || doc.id;
+          if (name === 'aircraft' && !docData.tailNumber) docData.tailNumber = doc.id;
+          if (name === 'parts' && !docData.partNumber) docData.partNumber = doc.id;
           if (!docData.id) docData.id = doc.id;
           if (local && !docData.photoData && local.photoData) docData.photoData = local.photoData;
           await DB.put(name, docData).catch(() => {});
