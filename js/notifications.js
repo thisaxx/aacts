@@ -181,6 +181,7 @@ function notificationsView() {
     }
     updateNotifBadge();
     renderNotifList();
+    if (typeof pullAllCollections === 'function') pullAllCollections();
     showToast('All notifications cleared');
   });
 

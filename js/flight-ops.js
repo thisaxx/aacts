@@ -312,8 +312,7 @@ function flightOpsView() {
 
     // Populate pilot dropdowns from aac_pilots
     const pilots = (() => { try { return JSON.parse(localStorage.getItem('aac_pilots')) || []; } catch(e) { return []; } })();
-    const defaultPic = localStorage.getItem('aac_pic') || '';
-    function populatePilotDropdown(selId, defaultVal, placeholder) {
+    function populatePilotDropdown(selId, placeholder) {
       const sel = document.getElementById(selId);
       if (!sel) return;
       sel.innerHTML = '<option value="">' + placeholder + '</option>';
@@ -322,7 +321,6 @@ function flightOpsView() {
           const opt = document.createElement('option');
           opt.value = name;
           opt.textContent = name;
-          if (name === defaultVal) opt.selected = true;
           sel.appendChild(opt);
         });
       } else {
@@ -333,8 +331,21 @@ function flightOpsView() {
         sel.appendChild(opt);
       }
     }
-    populatePilotDropdown('pilot-name', defaultPic, 'Select PIC...');
-    populatePilotDropdown('trainee-name', '', 'None');
+    populatePilotDropdown('pilot-name', 'Select PIC...');
+    populatePilotDropdown('trainee-name', 'None');
+    // Prevent PIC and Trainee from being the same
+    function excludeSelected(changeId, otherId) {
+      const changeEl = document.getElementById(changeId);
+      const otherEl = document.getElementById(otherId);
+      if (!changeEl || !otherEl) return;
+      changeEl.addEventListener('change', () => {
+        if (otherEl.value && otherEl.value === changeEl.value) {
+          otherEl.value = '';
+        }
+      });
+    }
+    excludeSelected('pilot-name', 'trainee-name');
+    excludeSelected('trainee-name', 'pilot-name');
     // Solo checkbox hides trainee
     const soloCheck = document.getElementById('solo-flight');
     const traineeGroup = document.getElementById('trainee-group');
@@ -1069,6 +1080,15 @@ async function editFlight(flightId) {
       editTraineeGroup.style.display = editSoloCheck.checked ? 'none' : '';
     });
   }
+  // Prevent PIC = Trainee in edit
+  document.getElementById('edit-flight-pilot')?.addEventListener('change', function() {
+    const t = document.getElementById('edit-flight-trainee');
+    if (t && t.value === this.value) t.value = '';
+  });
+  document.getElementById('edit-flight-trainee')?.addEventListener('change', function() {
+    const p = document.getElementById('edit-flight-pilot');
+    if (p && p.value === this.value) p.value = '';
+  });
 
   document.getElementById('save-edit-flight-btn').addEventListener('click', async () => {
     const date = document.getElementById('edit-flight-date').value;
