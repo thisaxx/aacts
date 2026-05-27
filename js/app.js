@@ -2539,7 +2539,6 @@ function showLoginGate() {
     updateSidebarUser();
     await initAppData();
     navigate('dashboard');
-    openSidebar();
     checkInspectionNotifications();
     scheduleEndOfDayCheck();
   });
@@ -2556,7 +2555,6 @@ function showLoginGate() {
     updateSidebarUser();
     initAppData().then(() => {
     navigate('dashboard');
-    openSidebar();
     checkInspectionNotifications();
     scheduleEndOfDayCheck();
     });
