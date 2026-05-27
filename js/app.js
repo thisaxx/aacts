@@ -2614,6 +2614,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if ('serviceWorker' in navigator) {
     const reg = await navigator.serviceWorker.register('sw.js');
+    reg.update();
     reg.addEventListener('updatefound', () => {
       const newSW = reg.installing;
       if (newSW) {
