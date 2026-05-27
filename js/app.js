@@ -1082,6 +1082,10 @@ function enableSwipe(el, { onSwipeLeft, onSwipeRight }) {
 
 function navigate(view) {
   if (!_authenticated) return false;
+  const role = localStorage.getItem('aac_user_role') || '';
+  if (role === 'guest' && view !== 'dashboard') {
+    view = 'dashboard';
+  }
   _currentView = view;
   try { sessionStorage.setItem('aac_last_view', view); } catch(e) {}
   document.querySelectorAll('.nav-link').forEach(a => a.classList.remove('active'));
@@ -2773,7 +2777,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   initPullToRefresh();
 
-  showLoginGate();
+  const savedUser = localStorage.getItem('aac_user');
+  const savedRole = localStorage.getItem('aac_user_role');
+  if (savedUser && savedRole) {
+    document.querySelector('.app-header').style.display = '';
+    document.querySelector('.bottom-nav').style.display = '';
+    document.getElementById('hamburger-btn').style.display = '';
+    document.getElementById('sidebar').style.display = '';
+    document.getElementById('sidebar-overlay').style.display = '';
+    updateSidebarUser();
+    await initAppData();
+    const lastView = sessionStorage.getItem('aac_last_view') || 'dashboard';
+    navigate(lastView);
+    scheduleEndOfDayCheck();
+    checkInspectionNotifications();
+  } else {
+    showLoginGate();
+  }
   } catch (e) {
     console.warn('App init error — showing fallback UI', e);
     // Show a basic fallback so the page is never blank

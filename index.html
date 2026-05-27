@@ -35,23 +35,23 @@
     <nav class="sidebar-nav">
       <div class="sidebar-group-label">Operations</div>
       <a href="#" class="sidebar-link" data-view="dashboard"><span class="s-icon">&#127968;</span> Dashboard</a>
-      <a href="#" class="sidebar-link" data-view="live-feed"><span class="s-icon">&#128197;</span> Live Feed</a>
-      <a href="#" class="sidebar-link" data-view="flight-ops"><span class="s-icon">&#9992;</span> Log Flights</a>
-      <a href="#" class="sidebar-link" data-view="fuel"><span class="s-icon">&#9981;</span> Fuel Ops</a>
-      <a href="#" class="sidebar-link" data-view="calendar"><span class="s-icon">&#128197;</span> Logbook</a>
-      <a href="#" class="sidebar-link" data-view="reports"><span class="s-icon">&#128200;</span> Reports</a>
+      <a href="#" class="sidebar-link" data-view="live-feed" data-role="admin,engineer,production_planner,senior_technician,technician,pilot"><span class="s-icon">&#128197;</span> Live Feed</a>
+      <a href="#" class="sidebar-link" data-view="flight-ops" data-role="admin,engineer,production_planner,senior_technician,technician,pilot"><span class="s-icon">&#9992;</span> Log Flights</a>
+      <a href="#" class="sidebar-link" data-view="fuel" data-role="admin,engineer,production_planner,senior_technician,technician,pilot"><span class="s-icon">&#9981;</span> Fuel Ops</a>
+      <a href="#" class="sidebar-link" data-view="calendar" data-role="admin,engineer,production_planner,senior_technician,technician,pilot"><span class="s-icon">&#128197;</span> Logbook</a>
+      <a href="#" class="sidebar-link" data-view="reports" data-role="admin,engineer,production_planner,senior_technician,technician,pilot"><span class="s-icon">&#128200;</span> Reports</a>
       <div class="sidebar-group-label">Technical</div>
-      <a href="#" class="sidebar-link" data-view="maintenance"><span class="s-icon">&#9881;</span> Mx / Sign-offs</a>
-      <a href="#" class="sidebar-link" data-view="defects"><span class="s-icon">&#9888;</span> Defects</a>
-      <a href="#" class="sidebar-link" data-view="inventory"><span class="s-icon">&#128230;</span> Parts</a>
+      <a href="#" class="sidebar-link" data-view="maintenance" data-role="admin,engineer,production_planner,senior_technician,technician"><span class="s-icon">&#9881;</span> Mx / Sign-offs</a>
+      <a href="#" class="sidebar-link" data-view="defects" data-role="admin,engineer,production_planner,senior_technician,technician,pilot"><span class="s-icon">&#9888;</span> Defects</a>
+      <a href="#" class="sidebar-link" data-view="inventory" data-role="admin,engineer,production_planner,senior_technician,technician"><span class="s-icon">&#128230;</span> Parts</a>
       <a href="#" class="sidebar-link role-restricted" id="sidebar-manage-ac" data-role="engineer,admin,production_planner"><span class="s-icon">&#9992;</span> Fleet Manager</a>
       <div class="sidebar-group-label">Admin</div>
-      <a href="#" class="sidebar-link" data-view="attendance"><span class="s-icon">&#10003;</span> Crew</a>
-      <a href="#" class="sidebar-link" data-view="activity"><span class="s-icon">&#128197;</span> Activity Log</a>
-      <a href="#" class="sidebar-link" data-view="notifications"><span class="s-icon">&#128276;</span> Alerts <span class="notif-badge-sm" id="sidebar-notif-badge" style="display:none"></span></a>
+      <a href="#" class="sidebar-link" data-view="attendance" data-role="admin,engineer,production_planner,senior_technician"><span class="s-icon">&#10003;</span> Crew</a>
+      <a href="#" class="sidebar-link" data-view="activity" data-role="admin,engineer,production_planner"><span class="s-icon">&#128197;</span> Activity Log</a>
+      <a href="#" class="sidebar-link" data-view="notifications" data-role="admin,engineer,production_planner,senior_technician,technician,pilot"><span class="s-icon">&#128276;</span> Alerts <span class="notif-badge-sm" id="sidebar-notif-badge" style="display:none"></span></a>
       <hr>
-      <a href="#" class="sidebar-link" data-view="settings"><span class="s-icon">&#128295;</span> Settings</a>
-      <a href="#" class="sidebar-link" id="sidebar-export"><span class="s-icon">&#128230;</span> Export / Tech Log</a>
+      <a href="#" class="sidebar-link" data-view="settings" data-role="admin,engineer,production_planner,senior_technician,technician,pilot"><span class="s-icon">&#128295;</span> Settings</a>
+      <a href="#" class="sidebar-link" id="sidebar-export" data-role="admin,engineer,production_planner,senior_technician"><span class="s-icon">&#128230;</span> Export / Tech Log</a>
       <hr>
       <div class="sidebar-inspections" id="sidebar-inspections">
         <div class="sidebar-insp-title">Inspections</div>
@@ -69,11 +69,11 @@
       <span class="header-clock" id="header-clock">--:--:--</span>
     </div>
     <div class="header-right">
-      <button class="notif-bell-btn" id="notif-bell-btn" onclick="return navigate('notifications')">
+      <button class="notif-bell-btn" id="notif-bell-btn" onclick="return navigate('notifications')" data-role="admin,engineer,production_planner,senior_technician,technician,pilot">
         <span class="nav-icon">&#128276;</span>
         <span class="notif-badge" id="notif-badge" style="display:none"></span>
       </button>
-      <span class="ac-selector-wrap">
+      <span class="ac-selector-wrap" data-role="admin,engineer,production_planner,senior_technician,technician,pilot">
         <select id="ac-selector" class="ac-selector"></select>
       </span>
     </div>
@@ -82,16 +82,16 @@
   <div class="pull-indicator" id="pull-indicator">&#8593; Pull to refresh</div>
   <div id="app"></div>
 
-  <button class="fab hidden" id="fab" title="Log Flight">&#9992;</button>
+  <button class="fab hidden" id="fab" title="Log Flight" data-role="admin,engineer,production_planner,senior_technician,technician,pilot">&#9992;</button>
   <div id="toast" class="toast"></div>
   <input type="file" id="ac-photo-input" accept="image/*" style="display:none">
 
   <nav class="bottom-nav">
-    <a href="#" class="nav-link" data-view="flight-ops">
+    <a href="#" class="nav-link" data-view="flight-ops" data-role="admin,engineer,production_planner,senior_technician,technician,pilot">
       <span class="nav-icon">&#9992;</span>
       <span class="nav-label">Log Flights</span>
     </a>
-    <a href="#" class="nav-link" data-view="maintenance">
+    <a href="#" class="nav-link" data-view="maintenance" data-role="admin,engineer,production_planner,senior_technician,technician">
       <span class="nav-icon">&#9881;&#9888;</span>
       <span class="nav-label">Mx/Defects</span>
     </a>
@@ -99,11 +99,11 @@
       <span class="nav-icon">&#127968;</span>
       <span class="nav-label">Home</span>
     </a>
-    <a href="#" class="nav-link" data-view="fuel">
+    <a href="#" class="nav-link" data-view="fuel" data-role="admin,engineer,production_planner,senior_technician,technician,pilot">
       <span class="nav-icon">&#9981;</span>
       <span class="nav-label">Fuel</span>
     </a>
-    <a href="#" class="nav-link" data-view="inventory">
+    <a href="#" class="nav-link" data-view="inventory" data-role="admin,engineer,production_planner,senior_technician,technician">
       <span class="nav-icon">&#128230;</span>
       <span class="nav-label">Parts</span>
     </a>
