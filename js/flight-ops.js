@@ -154,7 +154,7 @@ function flightOpsView() {
           <label for="flight-date">Flight Date</label>
           <input type="date" id="flight-date" required>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="pic-group">
           <label for="pilot-name">Pilot in Command (PIC)</label>
           <select id="pilot-name" class="form-input">
             <option value="">Select PIC...</option>
@@ -163,7 +163,7 @@ function flightOpsView() {
         <div class="form-group">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
             <input type="checkbox" id="solo-flight" style="width:16px;height:16px;accent-color:var(--accent)">
-            <span style="font-size:12px">Solo Flight <span class="text-muted small">(no trainee)</span></span>
+            <span style="font-size:12px">Solo Flight <span class="text-muted small">(trainee flies alone)</span></span>
           </label>
         </div>
         <div class="form-group" id="trainee-group">
@@ -346,12 +346,14 @@ function flightOpsView() {
     }
     excludeSelected('pilot-name', 'trainee-name');
     excludeSelected('trainee-name', 'pilot-name');
-    // Solo checkbox hides trainee
+    // Solo checkbox: hides PIC, shows trainee (trainee flies alone)
     const soloCheck = document.getElementById('solo-flight');
     const traineeGroup = document.getElementById('trainee-group');
-    if (soloCheck && traineeGroup) {
+    const picGroup = document.getElementById('pic-group');
+    if (soloCheck) {
       soloCheck.addEventListener('change', () => {
-        traineeGroup.style.display = soloCheck.checked ? 'none' : '';
+        if (picGroup) picGroup.style.display = soloCheck.checked ? 'none' : '';
+        if (traineeGroup) traineeGroup.style.display = soloCheck.checked ? '' : 'none';
       });
     }
 
@@ -473,7 +475,7 @@ async function onDepartureSubmit(e) {
   if (_submitting) return;
   _submitting = true;
   try {
-  const pilot = document.getElementById('pilot-name').value.trim() || 'Unknown';
+  const pilot = document.getElementById('pilot-name').value.trim();
   const trainee = document.getElementById('trainee-name')?.value?.trim() || '';
   const solo = document.getElementById('solo-flight')?.checked || false;
   const takeoffTime = document.getElementById('takeoff-time').value;
@@ -486,8 +488,13 @@ async function onDepartureSubmit(e) {
     return;
   }
 
+  if (solo && !trainee) {
+    showToast('Select the trainee for solo flight', 'error');
+    _submitting = false;
+    return;
+  }
   if (!solo && !pilot) {
-    showToast('Select PIC or check Solo', 'error');
+    showToast('Select PIC', 'error');
     _submitting = false;
     return;
   }
@@ -503,12 +510,13 @@ async function onDepartureSubmit(e) {
   }
 
   const ac = await getAircraft();
+  const crewName = solo ? trainee : pilot;
   const flight = {
     id: 'flt_' + Date.now(),
     aircraftId: ac.tailNumber,
     flightDate,
-    pilotName: pilot,
-    traineeName: trainee || null,
+    pilotName: crewName,
+    traineeName: solo ? null : (trainee || null),
     solo: solo,
     takeoffTime,
     eta,
@@ -545,7 +553,7 @@ async function onDepartureSubmit(e) {
 
   showToast('Departure recorded — awaiting arrival');
 
-  const crewStr = solo ? 'Solo' : trainee ? pilot + ' + ' + trainee : pilot;
+  const crewStr = solo ? trainee + ' (Solo)' : trainee ? pilot + ' + ' + trainee : pilot;
   createNotification('sortie', 'Departure Recorded', `${crewStr} departed in ${ac.tailNumber} at ${takeoffTime}${eta ? `, ETA ${eta}` : ''}`, 'flight-ops');
   logActivity('departure', `${crewStr} departed in ${ac.tailNumber} at ${takeoffTime}${eta ? `, ETA ${eta}` : ''}`, flight.id);
 
@@ -988,23 +996,23 @@ async function editFlight(flightId) {
       <input type="date" id="edit-flight-date" class="form-input" value="${flight.flightDate}">
     </div>
     <div class="form-group">
-      <label>Pilot in Command (PIC)</label>
-      <select id="edit-flight-pilot" class="form-input">
-        <option value="">— Select PIC —</option>
-        ${(() => { try { const pilots = JSON.parse(localStorage.getItem('aac_pilots') || '[]'); const exists = pilots.includes(flight.pilotName); if (!pilots.length && !exists) return '<option value="" disabled>— No pilots — Add in Settings > Pilot Management</option>'; return pilots.map(n => `<option value="${escHtml(n)}"${n === flight.pilotName ? ' selected' : ''}>${escHtml(n)}</option>`).join('') + (!exists && flight.pilotName ? `<option value="${escHtml(flight.pilotName)}" selected>${escHtml(flight.pilotName)}</option>` : ''); } catch(e) { return ''; } })()}
-      </select>
-    </div>
-    <div class="form-group">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
         <input type="checkbox" id="edit-solo-flight" style="width:16px;height:16px;accent-color:var(--accent)" ${flight.solo ? 'checked' : ''}>
-        <span style="font-size:12px">Solo Flight</span>
+        <span style="font-size:12px">Solo Flight <span class="text-muted small">(trainee flies alone)</span></span>
       </label>
     </div>
-    <div class="form-group" id="edit-trainee-group" ${flight.solo ? 'style="display:none"' : ''}>
+    <div class="form-group" id="edit-pic-group" ${flight.solo ? 'style="display:none"' : ''}>
+      <label>Pilot in Command (PIC)</label>
+      <select id="edit-flight-pic" class="form-input">
+        <option value="">— Select PIC —</option>
+        ${(() => { try { const pilots = JSON.parse(localStorage.getItem('aac_pilots') || '[]'); const exists = pilots.includes(flight.pilotName); if (!pilots.length && !exists) return '<option value="" disabled>— No pilots — Add in Settings > Pilot Management</option>'; return pilots.map(n => `<option value="${escHtml(n)}"${!flight.solo && n === flight.pilotName ? ' selected' : ''}>${escHtml(n)}</option>`).join('') + (!exists && !flight.solo && flight.pilotName ? `<option value="${escHtml(flight.pilotName)}" selected>${escHtml(flight.pilotName)}</option>` : ''); } catch(e) { return ''; } })()}
+      </select>
+    </div>
+    <div class="form-group" id="edit-trainee-group" ${flight.solo ? '' : 'style="display:none"'}>
       <label>Trainee / Second Pilot</label>
       <select id="edit-flight-trainee" class="form-input">
         <option value="">None</option>
-        ${(() => { try { const pilots = JSON.parse(localStorage.getItem('aac_pilots') || '[]'); return pilots.map(n => `<option value="${escHtml(n)}"${n === flight.traineeName ? ' selected' : ''}>${escHtml(n)}</option>`).join(''); } catch(e) { return ''; } })()}
+        ${(() => { try { const pilots = JSON.parse(localStorage.getItem('aac_pilots') || '[]'); return pilots.map(n => `<option value="${escHtml(n)}"${flight.solo && n === flight.pilotName ? ' selected' : ''}${!flight.solo && n === flight.traineeName ? ' selected' : ''}>${escHtml(n)}</option>`).join(''); } catch(e) { return ''; } })()}
       </select>
     </div>
     <div class="row">
@@ -1072,32 +1080,39 @@ async function editFlight(flightId) {
   document.querySelector('[data-toggle-id="edit-refueled-check"]')?.addEventListener('change', function(e) {
     document.getElementById('edit-refuel-fields').classList.toggle('hidden', !e.checked);
   });
-  // Solo toggle in edit
+  // Solo toggle in edit: swap PIC/trainee visibility
   const editSoloCheck = document.getElementById('edit-solo-flight');
   const editTraineeGroup = document.getElementById('edit-trainee-group');
-  if (editSoloCheck && editTraineeGroup) {
+  const editPicGroup = document.getElementById('edit-pic-group');
+  if (editSoloCheck) {
     editSoloCheck.addEventListener('change', () => {
-      editTraineeGroup.style.display = editSoloCheck.checked ? 'none' : '';
+      if (editPicGroup) editPicGroup.style.display = editSoloCheck.checked ? 'none' : '';
+      if (editTraineeGroup) editTraineeGroup.style.display = editSoloCheck.checked ? '' : 'none';
     });
   }
   // Prevent PIC = Trainee in edit
-  document.getElementById('edit-flight-pilot')?.addEventListener('change', function() {
+  document.getElementById('edit-flight-pic')?.addEventListener('change', function() {
     const t = document.getElementById('edit-flight-trainee');
     if (t && t.value === this.value) t.value = '';
   });
   document.getElementById('edit-flight-trainee')?.addEventListener('change', function() {
-    const p = document.getElementById('edit-flight-pilot');
+    const p = document.getElementById('edit-flight-pic');
     if (p && p.value === this.value) p.value = '';
   });
 
   document.getElementById('save-edit-flight-btn').addEventListener('click', async () => {
     const date = document.getElementById('edit-flight-date').value;
-    const pilot = document.getElementById('edit-flight-pilot').value.trim();
-    if (!date || !pilot) { showToast('Date and pilot required', 'error'); return; }
+    const solo = document.getElementById('edit-solo-flight')?.checked || false;
+    const pic = document.getElementById('edit-flight-pic')?.value?.trim() || '';
+    const trainee = document.getElementById('edit-flight-trainee')?.value?.trim() || '';
+    if (!date) { showToast('Date required', 'error'); return; }
+    if (solo && !trainee) { showToast('Select the trainee for solo flight', 'error'); return; }
+    if (!solo && !pic) { showToast('Select PIC', 'error'); return; }
+    const crewName = solo ? trainee : pic;
     flight.flightDate = date;
-    flight.pilotName = pilot;
-    flight.solo = document.getElementById('edit-solo-flight')?.checked || false;
-    flight.traineeName = document.getElementById('edit-flight-trainee')?.value?.trim() || null;
+    flight.pilotName = crewName;
+    flight.solo = solo;
+    flight.traineeName = solo ? null : (trainee || null);
     flight.takeoffTime = document.getElementById('edit-flight-takeoff').value || '';
     flight.landingTime = document.getElementById('edit-flight-landing').value || '';
     flight.flownHours = parseFloat(document.getElementById('edit-flight-hours').value) || 0;
