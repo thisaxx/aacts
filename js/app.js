@@ -2768,6 +2768,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('sidebar-theme-toggle').addEventListener('click', e => {
     toggleTheme();
   });
+  document.getElementById('sidebar-logout-btn').addEventListener('click', e => {
+    e.stopPropagation();
+    localStorage.removeItem('aac_user');
+    localStorage.removeItem('aac_user_role');
+    localStorage.removeItem('aac_user_photo');
+    localStorage.removeItem('aac_user_id');
+    document.getElementById('sidebar').style.display = 'none';
+    document.getElementById('sidebar-overlay').style.display = 'none';
+    document.getElementById('hamburger-btn').style.display = 'none';
+    showLoginGate();
+  });
   document.getElementById('sidebar-user').addEventListener('click', e => {
     e.preventDefault();
     closeSidebar();
