@@ -2510,6 +2510,7 @@ function showLoginGate() {
     document.getElementById('hamburger-btn').style.display = '';
     updateSidebarUser();
     navigate('dashboard');
+    openSidebar();
     checkInspectionNotifications();
     scheduleEndOfDayCheck();
   });
@@ -2523,6 +2524,7 @@ function showLoginGate() {
     document.getElementById('hamburger-btn').style.display = '';
     updateSidebarUser();
     navigate('dashboard');
+    openSidebar();
     checkInspectionNotifications();
     scheduleEndOfDayCheck();
   });
