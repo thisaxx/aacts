@@ -1,4 +1,4 @@
-const CACHE = 'aac-v21';
+const CACHE = 'aac-v22';
 const BASE = self.location.pathname.replace(/\/[^/]*$/, '') || '/aacts';
 const ASSETS = [
   BASE + '/',
@@ -8,7 +8,6 @@ const ASSETS = [
   BASE + '/js/db.js',
   BASE + '/js/sync.js',
   BASE + '/js/insforge-bundle.js',
-  BASE + '/js/insforge-auth.js',
   BASE + '/js/flight-ops.js',
   BASE + '/js/defects.js',
   BASE + '/js/fuel.js',
