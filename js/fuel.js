@@ -246,6 +246,8 @@ async function updateFuelStockQty(id, qty) {
   if (invEl && typeof renderInventory === 'function') renderInventory();
 }
 
+let _fuelChart = null;
+
 async function renderFuelTrends() {
   const el = document.getElementById('fuel-trends-list');
   if (!el) return;
@@ -259,12 +261,12 @@ async function renderFuelTrends() {
     return;
   }
   const avg = recent.reduce((s, f) => s + f.fuelConsumed, 0) / recent.length;
-  const max = Math.max(...recent.map(f => f.fuelConsumed));
   const flownCount = recent.filter(f => f.flownHours > 0).length;
-  const avgConsumption = flownCount > 0 ? recent.reduce((s, f) => {
+  const avgRate = flownCount > 0 ? recent.reduce((s, f) => {
     if (f.flownHours > 0) return s + f.fuelConsumed / f.flownHours;
     return s;
   }, 0) / flownCount : 0;
+
   el.innerHTML = `
     <div style="padding:8px 0">
       <div style="display:flex;gap:16px;margin-bottom:12px">
@@ -273,7 +275,7 @@ async function renderFuelTrends() {
           <div class="text-muted small">Avg gal/flight</div>
         </div>
         <div style="flex:1;text-align:center">
-          <div style="font-size:20px;font-weight:700">${avgConsumption.toFixed(1)}</div>
+          <div style="font-size:20px;font-weight:700">${avgRate.toFixed(1)}</div>
           <div class="text-muted small">Avg gal/hr</div>
         </div>
         <div style="flex:1;text-align:center">
@@ -281,19 +283,103 @@ async function renderFuelTrends() {
           <div class="text-muted small">Flights tracked</div>
         </div>
       </div>
-      <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Recent fuel usage per flight (last ${Math.min(20, recent.length)} flights):</div>
-      ${recent.map(f => {
-        const pct = max > 0 ? (f.fuelConsumed / max) * 100 : 0;
-        return `
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-            <div style="width:60px;flex-shrink:0;font-size:10px;color:var(--text-muted);font-family:var(--mono)">${f.flightDate ? f.flightDate.slice(5) : '—'}</div>
-            <div style="flex:1;height:16px;background:var(--surface);border-radius:4px;overflow:hidden">
-              <div style="height:100%;width:${pct}%;background:${f.fuelConsumed > avg * 1.2 ? 'var(--gold)' : 'var(--text)'};border-radius:4px;min-width:2px"></div>
-            </div>
-            <div style="width:40px;text-align:right;font-size:11px;font-family:var(--mono)">${f.fuelConsumed.toFixed(1)}</div>
-          </div>`;
-      }).join('')}
+      <div class="chart-container" style="position:relative;height:250px;width:100%">
+        <canvas id="fuel-consumption-chart"></canvas>
+      </div>
     </div>`;
+
+  const canvas = document.getElementById('fuel-consumption-chart');
+  if (!canvas) return;
+
+  if (_fuelChart) { _fuelChart.destroy(); _fuelChart = null; }
+
+  const labels = recent.map(f => f.flightDate ? f.flightDate.slice(5) : '—');
+  const gallons = recent.map(f => f.fuelConsumed);
+  const rates = recent.map(f => f.flownHours > 0 ? f.fuelConsumed / f.flownHours : null);
+
+  const ctx = canvas.getContext('2d');
+  _fuelChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Gallons consumed',
+          data: gallons,
+          backgroundColor: 'rgba(59, 130, 246, 0.6)',
+          borderColor: 'rgba(59, 130, 246, 1)',
+          borderWidth: 1,
+          borderRadius: 3,
+          yAxisID: 'y',
+          order: 2
+        },
+        {
+          label: 'gal/hr',
+          data: rates,
+          borderColor: 'rgba(239, 68, 68, 1)',
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          borderWidth: 2,
+          pointRadius: 4,
+          pointBackgroundColor: 'rgba(239, 68, 68, 1)',
+          type: 'line',
+          fill: false,
+          tension: 0.3,
+          yAxisID: 'y1',
+          order: 1
+        },
+        {
+          label: 'Avg gal/hr',
+          data: rates.map(() => avgRate),
+          borderColor: 'rgba(239, 68, 68, 0.4)',
+          borderWidth: 1,
+          borderDash: [5, 5],
+          pointRadius: 0,
+          type: 'line',
+          fill: false,
+          yAxisID: 'y1',
+          order: 0
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { boxWidth: 12, padding: 8, font: { size: 11 } }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              if (ctx.datasetIndex === 0) return `Fuel: ${ctx.parsed.y.toFixed(1)} gal`;
+              if (ctx.datasetIndex === 1) return `Rate: ${ctx.parsed.y.toFixed(1)} gal/hr`;
+              return `Avg: ${avgRate.toFixed(1)} gal/hr`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { font: { size: 10 } },
+          grid: { display: false }
+        },
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: 'Gallons', font: { size: 10 } },
+          ticks: { font: { size: 10 } },
+          grid: { color: 'rgba(128,128,128,0.1)' }
+        },
+        y1: {
+          beginAtZero: true,
+          position: 'right',
+          title: { display: true, text: 'gal/hr', font: { size: 10 } },
+          ticks: { font: { size: 10 } },
+          grid: { display: false }
+        }
+      }
+    }
+  });
 }
 
 async function deleteFuelLog(logId, logType, fuelType, liters) {
