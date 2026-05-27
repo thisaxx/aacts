@@ -67,7 +67,7 @@ async function getFuelLogs() {
 }
 
 function fuelView() {
-  if (typeof denyGuest === 'function' && denyGuest()) return;
+  const isGuest = localStorage.getItem('aac_user_role') === 'guest';
   const app = document.getElementById('app');
   app.innerHTML = `
     <div class="page">
@@ -79,7 +79,7 @@ function fuelView() {
       <div class="card">
         <div class="card-header">
           <h3>Bulk Fuel Stock</h3>
-          <button class="btn btn-sm btn-primary" id="topup-btn">+ Record Delivery</button>
+          ${isGuest ? '' : '<button class="btn btn-sm btn-primary" id="topup-btn">+ Record Delivery</button>'}
         </div>
         <div id="fuel-stock-list"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line" style="width:60%"></div></div>
       </div>
@@ -94,7 +94,7 @@ function fuelView() {
     </div>
   `;
 
-  document.getElementById('topup-btn').addEventListener('click', showTopUpSheet);
+  if (!isGuest) document.getElementById('topup-btn').addEventListener('click', showTopUpSheet);
 
   seedFuelStock().then(() => {
     renderFuelStock();
@@ -179,10 +179,11 @@ async function deleteFuelStock(fuelId, fuelName) {
 }
 
 async function renderFuelStock() {
+  const isGuest = localStorage.getItem('aac_user_role') === 'guest';
   const stocks = await getFuelStock();
   const el = document.getElementById('fuel-stock-list');
   if (stocks.length === 0) {
-    el.innerHTML = '<p class="text-muted small">No fuel types configured. Add one via Record Fuel Delivery.</p>';
+    el.innerHTML = '<p class="text-muted small">No fuel types configured.</p>';
     return;
   }
   el.innerHTML = stocks.map(s => {
@@ -192,9 +193,9 @@ async function renderFuelStock() {
         <div class="fuel-stock-header">
           <strong>${escHtml(s.name)}</strong>
           <div style="display:flex;align-items:center;gap:6px">
-            <input type="number" class="form-input stock-qty-input" data-id="${s.id}" value="${s.quantityLiters}" min="0" style="width:70px;font-size:14px;text-align:center">
+            ${isGuest ? `<span style="font-size:20px;font-weight:700">${s.quantityLiters}</span>` : `<input type="number" class="form-input stock-qty-input" data-id="${s.id}" value="${s.quantityLiters}" min="0" style="width:70px;font-size:14px;text-align:center">`}
             <span style="font-size:12px;color:var(--text-muted)">L</span>
-            <button class="btn btn-sm btn-danger del-fuel-stock-btn" data-id="${s.id}" data-name="${escHtml(s.name)}" style="padding:2px 6px;font-size:10px">&times;</button>
+            ${isGuest ? '' : `<button class="btn btn-sm btn-danger del-fuel-stock-btn" data-id="${s.id}" data-name="${escHtml(s.name)}" style="padding:2px 6px;font-size:10px">&times;</button>`}
           </div>
         </div>
         <div class="progress-bar" style="margin-top:8px">
@@ -206,17 +207,19 @@ async function renderFuelStock() {
     `;
   }).join('');
 
-  el.querySelectorAll('.stock-qty-input').forEach(input => {
-    input.addEventListener('change', async () => {
-      const id = input.dataset.id;
-      const v = Math.max(0, parseFloat(input.value) || 0);
-      input.value = v;
-      await updateFuelStockQty(id, v);
+  if (!isGuest) {
+    el.querySelectorAll('.stock-qty-input').forEach(input => {
+      input.addEventListener('change', async () => {
+        const id = input.dataset.id;
+        const v = Math.max(0, parseFloat(input.value) || 0);
+        input.value = v;
+        await updateFuelStockQty(id, v);
+      });
     });
-  });
-  el.querySelectorAll('.del-fuel-stock-btn').forEach(btn => {
-    btn.addEventListener('click', () => deleteFuelStock(btn.dataset.id, btn.dataset.name));
-  });
+    el.querySelectorAll('.del-fuel-stock-btn').forEach(btn => {
+      btn.addEventListener('click', () => deleteFuelStock(btn.dataset.id, btn.dataset.name));
+    });
+  }
 }
 
 async function updateFuelStockQty(id, qty) {
@@ -398,6 +401,7 @@ async function deleteFuelLog(logId, logType, fuelType, liters) {
 }
 
 async function renderFuelLogs() {
+  const isGuest = localStorage.getItem('aac_user_role') === 'guest';
   const logs = await getFuelLogs();
   const el = document.getElementById('fuel-log-list');
   if (logs.length === 0) {
@@ -413,14 +417,16 @@ async function renderFuelLogs() {
       </div>
       <div style="display:flex;align-items:center;gap:10px">
         <div class="flight-hours">+${l.liters}L</div>
-        <button class="btn btn-sm btn-danger del-fuel-btn" data-id="${l.id}" data-type="${l.type}" data-fuel="${l.fuelType}" data-liters="${l.liters}" style="padding:4px 8px;font-size:11px">&times;</button>
+        ${isGuest ? '' : `<button class="btn btn-sm btn-danger del-fuel-btn" data-id="${l.id}" data-type="${l.type}" data-fuel="${l.fuelType}" data-liters="${l.liters}" style="padding:4px 8px;font-size:11px">&times;</button>`}
       </div>
     </div>
   `).join('');
 
-  el.querySelectorAll('.del-fuel-btn').forEach(btn => {
-    btn.addEventListener('click', () => deleteFuelLog(btn.dataset.id, btn.dataset.type, btn.dataset.fuel, parseFloat(btn.dataset.liters)));
-  });
+  if (!isGuest) {
+    el.querySelectorAll('.del-fuel-btn').forEach(btn => {
+      btn.addEventListener('click', () => deleteFuelLog(btn.dataset.id, btn.dataset.type, btn.dataset.fuel, parseFloat(btn.dataset.liters)));
+    });
+  }
   if (_fuelLogPage < logs.length) {
     const more = document.createElement('button');
     more.className = 'btn btn-ghost btn-block';

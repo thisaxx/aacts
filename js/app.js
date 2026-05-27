@@ -1085,11 +1085,11 @@ function enableSwipe(el, { onSwipeLeft, onSwipeRight }) {
 function navigate(view) {
   if (!_authenticated) return false;
   const role = localStorage.getItem('aac_user_role') || '';
-  if (role === 'guest' && view !== 'dashboard') {
+  if (role === 'guest' && view !== 'dashboard' && view !== 'fuel') {
     view = 'dashboard';
   }
   _currentView = view;
-  try { sessionStorage.setItem('aac_last_view', view); } catch(e) {}
+  try { localStorage.setItem('aac_last_view', view); } catch(e) {}
   document.querySelectorAll('.nav-link').forEach(a => a.classList.remove('active'));
   const link = document.querySelector(`.nav-link[data-view="${view}"]`);
   if (link) link.classList.add('active');
@@ -2617,15 +2617,6 @@ async function initAppData() {
     }
   } catch (e) { /* skip user sync — non-critical */ }
 
-  try {
-    const existingAC = await DB.getAll('aircraft');
-    if (existingAC.length === 0) {
-      const defaultAC = { ...DEFAULT_AIRCRAFT, photoData: null, createdAt: new Date().toISOString() };
-      await DB.put('aircraft', defaultAC);
-      setCurrentAircraftKey(defaultAC.tailNumber);
-      try { await populateACSelector(); } catch (e) { /* ok */ }
-    }
-  } catch (e) { /* skip */ }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -2823,7 +2814,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('sidebar-overlay').style.display = '';
     updateSidebarUser();
     await initAppData();
-    const lastView = sessionStorage.getItem('aac_last_view') || 'dashboard';
+    const lastView = localStorage.getItem('aac_last_view') || 'dashboard';
     navigate(lastView);
     scheduleEndOfDayCheck();
     checkInspectionNotifications();
