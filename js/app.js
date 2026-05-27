@@ -2794,10 +2794,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     navigate('flight-ops');
   });
 
-  // Global haptic on actionable elements
-  document.addEventListener('click', e => {
-    const t = e.target.closest('.btn, .quick-action, .sidebar-link, .header-btn, .hamburger-btn');
-    if (t) haptic();
+  // Haptic on nav clicks only (avoid global listener overhead)
+  document.getElementById('sidebar').addEventListener('click', e => {
+    if (e.target.closest('.sidebar-link, .sidebar-theme-toggle')) haptic();
+  });
+  document.querySelector('.bottom-nav')?.addEventListener('click', e => {
+    if (e.target.closest('.nav-link')) haptic();
   });
 
   initPullToRefresh();

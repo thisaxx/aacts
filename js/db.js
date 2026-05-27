@@ -79,15 +79,27 @@ function openDB() {
   return _dbOpen;
 }
 
+const _getAllCache = { flights: { data: null, time: 0 } };
+const CACHE_TTL = 8000;
+
 async function dbGetAll(storeName) {
+  const cached = _getAllCache[storeName];
+  if (cached && cached.data && Date.now() - cached.time < CACHE_TTL) {
+    return cached.data;
+  }
   const db = await openDB();
-  return new Promise((resolve, reject) => {
+  const result = await new Promise((resolve, reject) => {
     const tx = db.transaction(storeName, 'readonly');
     const store = tx.objectStore(storeName);
     const req = store.getAll();
     tx.oncomplete = () => { resolve(req.result || []); };
     tx.onerror = () => { reject(tx.error); };
   });
+  if (_getAllCache[storeName]) {
+    _getAllCache[storeName].data = result;
+    _getAllCache[storeName].time = Date.now();
+  }
+  return result;
 }
 
 async function dbGet(storeName, key) {
@@ -102,6 +114,7 @@ async function dbGet(storeName, key) {
 }
 
 async function dbPut(storeName, value) {
+  if (_getAllCache[storeName]) { _getAllCache[storeName] = { data: null, time: 0 }; }
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(storeName, 'readwrite');
@@ -113,6 +126,7 @@ async function dbPut(storeName, value) {
 }
 
 async function dbDelete(storeName, key) {
+  if (_getAllCache[storeName]) { _getAllCache[storeName] = { data: null, time: 0 }; }
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(storeName, 'readwrite');
