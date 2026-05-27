@@ -1328,7 +1328,8 @@ function profileView() {
     showToast('Profile saved');
     navigate('dashboard');
   });
-  document.getElementById('profile-logout-btn').addEventListener('click', () => {
+  document.getElementById('profile-logout-btn').addEventListener('click', async () => {
+    await signOut();
     localStorage.removeItem('aac_user');
     localStorage.removeItem('aac_user_role');
     localStorage.removeItem('aac_user_photo');
@@ -2444,6 +2445,54 @@ function addPilot() {
   showToast(`Pilot "${name}" added`);
 }
 
+function showRolePicker(displayName, userId) {
+  const app = document.getElementById('app');
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  if (sidebar) sidebar.style.display = 'none';
+  if (overlay) overlay.style.display = 'none';
+  document.getElementById('hamburger-btn').style.display = 'none';
+
+  const roles = [
+    { value: 'guest', label: 'Guest', desc: 'View-only' },
+    { value: 'technician', label: 'Technician', desc: 'Record sorties, squawks' },
+    { value: 'senior_technician', label: 'Senior Technician', desc: 'Above + approve sign-ins' },
+    { value: 'production_planner', label: 'Production Planner', desc: 'Above + manage fleet, end flying' },
+    { value: 'engineer', label: 'Engineer', desc: 'Above + approve CRS' },
+    { value: 'admin', label: 'Admin', desc: 'Full access' }
+  ];
+  app.innerHTML = `
+    <div class="page" style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px">
+      <div class="card" style="max-width:400px;width:100%;padding:20px">
+        <h3 style="margin:0 0 4px">Welcome, ${escHtml(displayName)}</h3>
+        <p class="text-muted small" style="margin-bottom:16px">Select your role to continue:</p>
+        ${roles.map(r => `
+          <button class="btn btn-block ${r.value === 'technician' ? 'btn-primary' : 'btn-secondary'}" data-role="${r.value}" style="margin-bottom:6px;text-align:left">
+            <strong>${r.label}</strong>
+            <div style="font-size:11px;opacity:0.7;font-weight:normal">${r.desc}</div>
+          </button>
+        `).join('')}
+      </div>
+    </div>`;
+  document.querySelectorAll('[data-role]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const chosen = btn.dataset.role;
+      let userRoleMap = {};
+      try { userRoleMap = JSON.parse(localStorage.getItem('aac_if_role_map')) || {}; } catch(e) {}
+      userRoleMap[userId] = chosen;
+      localStorage.setItem('aac_if_role_map', JSON.stringify(userRoleMap));
+      localStorage.setItem('aac_user_role', chosen);
+      if (sidebar) sidebar.style.display = '';
+      if (overlay) overlay.style.display = '';
+      document.getElementById('hamburger-btn').style.display = '';
+      updateSidebarUser();
+      navigate('dashboard');
+      checkInspectionNotifications();
+      scheduleEndOfDayCheck();
+    });
+  });
+}
+
 function showLoginGate() {
   const app = document.getElementById('app');
   const sidebar = document.getElementById('sidebar');
@@ -2452,73 +2501,58 @@ function showLoginGate() {
   if (overlay) overlay.style.display = 'none';
   document.getElementById('hamburger-btn').style.display = 'none';
 
-  let users = [];
-  try { users = JSON.parse(localStorage.getItem('aac_users')) || []; } catch(e) {}
+  renderAuthUI(app);
 
-  app.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:var(--bg)">
-      <div style="max-width:400px;width:100%">
-        <div style="text-align:center;margin-bottom:24px">
-          <img src="img/logo.jpg" alt="AACTS" style="width:80px;height:80px;border-radius:50%;margin-bottom:8px;object-fit:cover;border:2px solid var(--border)">
-          <h1 style="font-size:22px;margin:0">AAC Technical Services</h1>
-          <p class="text-muted" style="margin-top:4px">Select your name to sign in</p>
-        </div>
-        <div class="card" style="padding:20px">
-          <div class="form-group">
-            <label>Select User</label>
-            <select id="login-user" class="form-input">
-              <option value="">— Select user —</option>
-              ${users.map(u => `<option value="${escHtml(u.name)}" data-role="${u.role}">${escHtml(u.name)}</option>`).join('')}
-            </select>
-          </div>
-          <div class="form-group" id="login-pin-group" style="display:none">
-            <label>PIN</label>
-            <input type="password" id="login-pin" class="form-input" placeholder="Enter PIN" inputmode="numeric" maxlength="10">
-          </div>
-          <div id="login-error" class="text-red small" style="display:none;margin-bottom:8px"></div>
-          <button class="btn btn-primary btn-block" id="login-btn">Sign In</button>
-        </div>
-      </div>
-    </div>
-  `;
+  // Listen for successful auth — once user is set, proceed
+  const unsub = onAuthChange(async (user) => {
+    if (!user) return;
+    unsub();
+    const email = user.email || '';
+    const displayName = user.profile?.name || user.email?.split('@')[0] || 'User';
+    localStorage.setItem('aac_user', escHtml(displayName));
+    localStorage.setItem('aac_user_id', user.id);
 
-  document.getElementById('login-user').addEventListener('change', function() {
-    const opt = this.options[this.selectedIndex];
-    const role = opt?.dataset?.role || '';
-    const pinGroup = document.getElementById('login-pin-group');
-    const error = document.getElementById('login-error');
-    error.style.display = 'none';
-    pinGroup.style.display = role === 'guest' ? 'none' : '';
-  });
+    // Check if this user already has a role mapping
+    let userRoleMap = {};
+    try { userRoleMap = JSON.parse(localStorage.getItem('aac_if_role_map')) || {}; } catch(e) {}
 
-  document.getElementById('login-btn').addEventListener('click', async () => {
-    const sel = document.getElementById('login-user');
-    const name = sel.value;
-    const role = sel.options[sel.selectedIndex]?.dataset?.role || '';
-    const error = document.getElementById('login-error');
-    error.style.display = 'none';
-    if (!name) { showToast('Select a user', 'error'); return; }
-    if (role !== 'guest') {
-      const pin = document.getElementById('login-pin').value.trim();
-      let userPins = {};
-      try { userPins = JSON.parse(localStorage.getItem('aac_user_pins')) || {}; } catch(e) {}
-      const storedPin = userPins[name] || '1234';
-      if (!pin) { error.textContent = 'PIN required'; error.style.display = ''; return; }
-      if (pin !== storedPin) { error.textContent = 'Incorrect PIN'; error.style.display = ''; return; }
+    if (userRoleMap[user.id]) {
+      localStorage.setItem('aac_user_role', userRoleMap[user.id]);
+    } else {
+      const roles = [
+        { value: 'guest', label: 'Guest', desc: 'View-only' },
+        { value: 'technician', label: 'Technician', desc: 'Record sorties, squawks' },
+        { value: 'senior_technician', label: 'Senior Technician', desc: 'Above + approve sign-ins' },
+        { value: 'production_planner', label: 'Production Planner', desc: 'Above + manage fleet, end flying' },
+        { value: 'engineer', label: 'Engineer', desc: 'Above + approve CRS' },
+        { value: 'admin', label: 'Admin', desc: 'Full access' }
+      ];
+      const chosen = await new Promise(resolve => {
+        app.innerHTML = `
+          <div class="page" style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px">
+            <div class="card" style="max-width:400px;width:100%;padding:20px">
+              <h3 style="margin:0 0 4px">Welcome, ${escHtml(displayName)}</h3>
+              <p class="text-muted small" style="margin-bottom:16px">Select your role to continue:</p>
+              ${roles.map(r => `
+                <button class="btn btn-block ${r.value === 'technician' ? 'btn-primary' : 'btn-secondary'}" data-role="${r.value}" style="margin-bottom:6px;text-align:left">
+                  <strong>${r.label}</strong>
+                  <div style="font-size:11px;opacity:0.7;font-weight:normal">${r.desc}</div>
+                </button>
+              `).join('')}
+            </div>
+          </div>`;
+        document.querySelectorAll('[data-role]').forEach(btn => {
+          btn.addEventListener('click', () => resolve(btn.dataset.role));
+        });
+      });
+      userRoleMap[user.id] = chosen;
+      localStorage.setItem('aac_if_role_map', JSON.stringify(userRoleMap));
+      localStorage.setItem('aac_user_role', chosen);
     }
-    localStorage.setItem('aac_user', escHtml(name));
-    localStorage.setItem('aac_user_role', role);
-    // Show loading state immediately — no await before this
-    app.innerHTML = '<div class="page" style="display:flex;align-items:center;justify-content:center;min-height:60vh"><div style="text-align:center"><div class="spinner" style="width:32px;height:32px;border:3px solid var(--glass-border);border-top:3px solid var(--text);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px"></div><p class="text-muted">Signing in...</p></div></div>';
-    // Restore profile photo from DB (fire-and-forget, non-blocking)
-    DB.getAll('users').then(allUsers => {
-      const match = allUsers.find(u => u.name === name);
-      if (match && match.photo) {
-        localStorage.setItem('aac_user_photo', match.photo);
-      } else {
-        localStorage.removeItem('aac_user_photo');
-      }
-    }).catch(() => {});
+
+    // Show loading
+    app.innerHTML = '<div class="page" style="display:flex;align-items:center;justify-content:center;min-height:60vh"><div style="text-align:center"><div class="spinner" style="width:32px;height:32px;border:3px solid var(--glass-border);border-top:3px solid var(--text);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px"></div><p class="text-muted">Loading...</p></div></div>';
+
     if (sidebar) sidebar.style.display = '';
     if (overlay) overlay.style.display = '';
     document.getElementById('hamburger-btn').style.display = '';
@@ -2548,8 +2582,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     Notification.requestPermission(); // fire-and-forget
   }
 
-  // Fire-and-forget: don't block the app on Firebase init (anonymous auth can hang when offline)
-  const _fbInit = initFirebase().catch(() => {});
+  // Initialize InsForge auth (fire-and-forget, non-blocking)
+  const _ifAuth = initAuth().catch(() => {});
+  // Keep Firestore sync alive for cross-device sync (will be migrated to InsForge DB later)
+  initFirebase().catch(() => {});
 
   // One-time cleanup: remove stale activity entries mistakenly written to flights store
   try {
@@ -2643,9 +2679,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   } catch (e) { /* skip */ }
 
-  // Login gate: require name & role before using the app
-  const needsLogin = !localStorage.getItem('aac_user') || !localStorage.getItem('aac_user_role');
-
   document.getElementById('ac-photo-input').addEventListener('change', async function() {
     const file = this.files[0];
     if (!file) return;
@@ -2735,13 +2768,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   initPullToRefresh();
 
-  if (needsLogin) {
-    showLoginGate();
-  } else {
+  // Wait for InsForge auth, then decide: go to app or show login gate
+  const ifUser = await _ifAuth;
+
+  if (ifUser && localStorage.getItem('aac_user') && localStorage.getItem('aac_user_role')) {
     const lastView = sessionStorage.getItem('aac_last_view') || 'dashboard';
     navigate(lastView);
     checkInspectionNotifications();
     scheduleEndOfDayCheck();
+  } else if (ifUser && !localStorage.getItem('aac_user_role')) {
+    const email = ifUser.email || '';
+    const displayName = ifUser.profile?.name || email.split('@')[0] || 'User';
+    localStorage.setItem('aac_user', escHtml(displayName));
+    localStorage.setItem('aac_user_id', ifUser.id);
+    let userRoleMap = {};
+    try { userRoleMap = JSON.parse(localStorage.getItem('aac_if_role_map')) || {}; } catch(e) {}
+    if (userRoleMap[ifUser.id]) {
+      localStorage.setItem('aac_user_role', userRoleMap[ifUser.id]);
+      const lastView = sessionStorage.getItem('aac_last_view') || 'dashboard';
+      navigate(lastView);
+      checkInspectionNotifications();
+      scheduleEndOfDayCheck();
+    } else {
+      showRolePicker(displayName, ifUser.id);
+    }
+  } else {
+    showLoginGate();
   }
   } catch (e) {
     console.warn('App init error — showing fallback UI', e);

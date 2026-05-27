@@ -9,7 +9,8 @@ const firebaseConfig = {
 };
 
 let db_firestore;
-let _deviceId = localStorage.getItem('aac_device_id');
+let _deviceId;
+try { _deviceId = localStorage.getItem('aac_device_id'); } catch (e) {}
 if (!_deviceId) {
   _deviceId = 'device_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
   try { localStorage.setItem('aac_device_id', _deviceId); } catch (e) {}
