@@ -1,3 +1,37 @@
+let _notifPopups = {};
+async function showNotifPopup(notif) {
+  if (_notifPopups[notif.id]) return;
+  _notifPopups[notif.id] = true;
+  const existing = document.getElementById('notif-popup');
+  if (existing) existing.remove();
+  const popup = document.createElement('div');
+  popup.id = 'notif-popup';
+  popup.className = 'notif-popup show';
+  popup.innerHTML = `
+    <div class="notif-popup-icon">${notifTypeIcon(notif.type)}</div>
+    <div class="notif-popup-body">
+      <div class="notif-popup-title">${escHtml(notif.title)}</div>
+      <div class="notif-popup-msg">${escHtml(notif.message)}</div>
+    </div>
+    <button class="notif-popup-close">&times;</button>
+  `;
+  popup.querySelector('.notif-popup-close').addEventListener('click', () => {
+    popup.classList.remove('show');
+    setTimeout(() => popup.remove(), 300);
+  });
+  popup.addEventListener('click', (e) => {
+    if (e.target.closest('.notif-popup-close')) return;
+    popup.classList.remove('show');
+    setTimeout(() => popup.remove(), 300);
+    if (notif.link) navigate(notif.link);
+  });
+  document.body.appendChild(popup);
+  setTimeout(() => {
+    popup.classList.remove('show');
+    setTimeout(() => popup.remove(), 300);
+  }, 6000);
+}
+
 async function createNotification(type, title, message, link) {
   const notif = {
     id: 'notif_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
@@ -11,6 +45,7 @@ async function createNotification(type, title, message, link) {
   await DB.put('notifications', notif);
   await queueSync('notifications', 'create', notif);
   updateNotifBadge();
+  showNotifPopup(notif);
   return notif;
 }
 

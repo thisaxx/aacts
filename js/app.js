@@ -1124,8 +1124,22 @@ function navigate(view) {
 
 let _refreshTimer = null;
 let _currentView = null;
+let _knownNotifIds = new Set();
+async function checkNewNotifications() {
+  try {
+    const notifs = await DB.getAll('notifications');
+    for (const n of notifs) {
+      if (!n.read && !_knownNotifIds.has(n.id)) {
+        _knownNotifIds.add(n.id);
+        if (typeof showNotifPopup === 'function') showNotifPopup(n);
+      }
+      if (n.read) _knownNotifIds.add(n.id);
+    }
+  } catch (e) {}
+}
 function onRemoteUpdate() {
   updateNotifBadge();
+  checkNewNotifications();
   if (_refreshTimer) return;
   _refreshTimer = setTimeout(() => {
     _refreshTimer = null;
@@ -2208,6 +2222,16 @@ function settingsView() {
       </div>
 
       <div class="card">
+        <div class="card-header"><h3>Pilot in Command (PIC)</h3></div>
+        <div style="padding:12px 16px">
+          <p class="text-muted small" style="margin-bottom:8px">Set your default PIC. This pre-selects in the departure form and can be changed per flight.</p>
+          <select id="pic-selector" class="form-input">
+            <option value="">— Select default PIC —</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card">
         <div class="card-header"><h3>Pilot Management</h3></div>
         <div style="padding:12px 16px" id="pilot-management">
           <p class="text-muted small" style="margin-bottom:8px">Manage the pilot list used in flight logging. These are separate from login users — only names added here appear in the pilot dropdown.</p>
@@ -2318,6 +2342,31 @@ function settingsView() {
   document.getElementById('new-pilot-name').addEventListener('keydown', e => {
     if (e.key === 'Enter') addPilot();
   });
+
+  // Populate PIC selector
+  const picSel = document.getElementById('pic-selector');
+  if (picSel) {
+    const pilots = getPilots();
+    const currentPic = localStorage.getItem('aac_pic') || '';
+    pilots.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      if (name === currentPic) opt.selected = true;
+      picSel.appendChild(opt);
+    });
+    picSel.addEventListener('change', () => {
+      localStorage.setItem('aac_pic', picSel.value);
+      showToast('Default PIC set to ' + picSel.value);
+    });
+    if (currentPic && !pilots.includes(currentPic)) {
+      const opt = document.createElement('option');
+      opt.value = currentPic;
+      opt.textContent = currentPic;
+      opt.selected = true;
+      picSel.appendChild(opt);
+    }
+  }
 
   const addUserBtn = document.getElementById('add-user-btn');
   if (addUserBtn) {
@@ -2625,6 +2674,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Set sidebar theme toggle icon
   const themeToggle = document.getElementById('sidebar-theme-toggle');
   if (themeToggle) themeToggle.innerHTML = isLight ? '&#127774;' : '&#127769;';
+
+  // Seed known notification IDs
+  try {
+    const notifs = await DB.getAll('notifications');
+    for (const n of notifs) _knownNotifIds.add(n.id);
+  } catch (e) {}
 
   startHeaderClock();
 
