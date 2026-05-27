@@ -1,5 +1,23 @@
 const GAL_TO_L = 3.78541;
 
+function initETSO_PTSO(ac) {
+  if (ac.engineETSO === 0 && ac.totalTachTime > 0) {
+    ac.engineETSO = ac.totalTachTime;
+  }
+  if (ac.propellerPTSO === 0 && ac.totalTachTime > 0) {
+    ac.propellerPTSO = ac.totalTachTime;
+  }
+}
+
+function maybePromptTachUpdate() {
+  const today = new Date().toISOString().slice(0, 10);
+  const lastPrompt = localStorage.getItem('aac_last_tach_prompt');
+  if (lastPrompt !== today) {
+    localStorage.setItem('aac_last_tach_prompt', today);
+    showToast('Reminder: Update tach reading for the day in Flight Ops');
+  }
+}
+
 const DEFAULT_AIRCRAFT = {
   tailNumber: 'C-152-001',
   type: 'Cessna 152',
@@ -570,12 +588,15 @@ async function onArrivalSubmit(e) {
   await queueSync('flights', 'update', flight);
 
   const ac = await getAircraft();
+  initETSO_PTSO(ac);
   ac.engineETSO = (ac.engineETSO || 0) + duration;
   ac.propellerPTSO = (ac.propellerPTSO || 0) + duration;
   ac.totalTachTime = (ac.totalTachTime || 0) + duration;
   await DB.put('aircraft', ac);
   await queueSync('aircraft', 'update', ac);
   if (typeof checkAndCreateInspectionTasks === 'function') checkAndCreateInspectionTasks(ac);
+
+  maybePromptTachUpdate();
 
   const hoursSinceOil = ac.totalTachTime - ac.lastOilChangeTach;
   const hoursSince100hr = ac.totalTachTime - ac.last100hrTach;
@@ -632,6 +653,7 @@ async function onUpdateMeters() {
   const newTach = parseFloat(document.getElementById('eod-tach').value) || 0;
   const newHobbs = parseFloat(document.getElementById('eod-hobbs').value) || 0;
   if (newTach <= 0) { showToast('Enter current tach reading', 'error'); return; }
+  initETSO_PTSO(ac);
   ac.totalTachTime = newTach;
   ac.currentHobbs = newHobbs;
   await DB.put('aircraft', ac);
@@ -715,6 +737,7 @@ async function showEndOfFlyingSheet() {
     const ac2 = await getAircraft();
     const duration = newTach - (ac2.totalTachTime || 0);
     if (duration > 0) {
+      initETSO_PTSO(ac2);
       ac2.engineETSO = (ac2.engineETSO || 0) + duration;
       ac2.propellerPTSO = (ac2.propellerPTSO || 0) + duration;
       ac2.totalTachTime = newTach;

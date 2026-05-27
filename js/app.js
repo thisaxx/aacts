@@ -1123,7 +1123,7 @@ function onRemoteUpdate() {
   _refreshTimer = setTimeout(() => {
     _refreshTimer = null;
     if (_currentView) refreshView(_currentView);
-  }, 300);
+  }, 500);
 }
 
 // Lightweight view refresh without full page rebuild
@@ -1143,7 +1143,7 @@ function notifyDataChange() {
   _notifyTimer = setTimeout(() => {
     _notifyTimer = null;
     if (_currentView) refreshView(_currentView);
-  }, 50);
+  }, 250);
 }
 
 /* ── Sidebar ── */
@@ -1357,7 +1357,7 @@ function liveFeedView() {
   `;
   renderLiveFeed();
   if (window._liveFeedTimer) clearInterval(window._liveFeedTimer);
-  window._liveFeedTimer = setInterval(renderLiveFeed, 15000);
+  window._liveFeedTimer = setInterval(renderLiveFeed, 30000);
 }
 
 async function renderLiveFeed() {
@@ -2509,6 +2509,7 @@ function showLoginGate() {
     if (overlay) overlay.style.display = '';
     document.getElementById('hamburger-btn').style.display = '';
     updateSidebarUser();
+    await initAppData();
     navigate('dashboard');
     openSidebar();
     checkInspectionNotifications();
@@ -2523,11 +2524,78 @@ function showLoginGate() {
     if (overlay) overlay.style.display = '';
     document.getElementById('hamburger-btn').style.display = '';
     updateSidebarUser();
+    initAppData().then(() => {
     navigate('dashboard');
     openSidebar();
     checkInspectionNotifications();
     scheduleEndOfDayCheck();
+    });
   });
+}
+
+let _authenticated = false;
+
+function startHeaderClock() {
+  const el = document.getElementById('header-clock');
+  if (!el) return;
+  function tick() {
+    const now = new Date();
+    el.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+
+async function initAppData() {
+  if (_authenticated) return;
+  _authenticated = true;
+
+  initFirebase().catch(() => {});
+
+  try {
+    const allFlights = await DB.getAll('flights');
+    for (const f of allFlights) {
+      if (!f.aircraftId && f.id && f.id.startsWith('act_')) {
+        await DB.del('flights', f.id);
+      }
+    }
+  } catch (e) { /* skip */ }
+
+  if (typeof restoreArrivalReminders === 'function') restoreArrivalReminders();
+  if (typeof restoreFlightProgressBars === 'function') restoreFlightProgressBars();
+
+  try { await populateACSelector(); } catch (e) { /* ok */ }
+
+  try {
+    const syncedPilots = await DB.getAll('pilots');
+    if (syncedPilots && syncedPilots.length > 0) {
+      const localPilots = JSON.parse(localStorage.getItem('aac_pilots') || '[]');
+      const merged = [...new Set([...localPilots, ...syncedPilots.map(p => p.name)])];
+      localStorage.setItem('aac_pilots', JSON.stringify(merged));
+    }
+  } catch(e) {}
+
+  try {
+    const seedUsers = JSON.parse(localStorage.getItem('aac_users') || '[]');
+    const existingDbUsers = await DB.getAll('users');
+    const existingNames = new Set(existingDbUsers.map(u => u.name));
+    for (const su of seedUsers) {
+      if (!existingNames.has(su.name)) {
+        const id = 'user_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+        await DB.put('users', { id, name: su.name, role: su.role, photo: '', createdAt: new Date().toISOString() });
+      }
+    }
+  } catch (e) { /* skip user sync — non-critical */ }
+
+  try {
+    const existingAC = await DB.getAll('aircraft');
+    if (existingAC.length === 0) {
+      const defaultAC = { ...DEFAULT_AIRCRAFT, photoData: null, createdAt: new Date().toISOString() };
+      await DB.put('aircraft', defaultAC);
+      setCurrentAircraftKey(defaultAC.tailNumber);
+      try { await populateACSelector(); } catch (e) { /* ok */ }
+    }
+  } catch (e) { /* skip */ }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -2542,28 +2610,28 @@ document.addEventListener('DOMContentLoaded', async () => {
   const themeToggle = document.getElementById('sidebar-theme-toggle');
   if (themeToggle) themeToggle.innerHTML = isLight ? '&#127774;' : '&#127769;';
 
+  startHeaderClock();
+
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js');
-  }
-  if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission(); // fire-and-forget
-  }
-
-  // Keep Firestore sync alive for cross-device sync (will be migrated to InsForge DB later)
-  initFirebase().catch(() => {});
-
-  // One-time cleanup: remove stale activity entries mistakenly written to flights store
-  try {
-    const allFlights = await DB.getAll('flights');
-    for (const f of allFlights) {
-      if (!f.aircraftId && f.id && f.id.startsWith('act_')) {
-        await DB.del('flights', f.id);
+    const reg = await navigator.serviceWorker.register('sw.js');
+    reg.addEventListener('updatefound', () => {
+      const newSW = reg.installing;
+      if (newSW) {
+        newSW.addEventListener('statechange', () => {
+          if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+            showToast('Update available — reload to apply', 'warning');
+          }
+        });
       }
-    }
-  } catch (e) { /* skip */ }
+    });
+  }
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
+  });
 
-  if (typeof restoreArrivalReminders === 'function') restoreArrivalReminders();
-  if (typeof restoreFlightProgressBars === 'function') restoreFlightProgressBars();
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
 
   window.addEventListener('online', () => {
     document.getElementById('offline-banner')?.classList.add('hidden');
@@ -2574,8 +2642,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!navigator.onLine) {
     document.getElementById('offline-banner')?.classList.remove('hidden');
   }
-
-  try { await populateACSelector(); } catch (e) { /* selector will just be empty */ }
 
   // Seed user database if not yet set
   if (!localStorage.getItem('aac_users')) {
@@ -2597,7 +2663,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     localStorage.setItem('aac_users', JSON.stringify(defaultUsers));
   }
 
-  // Seed per-user PINs if not yet set (run AFTER users seeded)
   if (!localStorage.getItem('aac_user_pins')) {
     const pins = {};
     let users = [];
@@ -2606,43 +2671,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     localStorage.setItem('aac_user_pins', JSON.stringify(pins));
   }
 
-  // Seed pilot list (separate from login users) — empty by default
   if (!localStorage.getItem('aac_pilots')) {
     localStorage.setItem('aac_pilots', JSON.stringify([]));
   }
-  // Merge pilots synced from Firestore into localStorage
-  try {
-    const syncedPilots = await DB.getAll('pilots');
-    if (syncedPilots && syncedPilots.length > 0) {
-      const localPilots = JSON.parse(localStorage.getItem('aac_pilots') || '[]');
-      const merged = [...new Set([...localPilots, ...syncedPilots.map(p => p.name)])];
-      localStorage.setItem('aac_pilots', JSON.stringify(merged));
-    }
-  } catch(e) {}
-
-  // Sync login users into DB so crew board shows everyone
-  try {
-    const seedUsers = JSON.parse(localStorage.getItem('aac_users') || '[]');
-    const existingDbUsers = await DB.getAll('users');
-    const existingNames = new Set(existingDbUsers.map(u => u.name));
-    for (const su of seedUsers) {
-      if (!existingNames.has(su.name)) {
-        const id = 'user_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-        await DB.put('users', { id, name: su.name, role: su.role, photo: '', createdAt: new Date().toISOString() });
-      }
-    }
-  } catch (e) { /* skip user sync — non-critical */ }
-
-  // Seed a default aircraft if the database is empty (e.g. after data reset)
-  try {
-    const existingAC = await DB.getAll('aircraft');
-    if (existingAC.length === 0) {
-      const defaultAC = { ...DEFAULT_AIRCRAFT, photoData: null, createdAt: new Date().toISOString() };
-      await DB.put('aircraft', defaultAC);
-      setCurrentAircraftKey(defaultAC.tailNumber);
-      try { await populateACSelector(); } catch (e) { /* ok */ }
-    }
-  } catch (e) { /* skip */ }
 
   document.getElementById('ac-photo-input').addEventListener('change', async function() {
     const file = this.files[0];

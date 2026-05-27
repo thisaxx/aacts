@@ -167,18 +167,25 @@ body::before {
   background: linear-gradient(90deg, transparent, var(--glass-border-active), transparent);
   opacity: 0.5;
 }
-.app-header h1 {
+.header-left { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.header-title {
   font-family: var(--dot);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 400;
   letter-spacing: 1px;
-  color: var(--text-primary);
   background: var(--accent-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
-.header-right { display: flex; align-items: center; gap: 8px; }
+.header-center { flex: 1; text-align: center; min-width: 0; }
+.header-clock {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+}
+.header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .ac-selector-wrap { position: relative; }
 .ac-selector {
   appearance: none;

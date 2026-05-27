@@ -93,14 +93,17 @@ async function pullAllCollections(fromBroadcast) {
       for (const doc of snap.docs) {
         remoteIds.add(doc.id);
         const data = doc.data();
-        const local = await DB.get(name, doc.id);
+        if (data._deleted) {
+          await DB.del(name, doc.id).catch(() => {});
+          continue;
+        }
+        const local = localMap.get(doc.id);
         if (!local || (data._updatedAt && (!local._updatedAt || data._updatedAt >= local._updatedAt))) {
           if (local && !data.photoData && local.photoData) data.photoData = local.photoData;
           await DB.put(name, data);
         }
       }
-      // Detect deletions only on full sync (all remote docs available for comparison)
-      // Incremental syncs may miss docs updated before lastSync, so don't delete on those
+      // Full sync: detect documents that were hard-deleted (no _deleted flag) from remote
       if (isFullSync) {
         for (const [id, local] of localMap) {
           if (!remoteIds.has(id) && local._deviceId && local._deviceId !== _deviceId) {
@@ -138,12 +141,12 @@ async function queueSync(collection, action, data) {
   // Strip heavy photo data before cloud sync
   const toSync = JSON.parse(JSON.stringify(data));
   if (toSync.photoData) delete toSync.photoData;
-  try {
-    if (action === 'delete') {
-      await db_firestore.collection(collection).doc(getDocId(collection, data)).delete();
-    } else {
-      await db_firestore.collection(collection).doc(getDocId(collection, data)).set(toSync, { merge: true });
-    }
+    try {
+      if (action === 'delete') {
+        await db_firestore.collection(collection).doc(getDocId(collection, data)).set({ _deleted: true, _updatedAt: Date.now() }, { merge: true });
+      } else {
+        await db_firestore.collection(collection).doc(getDocId(collection, data)).set(toSync, { merge: true });
+      }
     // Notify other tabs to pull latest
     try { _syncChannel.postMessage('sync'); } catch (e) { /* no channel */ }
   } catch (e) {
@@ -190,7 +193,7 @@ async function processSyncQueue() {
         if (toSync.photoData) delete toSync.photoData;
         const docId = getDocId(collection, data);
         if (action === 'delete') {
-          await db_firestore.collection(collection).doc(docId).delete();
+          await db_firestore.collection(collection).doc(docId).set({ _deleted: true, _updatedAt: Date.now() }, { merge: true });
         } else {
           await db_firestore.collection(collection).doc(docId).set(toSync, { merge: true });
           // Sync succeeded — update local record with correct _deviceId and _updatedAt
