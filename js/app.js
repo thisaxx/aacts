@@ -2063,17 +2063,16 @@ async function clearAllData() {
   db.close();
   localStorage.removeItem('aac_current_aircraft');
   localStorage.removeItem('aac_pilots');
-  // Also clear Firestore
-  if (db_firestore) {
-    const cols = stores.filter(s => s !== 'sync_queue');
-    for (const c of cols) {
-      try {
-        const snap = await db_firestore.collection(c).get();
-        const batch = db_firestore.batch();
-        snap.forEach(d => batch.delete(d.ref));
-        await batch.commit();
-      } catch (e) { /* ignore */ }
-    }
+  // Also clear InsForge sync_docs
+  if (typeof InsForge !== 'undefined' && InsForge.insforge) {
+    try {
+      const { data } = await InsForge.insforge.database.from('sync_docs').select('collection, id');
+      if (data && data.length > 0) {
+        for (const doc of data) {
+          await InsForge.insforge.database.from('sync_docs').update({ _deleted: true, _updated_at: Date.now() }).eq('collection', doc.collection).eq('id', doc.id);
+        }
+      }
+    } catch (e) { /* ignore */ }
   }
   showToast('All data cleared — reloading');
   setTimeout(() => location.reload(), 800);
@@ -2567,7 +2566,7 @@ async function initAppData() {
   if (_authenticated) return;
   _authenticated = true;
 
-  initFirebase().catch(() => {});
+  initSync();
 
   try {
     const allFlights = await DB.getAll('flights');
