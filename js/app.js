@@ -1081,6 +1081,7 @@ function enableSwipe(el, { onSwipeLeft, onSwipeRight }) {
 }
 
 function navigate(view) {
+  if (!_authenticated) return false;
   _currentView = view;
   try { sessionStorage.setItem('aac_last_view', view); } catch(e) {}
   document.querySelectorAll('.nav-link').forEach(a => a.classList.remove('active'));
@@ -2451,6 +2452,8 @@ function showLoginGate() {
   if (sidebar) sidebar.style.display = 'none';
   if (overlay) overlay.style.display = 'none';
   document.getElementById('hamburger-btn').style.display = 'none';
+  document.querySelector('.app-header').style.display = 'none';
+  document.querySelector('.bottom-nav').style.display = 'none';
 
   const users = getLoginUsers();
 
@@ -2508,6 +2511,8 @@ function showLoginGate() {
     if (sidebar) sidebar.style.display = '';
     if (overlay) overlay.style.display = '';
     document.getElementById('hamburger-btn').style.display = '';
+    document.querySelector('.app-header').style.display = '';
+    document.querySelector('.bottom-nav').style.display = '';
     updateSidebarUser();
     await initAppData();
     navigate('dashboard');
@@ -2523,6 +2528,8 @@ function showLoginGate() {
     if (sidebar) sidebar.style.display = '';
     if (overlay) overlay.style.display = '';
     document.getElementById('hamburger-btn').style.display = '';
+    document.querySelector('.app-header').style.display = '';
+    document.querySelector('.bottom-nav').style.display = '';
     updateSidebarUser();
     initAppData().then(() => {
     navigate('dashboard');
