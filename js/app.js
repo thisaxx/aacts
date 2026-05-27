@@ -2821,15 +2821,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   } else {
     showLoginGate();
   }
+  const ls = document.getElementById('loading-screen');
   } catch (e) {
     console.warn('App init error — showing fallback UI', e);
-    // Show a basic fallback so the page is never blank
     const app = document.getElementById('app');
     if (app && !app.innerHTML.trim()) {
       app.innerHTML = '<div class="page"><div class="card" style="padding:20px;text-align:center"><h3>App load error</h3><p class="text-muted" style="margin-top:8px">Please refresh or clear site data and try again.</p><button class="btn btn-primary btn-block" style="margin-top:16px" onclick="location.reload()">Reload</button></div></div>';
     }
   }
+  const ls = document.getElementById('loading-screen');
+  if (ls) { ls.style.opacity = '0'; ls.style.visibility = 'hidden'; setTimeout(() => ls.remove(), 500); }
 });
+// Safety: hide loading screen after 8s no matter what
+setTimeout(() => {
+  const ls = document.getElementById('loading-screen');
+  if (ls) { ls.style.opacity = '0'; ls.style.visibility = 'hidden'; setTimeout(() => ls.remove(), 500); }
+}, 8000);
 
 async function checkEndOfDayData() {
   const today = new Date().toISOString().slice(0, 10);

@@ -18,6 +18,29 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+  <div id="loading-screen" style="position:fixed;inset:0;z-index:99999;background:#0f172a;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 0.5s,visibility 0.5s">
+    <svg width="80" height="80" viewBox="0 0 192 192" style="margin-bottom:20px">
+      <defs>
+        <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#1e293b"/>
+          <stop offset="100%" stop-color="#0f172a"/>
+        </linearGradient>
+      </defs>
+      <rect width="192" height="192" rx="36" fill="url(#lg)"/>
+      <path d="M-26,17 L0,-30 L26,17 L0,6 Z" fill="#3b82f6" opacity="0.25"/>
+      <path d="M0,-30 L0,6 L-26,17" fill="#60a5fa" opacity="0.55"/>
+      <path d="M0,-30 L26,17 L0,6" fill="#93c5fd" opacity="0.55"/>
+      <path d="M-26,17 L0,6 L26,17" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div style="width:120px;height:3px;background:#1e293b;border-radius:4px;overflow:hidden">
+      <div style="width:30%;height:100%;background:linear-gradient(90deg,#3b82f6,#60a5fa);border-radius:4px;animation:loadPulse 1.2s ease-in-out infinite"></div>
+    </div>
+  </div>
+  <style>
+    @keyframes loadPulse {
+      0%{transform:translateX(-100%)}50%{transform:translateX(200%)}100%{transform:translateX(400%)}
+    }
+  </style>
   <div class="offline-banner hidden" id="offline-banner">No internet connection - working offline</div>
 
   <!-- Sidebar -->

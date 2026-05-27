@@ -1063,12 +1063,21 @@ async function editFlight(flightId) {
       </div>
       <div class="row">
         <div class="form-group">
-          <label>Source</label>
-          <input type="text" id="edit-refuel-source" class="form-input" value="${escHtml(flight.refuelSource || '')}">
+          <label for="edit-refuel-source">Source</label>
+          <select id="edit-refuel-source" class="form-input">
+            <option value="Main Pump" ${flight.refuelSource === 'Main Pump' ? 'selected' : ''}>Main Pump</option>
+            <option value="Bowser" ${flight.refuelSource === 'Bowser' ? 'selected' : ''}>Bowser</option>
+            <option value="Drum" ${flight.refuelSource === 'Drum' ? 'selected' : ''}>Drum</option>
+            <option value="Other" ${flight.refuelSource === 'Other' ? 'selected' : ''}>Other</option>
+          </select>
         </div>
         <div class="form-group">
-          <label>Fuel Type</label>
-          <input type="text" id="edit-fuel-type" class="form-input" value="${escHtml(flight.fuelType || '')}">
+          <label for="edit-fuel-type">Fuel Type</label>
+          <select id="edit-fuel-type" class="form-input">
+            <option value="mix" ${flight.fuelType === 'mix' ? 'selected' : ''}>Mix (Avgas + Mogas)</option>
+            <option value="avgas_100ll" ${flight.fuelType === 'avgas_100ll' ? 'selected' : ''}>Avgas 100LL</option>
+            <option value="mogas" ${flight.fuelType === 'mogas' ? 'selected' : ''}>Mogas</option>
+          </select>
         </div>
       </div>
     </div>
