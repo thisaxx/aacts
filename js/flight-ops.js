@@ -1120,12 +1120,46 @@ async function editFlight(flightId) {
     flight.fuelBeforeRight = parseFloat(document.getElementById('edit-fuel-before-right').value) || 0;
     flight.fuelAfterLeft = parseFloat(document.getElementById('edit-fuel-after-left').value) || 0;
     flight.fuelAfterRight = parseFloat(document.getElementById('edit-fuel-after-right').value) || 0;
-    flight.fuelConsumed = parseFloat(document.getElementById('edit-fuel-consumed').value) || 0;
+    flight.fuelConsumed = Math.max(0, (flight.fuelBeforeLeft + flight.fuelBeforeRight) - (flight.fuelAfterLeft + flight.fuelAfterRight));
     const refuelToggle = document.querySelector('[data-toggle-id="edit-refueled-check"]');
-    flight.refueled = refuelToggle?.querySelector('.toggle-track')?.classList.contains('on') || false;
-    flight.refuelAmount = flight.refueled ? parseFloat(document.getElementById('edit-refuel-amount').value) || 0 : 0;
-    flight.refuelSource = flight.refueled ? document.getElementById('edit-refuel-source').value : '';
-    flight.fuelType = flight.refueled ? document.getElementById('edit-fuel-type').value : '';
+    const newRefueled = refuelToggle?.querySelector('.toggle-track')?.classList.contains('on') || false;
+    const newAmt = newRefueled ? parseFloat(document.getElementById('edit-refuel-amount').value) || 0 : 0;
+    const newSrc = newRefueled ? document.getElementById('edit-refuel-source').value : '';
+    const newFuelType = newRefueled ? document.getElementById('edit-fuel-type').value : '';
+    // Auto-adjust fuel stock if refuel changed
+    const oldRefueled = flight.refueled;
+    const oldAmt = flight.refuelAmount;
+    const oldFuelType = flight.fuelType;
+    if (oldRefueled && oldAmt > 0 && oldFuelType) {
+      await addFuel(oldFuelType, oldAmt * GAL_TO_L);
+    }
+    if (newRefueled && newAmt > 0 && newFuelType) {
+      await deductFuel(newFuelType, newAmt * GAL_TO_L);
+    }
+    // Update fuel_log record
+    const existingLogs = await DB.getAll('fuel_logs');
+    const oldLog = existingLogs.find(l => l.flightId === flight.id && l.type === 'refuel');
+    if (oldLog) {
+      await DB.del('fuel_logs', oldLog.id);
+      await queueSync('fuel_logs', 'delete', { id: oldLog.id });
+    }
+    if (newRefueled && newAmt > 0 && newFuelType) {
+      await DB.put('fuel_logs', {
+        id: 'fuellog_' + Date.now(),
+        aircraftId: getCurrentAircraftKey(),
+        type: 'refuel',
+        flightId: flight.id,
+        fuelType: newFuelType,
+        liters: newAmt * GAL_TO_L,
+        source: newSrc,
+        createdAt: new Date().toISOString()
+      });
+      await queueSync('fuel_logs', 'create', { flightId: flight.id, fuelType: newFuelType, liters: newAmt * GAL_TO_L, source: newSrc });
+    }
+    flight.refueled = newRefueled;
+    flight.refuelAmount = newAmt;
+    flight.refuelSource = newSrc;
+    flight.fuelType = newFuelType;
     if (flight.status === 'departed' && flight.landingTime) flight.status = 'completed';
     else if (flight.status === 'completed' && !flight.landingTime) flight.status = 'departed';
     await DB.put('flights', flight);
